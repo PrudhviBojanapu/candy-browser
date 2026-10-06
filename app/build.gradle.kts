@@ -64,7 +64,7 @@ abstract class GenerateGeckoContentTopInsetScript : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val source = sourceFile.get().asFile.readText(Charsets.UTF_8)
+        val source = sourceFile.get().asFile.readText(Charsets.UTF_8).replace("\r\n", "\n")
         val template = source
             .substringAfter("        \"\"\"\n", missingDelimiterValue = "")
             .substringBefore("\n        \"\"\".trimIndent()", missingDelimiterValue = "")
@@ -92,7 +92,7 @@ abstract class GenerateSystemWebViewThirdPartyNotices : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val source = sourceFile.get().asFile.readText(Charsets.UTF_8)
+        val source = sourceFile.get().asFile.readText(Charsets.UTF_8).replace("\r\n", "\n")
         val geckoSectionStart = "\nGecko default extensions\n------------------------\n"
         val apacheLicenseStart = "\n\n                                 Apache License"
         val startIndex = source.indexOf(geckoSectionStart)
@@ -689,6 +689,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     // GeckoView resolves Media3 core at 1.11.0; keep the system-session API on that same version.
     implementation("androidx.media3:media3-session:1.11.0")
+    implementation("androidx.media3:media3-exoplayer:1.11.0")
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.0")
+    implementation("androidx.media3:media3-exoplayer-dash:1.11.0")
+    implementation("androidx.media3:media3-ui:1.11.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.2.0")
     implementation("androidx.webkit:webkit:1.16.0")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
@@ -705,6 +709,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.05.01"))
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3:1.4.0-alpha08")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

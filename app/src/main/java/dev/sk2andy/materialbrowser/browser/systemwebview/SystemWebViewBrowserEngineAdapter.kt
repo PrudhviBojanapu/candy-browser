@@ -48,6 +48,7 @@ import dev.sk2andy.materialbrowser.blocking.CandyDecisionAction
 import dev.sk2andy.materialbrowser.blocking.CandyMatcherSnapshot
 import dev.sk2andy.materialbrowser.browser.AndroidBrowserEngineCapabilities
 import dev.sk2andy.materialbrowser.browser.AndroidBrowserEngineKind
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
 import dev.sk2andy.materialbrowser.browser.AntiFingerprintingRules
 import dev.sk2andy.materialbrowser.browser.AntiFingerprintingScript
 import dev.sk2andy.materialbrowser.browser.BrowserEngineAuthPromptRequest
@@ -1170,6 +1171,7 @@ private class SystemWebViewBrowserEngineSession(
             view: WebView,
             request: WebResourceRequest,
         ): WebResourceResponse? {
+            MediaStreamDetectorBridge.inspectWebViewRequest(view, request, runCatching { view.title }.getOrNull())
             val requestState = requestPrivacyState
             val policy = requestState.policy
             val url = request.url.toString()

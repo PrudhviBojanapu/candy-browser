@@ -104,6 +104,9 @@ import dev.sk2andy.materialbrowser.ui.CandyAnimationRules
 import dev.sk2andy.materialbrowser.ui.CandySplashScreen
 import dev.sk2andy.materialbrowser.ui.FirefoxExtensionManagerOverlay
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoOverlay
+import dev.sk2andy.materialbrowser.ui.ExoPlayerMediaOverlay
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
+import androidx.compose.runtime.collectAsState
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoSystemControls
 import dev.sk2andy.materialbrowser.ui.GestureOnboardingScreen
 import dev.sk2andy.materialbrowser.ui.ProfileLockedOverlay
@@ -826,6 +829,13 @@ class MainActivity : AppCompatActivity() {
                             .takeIf { fullscreenVideoGesturesActive },
                         onBoundsChanged = ::onFullscreenVideoBoundsChanged,
                     )
+                    val activeExoStreamPayload by MediaStreamDetectorBridge.activeStreamPayload.collectAsState()
+                    activeExoStreamPayload?.let { payload ->
+                        ExoPlayerMediaOverlay(
+                            payload = payload,
+                            onDismiss = { MediaStreamDetectorBridge.clearActiveStream() },
+                        )
+                    }
                     if (
                         pictureInPictureReturnRestorationPending ||
                         browserController.isMediaLayoutRestorationPending

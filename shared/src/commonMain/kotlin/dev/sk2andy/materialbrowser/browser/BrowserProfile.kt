@@ -14,6 +14,7 @@ data class BrowserProfile(
     val linkedSyncDeviceId: String? = null,
     val newTabWallpaper: ProfileWallpaper? = null,
     val tabSwitcherWallpaper: ProfileWallpaper? = null,
+    val preferredEngine: String? = null,
 )
 
 data class ProfileProtection(
