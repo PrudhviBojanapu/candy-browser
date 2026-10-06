@@ -330,27 +330,12 @@ class MainActivity : AppCompatActivity() {
         val hasIncomingBrowserRequest = IncomingBrowserIntent.from(intent) != null
         val isColdExternalLinkLaunch = isColdStart && hasIncomingBrowserRequest
         val onboardingStore = GestureOnboardingStore(this)
-        val hadCompletedOnboarding = onboardingStore.hasCompletedAnyVersion()
-        val onboardingRequired = onboardingStore.shouldShow()
-        initialOnboardingRequired = onboardingRequired && !hadCompletedOnboarding
-        onboardingVisible = savedInstanceState
-            ?.getBoolean(STATE_ONBOARDING_VISIBLE)
-            ?: onboardingRequired
+        onboardingStore.markCompleted()
+        initialOnboardingRequired = false
+        onboardingVisible = false
         releaseNotesStore = ReleaseNotesStore(this)
-        if (
-            intent.action == Intent.ACTION_MAIN ||
-            savedInstanceState?.getBoolean(STATE_RELEASE_NOTES_VISIBLE) == true
-        ) {
-            loadReleaseNotesContent()
-        }
-        val releaseNotesRequired = shouldPresentReleaseNotes(
-            isNewLaunch = savedInstanceState == null,
-            intentAction = intent.action,
-            isInitialOnboardingRequired = initialOnboardingRequired,
-        )
-        releaseNotesVisible = savedInstanceState
-            ?.getBoolean(STATE_RELEASE_NOTES_VISIBLE)
-            ?: releaseNotesRequired
+        releaseNotesStore.markHandled(BuildConfig.VERSION_CODE.toLong())
+        releaseNotesVisible = false
         BrowsingHistoryLifecycle.install(application)
         val snoozeWakeNotifier = SnoozeWakeNotifier(this).also { it.ensureChannel() }
         privateTabsNotifier.ensureChannel()
@@ -841,21 +826,6 @@ class MainActivity : AppCompatActivity() {
                         browserController.isMediaLayoutRestorationPending
                     ) {
                         Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-                    }
-                    if (!videoOnlyPresentation && onboardingVisible) {
-                        GestureOnboardingScreen(
-                            onCompleted = {
-                                onboardingStore.markCompleted()
-                                if (initialOnboardingRequired) {
-                                    releaseNotesStore.markHandled(
-                                        BuildConfig.VERSION_CODE.toLong(),
-                                    )
-                                    releaseNotesVisible = false
-                                }
-                                initialOnboardingRequired = false
-                                onboardingVisible = false
-                            },
-                        )
                     }
                     AnimatedVisibility(
                         visible = splashVisible && !videoOnlyPresentation,

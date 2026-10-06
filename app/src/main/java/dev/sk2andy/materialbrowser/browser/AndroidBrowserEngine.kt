@@ -43,21 +43,13 @@ internal object AndroidBrowserEngineRules {
     fun persistedKind(
         stableId: String?,
         systemWebViewOnly: Boolean,
-    ): AndroidBrowserEngineKind = if (systemWebViewOnly) {
-        AndroidBrowserEngineKind.SystemWebView
-    } else {
-        AndroidBrowserEngineKind.fromStableId(stableId)
-    }
+    ): AndroidBrowserEngineKind = AndroidBrowserEngineKind.GeckoView
 
     fun canSelect(
         kind: AndroidBrowserEngineKind,
         systemWebViewOnly: Boolean,
-    ): Boolean = !systemWebViewOnly || kind == AndroidBrowserEngineKind.SystemWebView
+    ): Boolean = kind == AndroidBrowserEngineKind.GeckoView
 
     fun capabilities(kind: AndroidBrowserEngineKind): AndroidBrowserEngineCapabilities =
-        when (kind) {
-            AndroidBrowserEngineKind.GeckoView -> AndroidBrowserEngineCapabilities.GeckoView
-            AndroidBrowserEngineKind.SystemWebView ->
-                AndroidBrowserEngineCapabilities.SystemWebView
-        }
+        AndroidBrowserEngineCapabilities.GeckoView
 }
