@@ -786,6 +786,17 @@ class MainActivity : AppCompatActivity() {
                             !startupPresentation.showSplash,
                         launcherAddressEditorRequestId = launcherAddressEditorRequestId,
                         hardwareTabChangeRequestId = hardwareTabChangeRequestId,
+                        onOpenMpvRx = { url, title ->
+                            val launched = launchMpvRx(
+                                url = url,
+                                title = title,
+                                referer = "https://www.youtube.com/",
+                                isDirectMedia = false,
+                            )
+                            if (launched) {
+                                browserController.pauseActiveMedia()
+                            }
+                        },
                     )
                     if (firefoxExtensionsVisible) {
                         firefoxExtensionManager?.let { manager ->

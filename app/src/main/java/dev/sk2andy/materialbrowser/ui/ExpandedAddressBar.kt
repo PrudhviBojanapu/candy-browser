@@ -48,9 +48,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,17 +60,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader
-import dev.sk2andy.materialbrowser.browser.PreloadedYouTubeStream
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -592,34 +586,18 @@ internal fun ExpandedBottomBarContent(
                                 }
                             },
                             displayTrailingContent = {
-                                val preloadedYtStream by YouTubeStreamPreloader.preloadedStream.collectAsState()
-                                val isYtLoading by YouTubeStreamPreloader.isLoading.collectAsState()
-                                val context = LocalContext.current
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (preloadedYtStream != null || isYtLoading) {
-                                        YouTubeMpvPillButton(
-                                            stream = preloadedYtStream,
-                                            isLoading = isYtLoading,
-                                            onClick = {
-                                                preloadedYtStream?.let { s ->
-                                                    YouTubeStreamPreloader.launchPreloadedStream(context, s)
-                                                }
-                                            },
-                                        )
-                                    }
-                                    PermissionRadarBadge(
-                                        siteAvailable = PermissionOrigin.normalize(tab.url) != null,
-                                        activityVisible = permissionActivityVisible,
-                                        connectionKind = SiteConnectionRules.kind(
-                                            pageUrl = tab.url,
-                                            isLoading = tab.isLoading,
-                                            hasError = tab.error != null || tab.failureKind != null,
-                                        ),
-                                        blockedCount = tab.blockedCount,
-                                        onClick = onPrivacyXRay,
-                                        tabId = tab.id,
-                                    )
-                                }
+                                PermissionRadarBadge(
+                                    siteAvailable = PermissionOrigin.normalize(tab.url) != null,
+                                    activityVisible = permissionActivityVisible,
+                                    connectionKind = SiteConnectionRules.kind(
+                                        pageUrl = tab.url,
+                                        isLoading = tab.isLoading,
+                                        hasError = tab.error != null || tab.failureKind != null,
+                                    ),
+                                    blockedCount = tab.blockedCount,
+                                    onClick = onPrivacyXRay,
+                                    tabId = tab.id,
+                                )
                             },
                         )
                     }
@@ -1032,64 +1010,5 @@ internal fun AddressEditorBackdrop(
 
 internal object AddressEditorTestTags {
     const val Hero = "address_editor_hero"
-}
-
-@Composable
-internal fun YouTubeMpvPillButton(
-    stream: PreloadedYouTubeStream?,
-    isLoading: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (stream == null && !isLoading) return
-    val isReady = stream != null
-    val label = when {
-        isLoading -> "Grabbing..."
-        stream != null -> "${stream.resolution} ▶ mpvRx"
-        else -> "▶ mpvRx"
-    }
-
-    Surface(
-        onClick = onClick,
-        enabled = isReady,
-        shape = RoundedCornerShape(12.dp),
-        color = if (isReady) Color(0xFFCC0000) else Color(0x88333333),
-        contentColor = Color.White,
-        shadowElevation = if (isReady) 3.dp else 0.dp,
-        modifier = modifier
-            .padding(end = 6.dp)
-            .height(28.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(12.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            } else {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play in mpvRx",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(modifier = Modifier.width(2.dp))
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                ),
-                color = Color.White,
-                maxLines = 1,
-            )
-        }
-    }
 }
 

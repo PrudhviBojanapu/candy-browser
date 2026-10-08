@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -47,6 +48,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
+import android.content.res.Configuration
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
+import dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -239,6 +251,7 @@ internal fun BrowserScreen(
     openAddressEditorOnLaunch: Boolean = false,
     launcherAddressEditorRequestId: Int = 0,
     hardwareTabChangeRequestId: Int = 0,
+    onOpenMpvRx: ((String, String?) -> Unit)? = null,
 ) {
     if (controller.isActiveProfileLocked) return
     val hideBrowserChrome = FullscreenVideoRules.hidesBrowserChrome(
@@ -1513,6 +1526,24 @@ internal fun BrowserScreen(
                             if (browserContentBlurTarget === target) browserContentBlurTarget = null
                         },
                     )
+
+                    val isYouTubeVideo = YouTubeStreamPreloader.isYouTubeUrl(selectedTab.url)
+                    if (
+                        isYouTubeVideo &&
+                        !hideBrowserChrome &&
+                        !tabOverviewVisible &&
+                        !addressEditorVisible &&
+                        !settingsVisible &&
+                        readerStudioSession == null &&
+                        onOpenMpvRx != null
+                    ) {
+                        YouTubeOverlayMpvButton(
+                            url = selectedTab.url,
+                            title = selectedTab.title,
+                            onOpenMpvRx = onOpenMpvRx,
+                            modifier = Modifier.align(Alignment.TopEnd),
+                        )
+                    }
                 }
             }
         }
@@ -1963,5 +1994,63 @@ private fun ReaderExtractionResult.readerActionMessageRes(): Int = when (this) {
         ReaderExtractionFailure.UnsupportedPage -> R.string.reader_extraction_unsupported
         ReaderExtractionFailure.EmptyArticle -> R.string.reader_extraction_empty
         ReaderExtractionFailure.InvalidResponse -> R.string.reader_extraction_invalid
+    }
+}
+
+@Composable
+private fun YouTubeOverlayMpvButton(
+    url: String,
+    title: String?,
+    onOpenMpvRx: (String, String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val baseTopDp = if (isLandscape) {
+        16.dp
+    } else {
+        (configuration.screenWidthDp.dp * 9f / 16f) + 56.dp
+    }
+    val minTopPx = with(density) { 16.dp.toPx() }
+    val maxTopPx = with(density) { (configuration.screenHeightDp.dp - 120.dp).toPx() }
+    val baseTopPx = with(density) { baseTopDp.toPx() }
+
+    var dragOffsetY by remember(url) { mutableFloatStateOf(0f) }
+    val draggableState = rememberDraggableState { delta ->
+        dragOffsetY += delta
+    }
+
+    Box(
+        modifier = modifier
+            .offset {
+                val clampedY = (baseTopPx + dragOffsetY).coerceIn(minTopPx, maxTopPx)
+                IntOffset(x = 0, y = clampedY.roundToInt())
+            }
+            .padding(end = 12.dp)
+            .draggable(
+                state = draggableState,
+                orientation = Orientation.Vertical,
+            )
+    ) {
+        Surface(
+            onClick = { onOpenMpvRx(url, title) },
+            shape = CircleShape,
+            color = Color(0xFFCC0000),
+            shadowElevation = 6.dp,
+            modifier = Modifier.size(46.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_mpvrx_logo),
+                    contentDescription = "Play in mpvRx",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+        }
     }
 }
