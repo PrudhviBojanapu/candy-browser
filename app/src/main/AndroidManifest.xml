@@ -57,6 +57,10 @@
         <package android:name="com.gopeed.gopeed" />
         <package android:name="com.dv.adm" />
         <package android:name="com.tachibana.downloader" />
+        <package android:name="app.gyrolet.mpvrx.debug" />
+        <package android:name="app.gyrolet.mpvrx" />
+        <provider android:authorities="app.gyrolet.mpvrx.debug.ytdlp" />
+        <provider android:authorities="app.gyrolet.mpvrx.ytdlp" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />

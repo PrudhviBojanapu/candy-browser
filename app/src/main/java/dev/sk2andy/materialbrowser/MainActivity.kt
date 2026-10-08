@@ -106,6 +106,7 @@ import dev.sk2andy.materialbrowser.ui.FirefoxExtensionManagerOverlay
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoOverlay
 import android.content.ComponentName
 import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
+import dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader
 import androidx.compose.runtime.collectAsState
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoSystemControls
 import dev.sk2andy.materialbrowser.ui.GestureOnboardingScreen
@@ -659,6 +660,10 @@ class MainActivity : AppCompatActivity() {
                         fullscreenVideoGesturesActive,
                     )
                     fullscreenVideoGestureState.setEnabled(fullscreenVideoGesturesActive)
+                }
+                val activeTabUrl = if (::browserController.isInitialized) browserController.selectedTab.url else null
+                LaunchedEffect(activeTabUrl) {
+                    YouTubeStreamPreloader.onUrlChanged(applicationContext, activeTabUrl)
                 }
                 Box(modifier = Modifier.fillMaxSize()) {
                     val castController = if (::castSessionController.isInitialized) {
@@ -1813,6 +1818,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun launchMpvRx(
         url: String,
+        audioUrl: String? = null,
         title: String? = null,
         referer: String? = null,
         userAgent: String? = null,
@@ -1825,6 +1831,7 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "video/*")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            audioUrl?.takeIf { it.isNotBlank() }?.let { putExtra("audio_url", it) }
             title?.takeIf { it.isNotBlank() }?.let { putExtra("title", it) }
             fallbackUrl?.takeIf { it.isNotBlank() && it != url }?.let { putExtra("fallback_url", it) }
             val headerPairs = mutableListOf<String>()
@@ -1899,6 +1906,18 @@ class MainActivity : AppCompatActivity() {
             val currentTab = if (::browserController.isInitialized) browserController.selectedTab else null
             val pageUrl = currentTab?.url.orEmpty()
             val isYouTube = pageUrl.contains("youtube.com/") || pageUrl.contains("youtu.be/")
+
+            if (isYouTube) {
+                val preloaded = YouTubeStreamPreloader.preloadedStream.value
+                val videoId = YouTubeStreamPreloader.extractVideoId(pageUrl)
+                if (preloaded != null && (preloaded.videoId == videoId || preloaded.pageUrl == pageUrl)) {
+                    val launched = YouTubeStreamPreloader.launchPreloadedStream(this, preloaded) {
+                        browserController.pauseActiveMedia()
+                        browserController.exitSelectedWebContentFullscreen()
+                    }
+                    if (launched) return
+                }
+            }
 
             // Fullscreen playback handoff:
             // 1) YouTube -> Always use YouTube page URL so mpvRx yt-dlp extracts highest quality 4K/1080p.
