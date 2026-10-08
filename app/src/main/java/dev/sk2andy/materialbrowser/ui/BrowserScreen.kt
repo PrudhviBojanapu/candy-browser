@@ -18,6 +18,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -1527,9 +1528,36 @@ internal fun BrowserScreen(
                         },
                     )
 
-                    val isYouTubeVideo = YouTubeStreamPreloader.isYouTubeUrl(selectedTab.url)
+                    val currentContext = LocalContext.current
+                    LaunchedEffect(selectedTab.url) {
+                        YouTubeStreamPreloader.onUrlChanged(currentContext, selectedTab.url)
+                    }
+                    val preloadedYtStream by YouTubeStreamPreloader.preloadedStream.collectAsState()
+                    val currentVideoId = remember(selectedTab.url) {
+                        YouTubeStreamPreloader.extractVideoId(selectedTab.url)
+                    }
+                    val isLinkFetched = currentVideoId != null && preloadedYtStream?.videoId == currentVideoId
+
+                    val configuration = LocalConfiguration.current
+                    val density = LocalDensity.current
+                    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                    val baseTopDp = if (isLandscape) {
+                        16.dp
+                    } else {
+                        (configuration.screenWidthDp.dp * 9f / 16f) + 56.dp
+                    }
+                    val minTopPx = with(density) { 16.dp.toPx() }
+                    val maxTopPx = with(density) { (configuration.screenHeightDp.dp - 120.dp).toPx() }
+                    val baseTopPx = with(density) { baseTopDp.toPx() }
+
+                    var dragOffsetY by remember(selectedTab.url) { mutableFloatStateOf(0f) }
+                    val draggableState = rememberDraggableState { delta ->
+                        dragOffsetY += delta
+                    }
+                    val clampedY = (baseTopPx + dragOffsetY).coerceIn(minTopPx, maxTopPx)
+
                     if (
-                        isYouTubeVideo &&
+                        isLinkFetched &&
                         !hideBrowserChrome &&
                         !tabOverviewVisible &&
                         !addressEditorVisible &&
@@ -1537,12 +1565,33 @@ internal fun BrowserScreen(
                         readerStudioSession == null &&
                         onOpenMpvRx != null
                     ) {
-                        YouTubeOverlayMpvButton(
-                            url = selectedTab.url,
-                            title = selectedTab.title,
-                            onOpenMpvRx = onOpenMpvRx,
-                            modifier = Modifier.align(Alignment.TopEnd),
-                        )
+                        Surface(
+                            onClick = { onOpenMpvRx?.invoke(selectedTab.url, preloadedYtStream?.title ?: selectedTab.title) },
+                            shape = CircleShape,
+                            color = Color(0xFFCC0000),
+                            shadowElevation = 6.dp,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset { IntOffset(x = 0, y = clampedY.roundToInt()) }
+                                .padding(end = 12.dp)
+                                .draggable(
+                                    state = draggableState,
+                                    orientation = Orientation.Vertical,
+                                )
+                                .size(46.dp),
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_mpvrx_logo),
+                                    contentDescription = "Play in mpvRx",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1997,60 +2046,3 @@ private fun ReaderExtractionResult.readerActionMessageRes(): Int = when (this) {
     }
 }
 
-@Composable
-private fun YouTubeOverlayMpvButton(
-    url: String,
-    title: String?,
-    onOpenMpvRx: (String, String?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val baseTopDp = if (isLandscape) {
-        16.dp
-    } else {
-        (configuration.screenWidthDp.dp * 9f / 16f) + 56.dp
-    }
-    val minTopPx = with(density) { 16.dp.toPx() }
-    val maxTopPx = with(density) { (configuration.screenHeightDp.dp - 120.dp).toPx() }
-    val baseTopPx = with(density) { baseTopDp.toPx() }
-
-    var dragOffsetY by remember(url) { mutableFloatStateOf(0f) }
-    val draggableState = rememberDraggableState { delta ->
-        dragOffsetY += delta
-    }
-
-    Box(
-        modifier = modifier
-            .offset {
-                val clampedY = (baseTopPx + dragOffsetY).coerceIn(minTopPx, maxTopPx)
-                IntOffset(x = 0, y = clampedY.roundToInt())
-            }
-            .padding(end = 12.dp)
-            .draggable(
-                state = draggableState,
-                orientation = Orientation.Vertical,
-            )
-    ) {
-        Surface(
-            onClick = { onOpenMpvRx(url, title) },
-            shape = CircleShape,
-            color = Color(0xFFCC0000),
-            shadowElevation = 6.dp,
-            modifier = Modifier.size(46.dp),
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_mpvrx_logo),
-                    contentDescription = "Play in mpvRx",
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
-        }
-    }
-}
