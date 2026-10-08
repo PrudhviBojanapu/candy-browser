@@ -1865,14 +1865,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val pm = packageManager
-        val mpvResolve = pm.queryIntentActivities(intent, 0).firstOrNull {
-            it.activityInfo.packageName.startsWith("app.gyrolet.mpvrx")
-        }
-        val mpvPackage = mpvResolve?.activityInfo?.packageName
-            ?: pm.getInstalledPackages(0).firstOrNull {
-                it.packageName.startsWith("app.gyrolet.mpvrx")
-            }?.packageName
-            ?: "app.gyrolet.mpvrx.debug"
+        val candidatePackages = listOf("app.gyrolet.mpvrx.debug", "app.gyrolet.mpvrx")
+        val mpvPackage = candidatePackages.firstOrNull { pkg ->
+            runCatching { pm.getPackageInfo(pkg, 0) }.isSuccess
+        } ?: "app.gyrolet.mpvrx.debug"
 
         intent.component = ComponentName(mpvPackage, "app.gyrolet.mpvrx.ui.player.PlayerActivity")
         return runCatching {

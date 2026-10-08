@@ -357,6 +357,10 @@ internal fun ExpandedBottomBarContent(
         onParkRight = onParkRight,
         onNewTabButtonBounds = onNewTabButtonBounds,
     )
+    val currentContext = LocalContext.current
+    LaunchedEffect(tab.url) {
+        YouTubeStreamPreloader.onUrlChanged(currentContext, tab.url)
+    }
     LaunchedEffect(editorUsesFullWidth) {
         if (editorUsesFullWidth) onMenuExpandedChange(false)
     }
