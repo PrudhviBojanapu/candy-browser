@@ -28,6 +28,7 @@
     "geckoViewAddons",
     "nativeMessaging",
     "privacy",
+    "cookies",
     "webRequest",
     "webRequestBlocking",
     "<all_urls>"

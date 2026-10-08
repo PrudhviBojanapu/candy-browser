@@ -250,6 +250,7 @@ internal fun ExpandedBottomBarContent(
     onOverviewGestureProgress: (Float) -> Unit,
     onOverviewGestureStarted: () -> Unit,
     onOverviewGestureCancelled: () -> Unit,
+    onManageFirefoxExtensions: () -> Unit = {},
 ) {
     val motionScheme = LocalCandyMotionScheme.current
     val addressChromeTokens = browserChromeSurfaceTokens(BrowserChromeSurfaceRole.AddressBar)
@@ -612,7 +613,6 @@ internal fun ExpandedBottomBarContent(
                                 callbacks = actionCallbacks,
                             )
                         }
-                        if (showCastButton) CastRouteButton()
                     }
                     if (segmentedAddressBar) {
                         Box(modifier = Modifier.size(SegmentedAddressBarGeometry.SEGMENT_GAP))
@@ -741,6 +741,7 @@ internal fun ExpandedBottomBarContent(
                                 firefoxExtensionActions = firefoxExtensionActions,
                                 menuLayout = menuLayout,
                                 onFirefoxExtensionAction = onFirefoxExtensionAction,
+                                onManageFirefoxExtensions = onManageFirefoxExtensions,
                                 onSettings = onSettings,
                             )
                         }

@@ -104,7 +104,7 @@ import dev.sk2andy.materialbrowser.ui.CandyAnimationRules
 import dev.sk2andy.materialbrowser.ui.CandySplashScreen
 import dev.sk2andy.materialbrowser.ui.FirefoxExtensionManagerOverlay
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoOverlay
-import dev.sk2andy.materialbrowser.ui.ExoPlayerMediaOverlay
+import android.content.ComponentName
 import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
 import androidx.compose.runtime.collectAsState
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoSystemControls
@@ -552,8 +552,8 @@ class MainActivity : AppCompatActivity() {
                 startupAnimationEnabled = browserController.isStartupAnimationEnabled,
             ),
             startupAddressFocusMode = browserController.startupAddressFocusMode,
-            isOnboardingRequired = onboardingRequired,
-            isReleaseNotesRequired = releaseNotesRequired,
+            isOnboardingRequired = false,
+            isReleaseNotesRequired = false,
         )
         setCandyContent(
             animationsEnabled = browserController.appearanceSettings.animationsEnabled,
@@ -814,13 +814,7 @@ class MainActivity : AppCompatActivity() {
                             .takeIf { fullscreenVideoGesturesActive },
                         onBoundsChanged = ::onFullscreenVideoBoundsChanged,
                     )
-                    val activeExoStreamPayload by MediaStreamDetectorBridge.activeStreamPayload.collectAsState()
-                    activeExoStreamPayload?.let { payload ->
-                        ExoPlayerMediaOverlay(
-                            payload = payload,
-                            onDismiss = { MediaStreamDetectorBridge.clearActiveStream() },
-                        )
-                    }
+
                     if (
                         pictureInPictureReturnRestorationPending ||
                         browserController.isMediaLayoutRestorationPending
@@ -1817,9 +1811,183 @@ class MainActivity : AppCompatActivity() {
         if (requestedOrientation != orientation) requestedOrientation = orientation
     }
 
+    private fun launchMpvRx(
+        url: String,
+        title: String? = null,
+        referer: String? = null,
+        userAgent: String? = null,
+        headers: Map<String, String> = emptyMap(),
+        isDirectMedia: Boolean = false,
+        fallbackUrl: String? = null,
+    ): Boolean {
+        if (url.isBlank()) return false
+        val uri = Uri.parse(url)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "video/*")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            title?.takeIf { it.isNotBlank() }?.let { putExtra("title", it) }
+            fallbackUrl?.takeIf { it.isNotBlank() && it != url }?.let { putExtra("fallback_url", it) }
+            val headerPairs = mutableListOf<String>()
+            headers.forEach { (k, v) ->
+                headerPairs.add(k)
+                headerPairs.add(v)
+            }
+            val ref = referer?.takeIf { it.isNotBlank() }
+                ?: headers.entries.firstOrNull { it.key.equals("Referer", ignoreCase = true) }?.value
+            if (ref?.isNotBlank() == true) {
+                if (!headers.keys.any { it.equals("Referer", ignoreCase = true) }) {
+                    headerPairs.add("Referer")
+                    headerPairs.add(ref)
+                }
+                putExtra("referer", ref)
+            }
+            val ua = userAgent?.takeIf { it.isNotBlank() }
+                ?: headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
+                ?: "Mozilla/5.0 (Android 14; Mobile; rv:130.0) Gecko/130.0 Firefox/130.0"
+            if (!headers.keys.any { it.equals("User-Agent", ignoreCase = true) }) {
+                headerPairs.add("User-Agent")
+                headerPairs.add(ua)
+            }
+            putExtra("user_agent", ua)
+            putExtra("headers", headerPairs.toTypedArray())
+            putExtra("format_sort", "res,fps,br")
+            putExtra("ytdl_format", "bestvideo+bestaudio/best")
+            if (isDirectMedia) {
+                putExtra("direct_media", true)
+                putExtra("ytdl", "no")
+            }
+        }
+        val pm = packageManager
+        val mpvResolve = pm.queryIntentActivities(intent, 0).firstOrNull {
+            it.activityInfo.packageName.startsWith("app.gyrolet.mpvrx")
+        }
+        val mpvPackage = mpvResolve?.activityInfo?.packageName
+            ?: pm.getInstalledPackages(0).firstOrNull {
+                it.packageName.startsWith("app.gyrolet.mpvrx")
+            }?.packageName
+            ?: "app.gyrolet.mpvrx.debug"
+
+        intent.component = ComponentName(mpvPackage, "app.gyrolet.mpvrx.ui.player.PlayerActivity")
+        return runCatching {
+            startActivity(intent)
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun isKnownYtdlpSite(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains("youtube.com/") ||
+            lower.contains("youtu.be/") ||
+            lower.contains("vimeo.com/") ||
+            lower.contains("dailymotion.com/") ||
+            lower.contains("twitch.tv/") ||
+            lower.contains("kick.com/") ||
+            lower.contains("bilibili.com/") ||
+            lower.contains("twitter.com/") ||
+            lower.contains("x.com/") ||
+            lower.contains("facebook.com/") ||
+            lower.contains("instagram.com/") ||
+            lower.contains("tiktok.com/") ||
+            lower.contains("reddit.com/") ||
+            lower.contains("streamable.com/")
+    }
+
     private fun onWebContentFullscreenChanged(fullscreen: Boolean) {
         applyBrowserSystemUi()
-        if (!fullscreen) {
+        if (fullscreen) {
+            val streamPayload = MediaStreamDetectorBridge.activeStreamPayload.value
+            val currentTab = if (::browserController.isInitialized) browserController.selectedTab else null
+            val pageUrl = currentTab?.url.orEmpty()
+            val isYouTube = pageUrl.contains("youtube.com/") || pageUrl.contains("youtu.be/")
+
+            // Fullscreen playback handoff:
+            // 1) YouTube -> Always use YouTube page URL so mpvRx yt-dlp extracts highest quality 4K/1080p.
+            // 2) Other sites -> Use intercepted direct media stream (.m3u8, .mpd, .mp4) if available.
+            val directStreamUrl = if (!isYouTube) {
+                streamPayload?.url?.takeIf {
+                    it.isNotBlank() && !it.startsWith("blob:") &&
+                        (it.startsWith("http://") || it.startsWith("https://")) &&
+                        !it.contains(".ts", ignoreCase = true) &&
+                        !it.contains(".m4s", ignoreCase = true)
+                } ?: browserController.systemMediaState?.sourceUrl?.takeIf {
+                    it.isNotBlank() && !it.startsWith("blob:") &&
+                        (it.startsWith("http://") || it.startsWith("https://")) &&
+                        !it.contains(".ts", ignoreCase = true) &&
+                        !it.contains(".m4s", ignoreCase = true)
+                }
+            } else null
+
+            val isMediaDirectUrl = pageUrl.endsWith(".mp4", ignoreCase = true) ||
+                pageUrl.endsWith(".m3u8", ignoreCase = true) ||
+                pageUrl.endsWith(".mpd", ignoreCase = true) ||
+                pageUrl.endsWith(".webm", ignoreCase = true) ||
+                pageUrl.endsWith(".mkv", ignoreCase = true)
+
+            // Fullscreen playback handoff:
+            // 1) YouTube -> Always use YouTube page URL (mpvRx yt-dlp plays highest quality 4K/1080p).
+            // 2) Direct stream detected (.m3u8, .mpd, .mp4) -> Open directly in mpvRx, with pageUrl fallback.
+            // 3) Page itself is a direct media URL -> Open directly in mpvRx.
+            // 4) Known yt-dlp supported extractor sites -> Send pageUrl to mpvRx.
+            // 5) Other sites without direct stream -> Do NOT blindly send webpage URL to mpvRx!
+            val (videoUrl, isDirectMedia, fallbackUrl) = when {
+                isYouTube -> Triple(pageUrl, false, null)
+                directStreamUrl != null -> Triple(directStreamUrl, true, pageUrl.takeIf { it.isNotBlank() })
+                isMediaDirectUrl -> Triple(pageUrl, true, null)
+                isKnownYtdlpSite(pageUrl) -> Triple(pageUrl, false, null)
+                else -> Triple(null, false, null)
+            }
+
+            if (videoUrl != null) {
+                val videoTitle = streamPayload?.title ?: currentTab?.title
+                val referer = streamPayload?.referer ?: pageUrl
+                val userAgent = streamPayload?.userAgent
+                val headers = streamPayload?.headers ?: emptyMap()
+                val launched = launchMpvRx(
+                    url = videoUrl,
+                    title = videoTitle,
+                    referer = referer,
+                    userAgent = userAgent,
+                    headers = headers,
+                    isDirectMedia = isDirectMedia,
+                    fallbackUrl = fallbackUrl,
+                )
+                if (launched) {
+                    browserController.pauseActiveMedia()
+                    browserController.exitSelectedWebContentFullscreen()
+                }
+            } else if (!isYouTube && !isKnownYtdlpSite(pageUrl)) {
+                // If the stream request was still in-flight when fullscreen was clicked, probe after 400ms
+                window.decorView.postDelayed({
+                    if (activityDestroyed) return@postDelayed
+                    val delayedPayload = MediaStreamDetectorBridge.activeStreamPayload.value
+                    val delayedUrl = delayedPayload?.url?.takeIf {
+                        it.isNotBlank() && !it.startsWith("blob:") &&
+                            (it.startsWith("http://") || it.startsWith("https://")) &&
+                            !it.contains(".ts", ignoreCase = true) &&
+                            !it.contains(".m4s", ignoreCase = true)
+                    }
+                    if (delayedUrl != null) {
+                        val videoTitle = delayedPayload.title ?: currentTab?.title
+                        val referer = delayedPayload.referer ?: pageUrl
+                        val userAgent = delayedPayload.userAgent
+                        val headers = delayedPayload.headers
+                        val launched = launchMpvRx(
+                            url = delayedUrl,
+                            title = videoTitle,
+                            referer = referer,
+                            userAgent = userAgent,
+                            headers = headers,
+                            isDirectMedia = true,
+                            fallbackUrl = pageUrl.takeIf { it.isNotBlank() },
+                        )
+                        if (launched) {
+                            browserController.pauseActiveMedia()
+                            browserController.exitSelectedWebContentFullscreen()
+                        }
+                    }
+                }, 400)
+            }
+        } else {
             window.decorView.postOnAnimation {
                 if (!activityDestroyed) applyBrowserSystemUi()
             }

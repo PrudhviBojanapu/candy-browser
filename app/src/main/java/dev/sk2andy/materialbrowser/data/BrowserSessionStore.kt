@@ -216,7 +216,7 @@ class BrowserSessionStore internal constructor(
     }
 
     fun loadProfiles(): Pair<List<BrowserProfile>, String> {
-        val profiles = preferences.getString(KEY_PROFILES, null)
+        val rawProfiles = preferences.getString(KEY_PROFILES, null)
             ?.let { raw ->
                 runCatching {
                     val array = JSONArray(raw)
@@ -224,7 +224,10 @@ class BrowserSessionStore internal constructor(
                         for (index in 0 until array.length()) {
                             val item = array.getJSONObject(index)
                             val id = item.optString("id").trim()
-                            val emoji = item.optString("emoji").trim()
+                            var emoji = item.optString("emoji").trim()
+                            if (id == dev.sk2andy.materialbrowser.browser.DEFAULT_PROFILE_ID && (emoji.isEmpty() || emoji == "🍬")) {
+                                emoji = dev.sk2andy.materialbrowser.browser.DEFAULT_PROFILE_EMOJI
+                            }
                             if (id.isNotEmpty() && emoji.isNotEmpty() && none { it.id == id }) {
                                 val legacyWallpaper = item.optJSONObject("wallpaper")
                                     ?.toProfileWallpaper()
@@ -259,15 +262,23 @@ class BrowserSessionStore internal constructor(
                 }.getOrNull()
             }
             .orEmpty()
-            .ifEmpty { listOf(DEFAULT_BROWSER_PROFILE) }
+        var profiles = rawProfiles.ifEmpty { dev.sk2andy.materialbrowser.browser.INITIAL_BROWSER_PROFILES }
+        var needsSave = rawProfiles.isEmpty()
+        if (profiles.none { it.id == dev.sk2andy.materialbrowser.browser.SHARED_PROFILE_ID }) {
+            profiles = profiles + dev.sk2andy.materialbrowser.browser.SHARED_BROWSER_PROFILE
+            needsSave = true
+        }
         val activeProfileId = preferences.getString(KEY_ACTIVE_PROFILE, null)
             ?.takeIf { candidate -> profiles.any { it.id == candidate } }
             ?: profiles.first().id
+        if (needsSave) {
+            saveProfiles(profiles, activeProfileId)
+        }
         return profiles to activeProfileId
     }
 
     fun saveProfiles(profiles: List<BrowserProfile>, activeProfileId: String) {
-        val safeProfiles = profiles.ifEmpty { listOf(DEFAULT_BROWSER_PROFILE) }
+        val safeProfiles = profiles.ifEmpty { dev.sk2andy.materialbrowser.browser.INITIAL_BROWSER_PROFILES }
         val array = JSONArray()
         safeProfiles.forEach { profile ->
             array.put(
@@ -1066,13 +1077,7 @@ class BrowserSessionStore internal constructor(
     }
 
     fun loadInlineMediaPlayerMode(): InlineMediaPlayerMode {
-        val storedMode = preferences.getString(KEY_INLINE_MEDIA_PLAYER_MODE, null)
-        if (storedMode != null) return InlineMediaPlayerMode.fromStableId(storedMode)
-        return if (preferences.getBoolean(KEY_INLINE_MEDIA_PLAYER_ENABLED, false)) {
-            InlineMediaPlayerMode.ButtonInlineAndFullscreen
-        } else {
-            InlineMediaPlayerMode.Default
-        }
+        return InlineMediaPlayerMode.Disabled
     }
 
     fun saveInlineMediaPlayerMode(mode: InlineMediaPlayerMode) {

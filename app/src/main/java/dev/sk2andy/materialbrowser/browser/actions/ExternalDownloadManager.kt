@@ -43,9 +43,12 @@ class ExternalDownloadManager(private val context: Context) {
     private val packageManager = context.packageManager
 
     fun discover(request: BrowserDownloadRequest? = null): List<ExternalDownloadManagerApp> {
-        val knownApps = ONE_DM_PACKAGES.mapNotNull { packageName ->
+        val knownApps = listOfNotNull(
+            knownApp(KETCH_PACKAGE, KETCH_ACTIVITY, isOneDm = false),
+            knownApp(GOPEED_PACKAGE, GOPEED_ACTIVITY, isOneDm = false),
+        ) + ONE_DM_PACKAGES.mapNotNull { packageName ->
             knownApp(packageName, ONE_DM_ACTIVITY, isOneDm = true)
-        } + listOfNotNull(knownApp(GOPEED_PACKAGE, GOPEED_ACTIVITY))
+        }
         val knownPackages = knownApps.mapTo(hashSetOf(), ExternalDownloadManagerApp::packageName)
         val mimeTypes = request?.mimeType?.let(::listOf) ?: PROBE_MIME_TYPES
         val genericApps = mimeTypes.asSequence()
@@ -93,14 +96,24 @@ class ExternalDownloadManager(private val context: Context) {
         app: ExternalDownloadManagerApp,
         settings: BrowserDownloadSettings,
         allowSessionData: Boolean,
-    ): Intent = if (app.isOneDm) {
+    ): Intent = when {
+        app.packageName == KETCH_PACKAGE -> {
+            Intent(Intent.ACTION_SEND).apply {
+                component = ComponentName(app.packageName, app.activityName)
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, request.url)
+            }
+        }
+        app.isOneDm -> {
             oneDmIntent(request, app, settings, allowSessionData)
-        } else {
+        }
+        else -> {
             Intent(Intent.ACTION_VIEW).apply {
                 component = ComponentName(app.packageName, app.activityName)
                 setDataAndType(Uri.parse(request.url), request.mimeType)
             }
         }
+    }
 
     private fun oneDmIntent(
         request: BrowserDownloadRequest,
@@ -199,6 +212,8 @@ class ExternalDownloadManager(private val context: Context) {
         const val ONE_DM_ACTIVITY = "idm.internet.download.manager.Downloader"
         const val GOPEED_PACKAGE = "com.gopeed.gopeed"
         const val GOPEED_ACTIVITY = "com.gopeed.gopeed.MainActivity"
+        const val KETCH_PACKAGE = "com.linroid.ketch.app"
+        const val KETCH_ACTIVITY = "com.linroid.ketch.app.android.QuickAddActivity"
         const val EXTRA_FILENAME = "extra_filename"
         const val EXTRA_COOKIES = "extra_cookies"
         const val EXTRA_USER_AGENT = "extra_useragent"

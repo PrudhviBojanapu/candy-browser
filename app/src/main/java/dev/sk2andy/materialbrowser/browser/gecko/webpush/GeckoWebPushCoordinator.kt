@@ -38,80 +38,18 @@ internal object GeckoWebPushCoordinator {
 
     @UiThread
     fun attach(context: Context, runtime: GeckoRuntime) {
-        val appContext = context.applicationContext
-        controller = runtime.webPushController
-        runtime.webPushController.setDelegate(delegate(appContext))
-        val reconnectOnAttach = !workerStartingRuntime.get()
-        val fossTransport = transport(appContext)
-        if (foregroundJob == null) {
-            val owner = ProcessLifecycleOwner.get()
-            foregroundJob = owner.lifecycleScope.launch {
-                owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    fossTransport.listenWhileForeground()
-                }
-            }
-        }
-        scope.launch {
-            val hasPendingWork = fossTransport.hasPendingWork()
-            FossWebPushTransport.schedulePeriodicReconnect(
-                context = appContext,
-                enabled = hasPendingWork,
-            )
-            if (hasPendingWork && reconnectOnAttach) {
-                fossTransport.reconnectOnce()
-            }
-        }
+        // Disabled per user request (debloated)
     }
 
-    suspend fun reconnectOnce(context: Context): Boolean {
-        if (BuildConfig.SYSTEM_WEBVIEW_ONLY) return true
-        val appContext = context.applicationContext
-        val settings = BrowserSessionStore(appContext)
-        if (settings.loadAndroidBrowserEngineKind() != AndroidBrowserEngineKind.GeckoView) return true
-        workerStartingRuntime.set(true)
-        try {
-            withContext(Dispatchers.Main) {
-                GeckoRuntimeOwner.getOrCreate(appContext)
-            }
-        } finally {
-            workerStartingRuntime.set(false)
-        }
-        return transport(appContext).reconnectOnce()
-    }
+    suspend fun reconnectOnce(context: Context): Boolean = true
 
     fun onBrowserEngineChanged(context: Context, kind: AndroidBrowserEngineKind) {
-        val appContext = context.applicationContext
-        if (kind != AndroidBrowserEngineKind.GeckoView) {
-            foregroundJob?.cancel()
-            foregroundJob = null
-            FossWebPushTransport.schedulePeriodicReconnect(appContext, enabled = false)
-            return
-        }
-        scope.launch {
-            val enabled = transport(appContext).hasPendingWork()
-            FossWebPushTransport.schedulePeriodicReconnect(appContext, enabled)
-        }
+        FossWebPushTransport.schedulePeriodicReconnect(context.applicationContext, enabled = false)
     }
 
-    suspend fun clearAllData(context: Context): Boolean {
-        val appContext = context.applicationContext
-        val clearedScopes = transport(appContext).clearAllData() ?: return false
-        FossWebPushTransport.schedulePeriodicReconnect(appContext, enabled = false)
-        onSubscriptionsInvalidated(clearedScopes)
-        return true
-    }
+    suspend fun clearAllData(context: Context): Boolean = true
 
-    suspend fun removeProfileSubscriptions(context: Context, profileId: String): Boolean {
-        val appContext = context.applicationContext
-        val fossTransport = transport(appContext)
-        val removedScopes = fossTransport.removeProfileSubscriptions(profileId) ?: return false
-        onSubscriptionsInvalidated(removedScopes)
-        FossWebPushTransport.schedulePeriodicReconnect(
-            appContext,
-            enabled = fossTransport.hasPendingWork(),
-        )
-        return true
-    }
+    suspend fun removeProfileSubscriptions(context: Context, profileId: String): Boolean = true
 
     private fun delegate(context: Context): WebPushDelegate = object : WebPushDelegate {
         override fun onSubscribe(

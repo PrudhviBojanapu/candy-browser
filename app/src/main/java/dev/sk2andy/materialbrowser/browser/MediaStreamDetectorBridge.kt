@@ -2,24 +2,56 @@ package dev.sk2andy.materialbrowser.browser
 
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
-import dev.sk2andy.materialbrowser.ui.VideoStreamPayload
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+data class VideoStreamPayload(
+    val url: String,
+    val title: String? = null,
+    val referer: String? = null,
+    val userAgent: String? = null,
+    val headers: Map<String, String> = emptyMap(),
+)
 
 object MediaStreamDetectorBridge {
 
     private val _activeStreamPayload = MutableStateFlow<VideoStreamPayload?>(null)
     val activeStreamPayload: StateFlow<VideoStreamPayload?> = _activeStreamPayload.asStateFlow()
 
+    fun getStreamPriority(url: String): Int {
+        val cleanUrl = url.lowercase()
+        return when {
+            cleanUrl.contains(".m3u8") || cleanUrl.contains(".mpd") || cleanUrl.contains("/manifest(") -> 100
+            cleanUrl.contains(".mp4") || cleanUrl.contains(".webm") || cleanUrl.contains(".mkv") -> 50
+            cleanUrl.contains("googlevideo.com") || cleanUrl.contains("/videoplayback") -> 20
+            else -> 10
+        }
+    }
+
     fun isMediaStream(url: String): Boolean {
         val cleanUrl = url.lowercase()
+        if (cleanUrl.contains(".ts?") || cleanUrl.endsWith(".ts") ||
+            cleanUrl.contains(".m4s?") || cleanUrl.endsWith(".m4s") ||
+            cleanUrl.contains(".vtt") || cleanUrl.contains(".srt") ||
+            cleanUrl.contains("doubleclick.net") || cleanUrl.contains("googleads") ||
+            cleanUrl.contains("/pagead/") || cleanUrl.contains("adnxs.com")
+        ) {
+            return false
+        }
         return cleanUrl.contains(".m3u8") ||
                 cleanUrl.contains(".mpd") ||
                 cleanUrl.contains(".mp4") ||
-                cleanUrl.contains("/manifest(") ||
-                cleanUrl.contains("/master.m3u8") ||
-                cleanUrl.contains("/playlist.m3u8")
+                cleanUrl.contains(".webm") ||
+                cleanUrl.contains(".mkv") ||
+                cleanUrl.contains("/videoplayback?") ||
+                cleanUrl.contains("googlevideo.com") ||
+                cleanUrl.contains("/manifest") ||
+                cleanUrl.contains("/master") ||
+                cleanUrl.contains("/playlist") ||
+                cleanUrl.contains("/hls/") ||
+                cleanUrl.contains("format=m3u8") ||
+                cleanUrl.contains("type=m3u8")
     }
 
     fun onStreamDetected(
@@ -31,15 +63,24 @@ object MediaStreamDetectorBridge {
     ) {
         if (!isMediaStream(url)) return
 
+        val newPriority = getStreamPriority(url)
+        val current = _activeStreamPayload.value
+        if (current != null && current.referer == pageUrl && getStreamPriority(current.url) > newPriority) {
+            return
+        }
+
         val finalHeaders = headers.toMutableMap()
-        if (pageUrl != null && !finalHeaders.containsKey("Referer")) {
-            finalHeaders["Referer"] = pageUrl
+        val hasReferer = finalHeaders.keys.any { it.equals("Referer", ignoreCase = true) }
+        val effectiveReferer = if (hasReferer) {
+            finalHeaders.entries.first { it.key.equals("Referer", ignoreCase = true) }.value
+        } else {
+            pageUrl?.also { finalHeaders["Referer"] = it }
         }
 
         _activeStreamPayload.value = VideoStreamPayload(
             url = url,
             title = title,
-            referer = pageUrl,
+            referer = effectiveReferer,
             userAgent = userAgent,
             headers = finalHeaders,
         )
@@ -77,7 +118,7 @@ object MediaStreamDetectorBridge {
             function notifyNative(url) {
                 if (!url || typeof url !== 'string') return;
                 const lower = url.toLowerCase();
-                if (lower.includes('.m3u8') || lower.includes('.mpd') || lower.includes('.mp4')) {
+                if (lower.includes('.m3u8') || lower.includes('.mpd') || lower.includes('.mp4') || lower.includes('.webm') || lower.includes('googlevideo.com') || lower.includes('/videoplayback')) {
                     if (window.CandyMediaBridge && window.CandyMediaBridge.onStreamFound) {
                         window.CandyMediaBridge.onStreamFound(url, document.title || document.location.href);
                     }
@@ -109,6 +150,16 @@ object MediaStreamDetectorBridge {
                     }
                 }
             }, true);
+
+            // Periodic DOM check for videos
+            function scanVideos() {
+                const elements = document.querySelectorAll('video');
+                elements.forEach(function(v) {
+                    if (v.currentSrc && !v.currentSrc.startsWith('blob:')) notifyNative(v.currentSrc);
+                    else if (v.src && !v.src.startsWith('blob:')) notifyNative(v.src);
+                });
+            }
+            setInterval(scanVideos, 2500);
         })();
     """.trimIndent()
 }

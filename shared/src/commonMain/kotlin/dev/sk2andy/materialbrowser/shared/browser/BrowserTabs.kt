@@ -29,7 +29,7 @@ data class BrowserTabState(
 data class BrowserTabsState(
     val tabs: List<BrowserTabState>,
     val selectedTabId: String,
-    val profiles: List<BrowserProfile> = listOf(DEFAULT_BROWSER_PROFILE),
+    val profiles: List<BrowserProfile> = dev.sk2andy.materialbrowser.browser.INITIAL_BROWSER_PROFILES,
     val activeProfileId: String = DEFAULT_PROFILE_ID,
     val isOverviewVisible: Boolean = false,
     val addressFocusRequest: Long = 0,

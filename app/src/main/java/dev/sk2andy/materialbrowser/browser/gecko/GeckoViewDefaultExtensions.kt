@@ -136,7 +136,7 @@ internal class GeckoDefaultExtensionAssets(context: Context) :
 }
 
 internal class GeckoViewDefaultExtensionInstaller(
-    context: Context,
+    private val context: Context,
     private val controller: WebExtensionController,
 ) : GeckoDefaultExtensionInstaller {
     private val installMutex = Mutex()
@@ -159,12 +159,26 @@ internal class GeckoViewDefaultExtensionInstaller(
                         .toURI()
                         .toASCIIString()
                 } else {
-                    extension.installUri
+                    val assetPath = requireNotNull(extension.assetPath) { "Bundled default extension missing assetPath" }
+                    val tempFile = File.createTempFile("bundled-default-ext-", ".xpi", context.cacheDir)
+                    context.assets.open(assetPath).use { input ->
+                        tempFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    downloaded = tempFile
+                    tempFile.toURI().toASCIIString()
                 }
-                controller.install(
+                android.util.Log.i("GeckoDefaultExt", "Installing default extension ${extension.id} from $installUri")
+                val result = controller.install(
                     installUri,
                     WebExtensionController.INSTALLATION_METHOD_ONBOARDING,
                 ).awaitDefaultExtensionResult().toDefaultExtension()
+                android.util.Log.i("GeckoDefaultExt", "Successfully installed default extension: ${extension.id}")
+                result
+            } catch (e: Throwable) {
+                android.util.Log.e("GeckoDefaultExt", "Failed installing default extension ${extension.id}", e)
+                throw e
             } finally {
                 pendingInstall = null
                 withContext(NonCancellable + Dispatchers.IO) {
@@ -182,7 +196,8 @@ internal class GeckoViewDefaultExtensionInstaller(
 
     fun automaticPermissionDecision(extension: WebExtension): GeckoExtensionPermissionDecision? {
         val expected = pendingInstall ?: return null
-        if (extension.id != expected.id || extension.metaData.version != expected.version) return null
+        if (extension.id != expected.id) return null
+        android.util.Log.i("GeckoDefaultExt", "Auto-granting permissions for ${extension.id}")
         return GeckoExtensionPermissionDecision(
             grantPermissions = true,
             allowInPrivateBrowsing = false,
@@ -310,13 +325,16 @@ internal class GeckoDefaultExtensionStartup(
                 try {
                     val created = provisionerFactory()
                     provisioner = created
-                    result = created.provision()
-                    if (result?.hasFailure == true) lastRetryNanos = nanoTime()
+                    val provResult = created.provision()
+                    result = provResult
+                    android.util.Log.i("GeckoDefaultExt", "Startup provisioning complete. Outcomes: ${provResult.outcomes}")
+                    if (provResult.hasFailure) lastRetryNanos = nanoTime()
                     completion.complete(Unit)
                 } catch (error: CancellationException) {
                     completion.cancel(error)
                     throw error
                 } catch (error: Throwable) {
+                    android.util.Log.e("GeckoDefaultExt", "Startup provisioning failed", error)
                     completion.completeExceptionally(error)
                 }
             }

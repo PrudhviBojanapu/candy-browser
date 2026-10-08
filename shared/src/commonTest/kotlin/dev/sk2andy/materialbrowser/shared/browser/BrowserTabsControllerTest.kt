@@ -280,7 +280,7 @@ class BrowserTabsControllerTest {
             icons = emptyList(),
         )
 
-        assertEquals("phone", state.profiles.single().linkedSyncDeviceId)
+        assertEquals("phone", state.profiles.single { it.id == DEFAULT_PROFILE_ID }.linkedSyncDeviceId)
         val restored = state.tabs.single { it.syncCandyId == "restored-tab" }
         assertEquals(DEFAULT_PROFILE_ID, restored.profileId)
         assertEquals("https://example.com/", restored.address)

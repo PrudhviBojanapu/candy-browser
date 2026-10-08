@@ -2232,45 +2232,9 @@ internal fun TabOverviewBackground(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    val backgroundModifier = if (wallpaper == null) {
-        Modifier.background(
-            Brush.linearGradient(
-                colors = listOf(
-                    colors.primaryContainer,
-                    colors.tertiaryContainer,
-                    colors.surface,
-                ),
-            ),
-        )
-    } else {
-        Modifier.drawBehind {
-            drawProfileWallpaper(
-                bitmap = wallpaper.bitmap,
-                wallpaper = wallpaper.wallpaper,
-                scrimAlpha = 0.54f,
-            )
-        }
-    }
     Box(
         modifier = modifier
             .testTag(TabOverviewChromeTestTags.Background)
-            .then(backgroundModifier),
-    ) {
-        if (wallpaper != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .windowInsetsTopHeight(statusBarInsets)
-                    .background(colors.surface.copy(alpha = 0.92f)),
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .windowInsetsBottomHeight(navigationBarInsets)
-                    .background(colors.surface.copy(alpha = 0.92f)),
-            )
-        }
-    }
+            .background(colors.background),
+    )
 }

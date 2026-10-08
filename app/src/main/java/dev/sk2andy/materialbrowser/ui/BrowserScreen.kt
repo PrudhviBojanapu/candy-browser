@@ -1640,6 +1640,7 @@ internal fun BrowserScreen(
                 performAddressBarLongPress(AddressBarLongPressAction.CreateSiteCapsule)
             },
             onAddressBarLongPressAction = ::performAddressBarLongPress,
+            onManageFirefoxExtensions = onManageFirefoxExtensions ?: {},
             )
         }
 

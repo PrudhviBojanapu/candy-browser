@@ -12,7 +12,132 @@ if (candyUsesBackgroundVideoVisibilityFix) {
   window.addEventListener("visibilitychange", (event) => {
     event.stopImmediatePropagation();
   }, true);
+
+  function enforceYouTubeHighestQuality() {
+    try {
+      const player = document.getElementById("movie_player") || document.querySelector(".html5-video-player");
+      if (!player) return;
+      const wrapped = player.wrappedJSObject || player;
+      if (typeof wrapped.getAvailableQualityLevels === "function") {
+        const levels = wrapped.getAvailableQualityLevels();
+        if (Array.isArray(levels) && levels.length > 0) {
+          const highest = levels[0];
+          const current = typeof wrapped.getPlaybackQuality === "function" ? wrapped.getPlaybackQuality() : null;
+          if (current !== highest) {
+            if (typeof wrapped.setPlaybackQualityRange === "function") {
+              wrapped.setPlaybackQualityRange(highest, highest);
+            }
+            if (typeof wrapped.setPlaybackQuality === "function") {
+              wrapped.setPlaybackQuality(highest);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  setInterval(enforceYouTubeHighestQuality, 2000);
+  document.addEventListener("play", enforceYouTubeHighestQuality, true);
+  document.addEventListener("playing", enforceYouTubeHighestQuality, true);
 }
+
+// Universal highest quality enforcement for all websites (HLS.js, Dash.js, VideoJS, JWPlayer, HTML5)
+function candyEnforceUniversalHighestQuality() {
+  try {
+    const videos = document.querySelectorAll("video");
+    videos.forEach((video) => {
+      const v = video.wrappedJSObject || video;
+      // HLS.js instance
+      const hls = v.hls || v.__hls || window.hls || (window.player && window.player.hls);
+      if (hls && Array.isArray(hls.levels) && hls.levels.length > 0) {
+        const maxLevel = hls.levels.length - 1;
+        if (hls.currentLevel !== maxLevel && hls.autoLevelEnabled !== false) {
+          hls.currentLevel = maxLevel;
+          if (typeof hls.loadLevel !== "undefined") hls.loadLevel = maxLevel;
+        }
+      }
+      // Dash.js
+      if (window.dashjs && window.player && typeof window.player.getBitrateInfoListFor === "function") {
+        try {
+          const list = window.player.getBitrateInfoListFor("video");
+          if (Array.isArray(list) && list.length > 0) {
+            window.player.setQualityFor("video", list.length - 1);
+            window.player.setAutoSwitchQualityFor("video", false);
+          }
+        } catch (_) {}
+      }
+      // Video.js
+      if (v.player && typeof v.player.qualityLevels === "function") {
+        try {
+          const ql = v.player.qualityLevels();
+          if (ql && ql.length > 0) {
+            for (let i = 0; i < ql.length; i++) {
+              ql[i].enabled = (i === ql.length - 1);
+            }
+            ql.selectedIndex = ql.length - 1;
+          }
+        } catch (_) {}
+      }
+    });
+  } catch (_) {}
+}
+setInterval(candyEnforceUniversalHighestQuality, 3000);
+document.addEventListener("play", candyEnforceUniversalHighestQuality, true);
+
+function candyInspectAndReportMedia(video) {
+  if (!video) return;
+  const v = video.wrappedJSObject || video;
+  let src = video.currentSrc || video.src;
+  if (!src || src.startsWith("blob:")) {
+    // Check hls instance source
+    const hls = v.hls || v.__hls || window.hls || (window.player && window.player.hls);
+    if (hls && typeof hls.url === "string" && !hls.url.startsWith("blob:")) {
+      src = hls.url;
+    }
+  }
+  if (!src || src.startsWith("blob:")) {
+    // Check data attributes often used by embeds
+    for (const attr of ["data-src", "data-url", "data-video", "data-stream", "data-hls"]) {
+      const val = video.getAttribute(attr);
+      if (val && !val.startsWith("blob:") && (val.startsWith("http://") || val.startsWith("https://") || val.startsWith("/"))) {
+        src = val.startsWith("/") ? (location.origin + val) : val;
+        break;
+      }
+    }
+  }
+  if (!src || src.startsWith("blob:")) {
+    const sources = video.querySelectorAll("source");
+    for (const s of sources) {
+      if (s.src && !s.src.startsWith("blob:")) {
+        src = s.src;
+        break;
+      }
+    }
+  }
+  if (src && (src.startsWith("http://") || src.startsWith("https://"))) {
+    const lower = src.toLowerCase();
+    if (!lower.includes("googlevideo.com") && !lower.includes("/videoplayback") &&
+        !lower.includes(".ts") && !lower.includes(".m4s")) {
+      browser.runtime.sendMessage({
+        type: "media-stream-detected",
+        url: src,
+        title: document.title || "",
+        pageUrl: location.href,
+      }).catch(() => {});
+    }
+  }
+}
+document.addEventListener("play", (e) => {
+  if (e.target instanceof HTMLVideoElement) candyInspectAndReportMedia(e.target);
+}, true);
+document.addEventListener("loadedmetadata", (e) => {
+  if (e.target instanceof HTMLVideoElement) candyInspectAndReportMedia(e.target);
+}, true);
+document.addEventListener("fullscreenchange", () => {
+  const el = document.fullscreenElement;
+  if (!el) return;
+  const video = el instanceof HTMLVideoElement ? el : el.querySelector("video");
+  if (video) candyInspectAndReportMedia(video);
+}, true);
 
 const candyPictureInPicturePlayback = {
   candidates: new Set(),

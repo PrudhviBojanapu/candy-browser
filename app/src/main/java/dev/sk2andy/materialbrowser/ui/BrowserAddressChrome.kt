@@ -129,6 +129,7 @@ internal fun BoxScope.BrowserAddressChrome(
     onSnooze: () -> Unit,
     onAddSiteCapsule: () -> Unit,
     onAddressBarLongPressAction: (AddressBarLongPressAction) -> Unit,
+    onManageFirefoxExtensions: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -550,6 +551,10 @@ internal fun BoxScope.BrowserAddressChrome(
         onFirefoxExtensionAction = { actionKey ->
             onAddressEditorDismiss()
             controller.clickFirefoxExtensionAction(actionKey)
+        },
+        onManageFirefoxExtensions = {
+            onAddressEditorDismiss()
+            onManageFirefoxExtensions()
         },
         onSettings = {
             onAddressEditorDismiss()

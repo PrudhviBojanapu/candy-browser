@@ -9,6 +9,7 @@ import dev.sk2andy.materialbrowser.browser.BrowserEngineScrollMetrics
 import dev.sk2andy.materialbrowser.browser.BrowserViewportRect
 import dev.sk2andy.materialbrowser.browser.TextInputOcclusionProbeMode
 import dev.sk2andy.materialbrowser.browser.TextInputOcclusionProbeResult
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
 import dev.sk2andy.materialbrowser.browser.WebRtcProtectionMode
 import dev.sk2andy.materialbrowser.browser.WebRtcProtectionRules
 import java.util.UUID
@@ -575,6 +576,35 @@ internal class GeckoViewPrivacyHostRuntime(
             "picture-in-picture-playback-result" ->
                 acceptPictureInPicturePlaybackResult(value)
             "reader-result" -> acceptReaderResult(value)
+            "media-stream-detected" -> {
+                val streamUrl = value.optString("url")
+                val pageUrl = value.optString("pageUrl").takeIf { it.isNotBlank() }
+                val title = value.optString("title").takeIf { it.isNotBlank() }
+                val userAgent = value.optString("userAgent").takeIf { it.isNotBlank() }
+                val headersJson = value.optJSONObject("headers")
+                val headersMap = mutableMapOf<String, String>()
+                if (headersJson != null) {
+                    val keys = headersJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val headerVal = headersJson.optString(key)
+                        if (headerVal.isNotBlank()) {
+                            headersMap[key] = headerVal
+                        }
+                    }
+                }
+                if (streamUrl.isNotBlank() && !streamUrl.startsWith("blob:")) {
+                    mainHandler.post {
+                        MediaStreamDetectorBridge.onStreamDetected(
+                            url = streamUrl,
+                            pageUrl = pageUrl,
+                            userAgent = userAgent,
+                            title = title,
+                            headers = headersMap,
+                        )
+                    }
+                }
+            }
             "text-input-occlusion-result" -> {
                 val binding = bindings[value.optString("token")] ?: return
                 if (

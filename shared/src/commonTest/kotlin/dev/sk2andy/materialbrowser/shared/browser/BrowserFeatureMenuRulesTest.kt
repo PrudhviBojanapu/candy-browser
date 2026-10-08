@@ -35,12 +35,10 @@ class BrowserFeatureMenuRulesTest {
                 BrowserFeatureMenuAction.NewTab,
                 BrowserFeatureMenuAction.CloseTab,
                 BrowserFeatureMenuAction.DuplicateTab,
-                BrowserFeatureMenuAction.OpenReader,
                 BrowserFeatureMenuAction.TranslatePage,
                 BrowserFeatureMenuAction.FindInPage,
                 BrowserFeatureMenuAction.Share,
                 BrowserFeatureMenuAction.OpenExternal,
-                BrowserFeatureMenuAction.Print,
                 BrowserFeatureMenuAction.ToggleCookieBannerRemoval,
                 BrowserFeatureMenuAction.ToggleForceVerticalScrolling,
                 BrowserFeatureMenuAction.ToggleForcePageZooming,
@@ -49,14 +47,13 @@ class BrowserFeatureMenuRulesTest {
                 BrowserFeatureMenuAction.ToggleDesktopView,
                 BrowserFeatureMenuAction.ToggleDomainMute,
                 BrowserFeatureMenuAction.OpenCandyTrail,
-                BrowserFeatureMenuAction.AddSiteCapsule,
-                BrowserFeatureMenuAction.Summarize,
                 BrowserFeatureMenuAction.SnoozeTab,
                 BrowserFeatureMenuAction.DockAddressBar,
                 BrowserFeatureMenuAction.OpenSnoozedTabs,
                 BrowserFeatureMenuAction.OpenFavorites,
                 BrowserFeatureMenuAction.OpenDownloads,
                 BrowserFeatureMenuAction.OpenHistory,
+                BrowserFeatureMenuAction.OpenFirefoxExtensions,
                 BrowserFeatureMenuAction.OpenSettings,
             ),
             items.map(BrowserFeatureMenuItem::action),
@@ -119,7 +116,10 @@ class BrowserFeatureMenuRulesTest {
 
     @Test
     fun `firefox extensions are Android additive capability`() {
-        val common = BrowserFeatureMenuRules.items(BrowserFeatureMenuState())
+        val common = BrowserFeatureMenuRules.items(
+            state = BrowserFeatureMenuState(),
+            capabilities = BrowserFeatureMenuCapabilities(supportsFirefoxExtensions = false),
+        )
         val android = BrowserFeatureMenuRules.items(
             state = BrowserFeatureMenuState(),
             capabilities = BrowserFeatureMenuCapabilities(supportsFirefoxExtensions = true),

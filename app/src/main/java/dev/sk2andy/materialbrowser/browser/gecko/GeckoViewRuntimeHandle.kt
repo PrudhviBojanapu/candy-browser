@@ -23,6 +23,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.sk2andy.materialbrowser.BuildConfig
 import dev.sk2andy.materialbrowser.browser.BrowserPerformanceTrace
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
 import dev.sk2andy.materialbrowser.browser.BrowserBackdropBlurRegion
 import dev.sk2andy.materialbrowser.browser.BrowserBackdropBlurRules
 import dev.sk2andy.materialbrowser.browser.BrowserSurfaceBackdropBlurRegion
@@ -311,7 +312,6 @@ internal class GeckoViewRuntimeHandle private constructor(
             val runtime = GeckoRuntime.create(appContext, runtimeSettings)
             GeckoLogging.attach(appContext)
             runtime.webNotificationDelegate = GeckoWebNotificationPresenter(appContext)
-            GeckoWebPushCoordinator.attach(appContext, runtime)
             val extensionController = runtime.webExtensionController
             val toppingHost = GeckoViewToppingHostRuntime(
                 controller = extensionController,
@@ -1194,6 +1194,16 @@ private class GeckoViewBrowserSession(
                         isRedirect = request.isRedirect,
                     )
                 ) return GeckoResult.allow()
+                if (MediaStreamDetectorBridge.isMediaStream(request.uri)) {
+                    mainHandler.post {
+                        MediaStreamDetectorBridge.onStreamDetected(
+                            url = request.uri,
+                            pageUrl = state.url?.takeUnless { it.isBlank() },
+                            title = state.title?.takeUnless { it.isBlank() },
+                        )
+                    }
+                    return GeckoResult.deny()
+                }
                 if (CandyPrivacyHostContract.isBootstrapDocumentUrl(request.uri)) {
                     return GeckoResult.deny()
                 }
@@ -1257,6 +1267,7 @@ private class GeckoViewBrowserSession(
                 if (privacyHost.isBootstrapNavigation(session, url)) return
                 invalidateDomProbe()
                 currentPageUrl = url
+                dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge.clearActiveStream()
                 if (!isPrivate) {
                     PermissionOrigin.normalize(url)?.let { origin ->
                         notificationPermissionDecisionProvider?.invoke(origin)?.let { decision ->

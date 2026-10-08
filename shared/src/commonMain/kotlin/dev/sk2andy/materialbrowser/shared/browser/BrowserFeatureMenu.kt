@@ -159,7 +159,7 @@ data class BrowserFeatureMenuState(
 )
 
 data class BrowserFeatureMenuCapabilities(
-    val supportsFirefoxExtensions: Boolean = false,
+    val supportsFirefoxExtensions: Boolean = true,
 )
 
 object BrowserFeatureMenuRules {
@@ -250,13 +250,6 @@ object BrowserFeatureMenuRules {
         )
         add(
             command(
-                BrowserFeatureMenuAction.OpenReader,
-                BrowserFeatureMenuLabelKey.Reader,
-                enabled = state.canOpenReader,
-            ),
-        )
-        add(
-            command(
                 BrowserFeatureMenuAction.TranslatePage,
                 BrowserFeatureMenuLabelKey.Translate,
                 enabled = state.canTranslatePage,
@@ -275,13 +268,6 @@ object BrowserFeatureMenuRules {
                 BrowserFeatureMenuAction.OpenExternal,
                 BrowserFeatureMenuLabelKey.OpenExternal,
                 enabled = state.hasPage,
-            ),
-        )
-        add(
-            command(
-                BrowserFeatureMenuAction.Print,
-                BrowserFeatureMenuLabelKey.Print,
-                enabled = state.canUseDocumentActions,
             ),
         )
         if (
@@ -381,18 +367,6 @@ object BrowserFeatureMenuRules {
         command(
             BrowserFeatureMenuAction.OpenCandyTrail,
             BrowserFeatureMenuLabelKey.CandyTrail,
-            BrowserFeatureMenuSection.Candy,
-            state.hasPage,
-        ),
-        command(
-            BrowserFeatureMenuAction.AddSiteCapsule,
-            BrowserFeatureMenuLabelKey.AddSiteCapsule,
-            BrowserFeatureMenuSection.Candy,
-            state.canAddSiteCapsule,
-        ),
-        command(
-            BrowserFeatureMenuAction.Summarize,
-            BrowserFeatureMenuLabelKey.Summarize,
             BrowserFeatureMenuSection.Candy,
             state.hasPage,
         ),

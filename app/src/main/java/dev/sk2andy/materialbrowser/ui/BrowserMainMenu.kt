@@ -31,6 +31,7 @@ import dev.sk2andy.materialbrowser.browser.gecko.GeckoExtensionActionState
 import dev.sk2andy.materialbrowser.browser.userscript.UserScriptMenuCommand
 import dev.sk2andy.materialbrowser.data.AddressBarAction
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuAction
+import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuCapabilities
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuItem
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuLabelKey
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuRules
@@ -302,6 +303,7 @@ internal fun BrowserMainMenu(
     firefoxExtensionActions: List<GeckoExtensionActionState> = emptyList(),
     menuLayout: BrowserMenuLayout = BrowserMenuLayout.Default,
     onFirefoxExtensionAction: (GeckoExtensionActionKey) -> Unit = {},
+    onManageFirefoxExtensions: () -> Unit = {},
     onSettings: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
@@ -338,7 +340,10 @@ internal fun BrowserMainMenu(
         toppingCommands = userScriptMenuCommands.map(UserScriptMenuCommand::sharedMenuCommand),
     )
     val items = BrowserMenuLayoutRules.visibleItems(
-        items = BrowserFeatureMenuRules.items(state = menuState),
+        items = BrowserFeatureMenuRules.items(
+            state = menuState,
+            capabilities = BrowserFeatureMenuCapabilities(supportsFirefoxExtensions = true),
+        ),
         layout = menuLayout,
         surface = BrowserMenuSurface.Tab,
     )
@@ -417,7 +422,7 @@ internal fun BrowserMainMenu(
                 BrowserFeatureMenuAction.OpenFavorites -> onFavorites()
                 BrowserFeatureMenuAction.OpenDownloads -> onDownloads()
                 BrowserFeatureMenuAction.OpenHistory -> onHistory()
-                BrowserFeatureMenuAction.OpenFirefoxExtensions -> Unit
+                BrowserFeatureMenuAction.OpenFirefoxExtensions -> onManageFirefoxExtensions()
                 BrowserFeatureMenuAction.OpenSettings -> onSettings()
                 BrowserFeatureMenuAction.InvokeToppingCommand -> {
                     userScriptMenuCommands.firstOrNull { command ->

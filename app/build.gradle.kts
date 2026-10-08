@@ -213,7 +213,7 @@ val releaseAbi = providers.gradleProperty("candy.releaseAbi").map { value ->
 }
 val compressNativeLibs = providers.gradleProperty("candy.compressNativeLibs")
     .map(String::toBooleanStrict)
-    .orElse(false)
+    .orElse(true)
 val performanceDiagnostics = providers.gradleProperty("candy.performanceDiagnostics")
     .map(String::toBooleanStrict)
     .orElse(false)
@@ -246,10 +246,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        releaseAbi.orNull?.let { abi ->
-            ndk {
-                abiFilters += abi
-            }
+        ndk {
+            abiFilters.clear()
+            abiFilters += "arm64-v8a"
         }
     }
 
@@ -488,7 +487,6 @@ tasks.matching { task ->
 }.configureEach {
     dependsOn(generateGeckoPrivacyRuleAssets)
     dependsOn(generateGeckoContentTopInsetScript)
-    dependsOn(verifyGeckoDefaultExtensionAssets)
 }
 
 val validateReleaseNotes by tasks.registering {
@@ -715,14 +713,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     "fullImplementation"("com.google.android.gms:play-services-code-scanner:16.1.0")
     "fullImplementation"("androidx.credentials:credentials-play-services-auth:1.5.0")
-    "fullImplementation"("com.google.android.gms:play-services-cast-framework:21.4.0") {
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-    }
     "systemwebviewImplementation"("com.google.android.gms:play-services-code-scanner:16.1.0")
     "systemwebviewImplementation"("androidx.credentials:credentials-play-services-auth:1.5.0")
-    "systemwebviewImplementation"("com.google.android.gms:play-services-cast-framework:21.4.0") {
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-    }
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

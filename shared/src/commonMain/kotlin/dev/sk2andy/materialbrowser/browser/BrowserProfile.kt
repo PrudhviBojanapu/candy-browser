@@ -71,10 +71,22 @@ val BrowserProfile.isSyncLinked: Boolean
     get() = syncedDeviceId != null || linkedSyncDeviceId != null
 
 const val DEFAULT_PROFILE_ID = "candy"
-const val DEFAULT_PROFILE_EMOJI = "🍬"
+const val DEFAULT_PROFILE_EMOJI = "🔐"
+const val SHARED_PROFILE_ID = "shared_sync"
+const val SHARED_PROFILE_EMOJI = "🌐"
 const val MAX_PROFILES = 12
 
 val DEFAULT_BROWSER_PROFILE = BrowserProfile(
     id = DEFAULT_PROFILE_ID,
     emoji = DEFAULT_PROFILE_EMOJI,
+)
+
+val SHARED_BROWSER_PROFILE = BrowserProfile(
+    id = SHARED_PROFILE_ID,
+    emoji = SHARED_PROFILE_EMOJI,
+)
+
+val INITIAL_BROWSER_PROFILES = listOf(
+    DEFAULT_BROWSER_PROFILE,
+    SHARED_BROWSER_PROFILE,
 )

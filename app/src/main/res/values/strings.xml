@@ -1274,8 +1274,8 @@
     <string name="captcha_compatibility_allow_for_tab">Allow for tab</string>
     <string name="captcha_compatibility_allow_for_profile">Allow for profile</string>
     <string name="captcha_compatibility_deny">Don’t allow</string>
-    <string name="gecko_extensions_title">Firefox extensions</string>
-    <string name="gecko_extensions_summary">Browse with Gecko and install Mozilla-signed add-ons</string>
+    <string name="gecko_extensions_title">Extensions (Bitwarden &amp; Add-ons)</string>
+    <string name="gecko_extensions_summary">Manage Bitwarden, uBlock Origin, and installed add-ons</string>
     <string name="gecko_invalid_address">This address cannot be opened.</string>
     <string name="gecko_extension_invalid_xpi">Use a direct HTTPS URL to a Mozilla-signed XPI package.</string>
     <string name="gecko_extension_install_network_failure">Download failed. Check your connection and the XPI address, then try again.</string>

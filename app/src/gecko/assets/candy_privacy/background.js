@@ -775,12 +775,75 @@ browser.webRequest.onBeforeRequest.addListener((details) => {
     });
     return { cancel: true };
   }
+  const lowerUrl = details.url.toLowerCase();
+  const isSegment = lowerUrl.includes(".ts?") || lowerUrl.endsWith(".ts") ||
+    lowerUrl.includes(".m4s?") || lowerUrl.endsWith(".m4s") ||
+    lowerUrl.includes(".vtt") || lowerUrl.includes(".srt");
+  const isAd = lowerUrl.includes("doubleclick.net") || lowerUrl.includes("googleads") ||
+    lowerUrl.includes("/pagead/") || lowerUrl.includes("adnxs.com");
+  const isYouTubeChunk = lowerUrl.includes("googlevideo.com") || lowerUrl.includes("/videoplayback");
+
+  if (!isSegment && !isAd && !isYouTubeChunk && (
+    lowerUrl.includes(".m3u8") ||
+    lowerUrl.includes(".mpd") ||
+    lowerUrl.includes(".mp4") ||
+    lowerUrl.includes(".webm") ||
+    lowerUrl.includes(".mkv") ||
+    lowerUrl.includes("/manifest(") ||
+    details.type === "media"
+  )) {
+    if (nativePort && (details.url.startsWith("http://") || details.url.startsWith("https://"))) {
+      nativePort.postMessage({
+        type: "media-stream-detected",
+        protocolVersion: PROTOCOL_VERSION,
+        url: details.url,
+        pageUrl: pageHost ? `https://${pageHost}/` : null,
+      });
+    }
+  }
   return {};
 }, { urls: ["http://*/*", "https://*/*"] }, ["blocking"]);
 
 browser.webRequest.onBeforeSendHeaders.addListener((details) => {
   const token = tokenByTab.get(details.tabId);
   const policy = token && policiesByToken.get(token);
+  const lowerUrl = details.url.toLowerCase();
+  const isSegment = lowerUrl.includes(".ts?") || lowerUrl.endsWith(".ts") ||
+    lowerUrl.includes(".m4s?") || lowerUrl.endsWith(".m4s");
+  const isAd = lowerUrl.includes("doubleclick.net") || lowerUrl.includes("googleads");
+  const isYouTubeChunk = lowerUrl.includes("googlevideo.com") || lowerUrl.includes("/videoplayback");
+
+  const isMediaCandidate = details.type === "media" ||
+    lowerUrl.includes(".m3u8") || lowerUrl.includes(".mpd") ||
+    lowerUrl.includes(".mp4") || lowerUrl.includes(".webm") ||
+    lowerUrl.includes(".mkv") || lowerUrl.includes("/manifest") ||
+    lowerUrl.includes("/hls/") || lowerUrl.includes("/playlist") ||
+    lowerUrl.includes("master.m3u8") || lowerUrl.includes("format=m3u8");
+
+  if (!isSegment && !isAd && !isYouTubeChunk && isMediaCandidate) {
+    if (nativePort && (details.url.startsWith("http://") || details.url.startsWith("https://"))) {
+      const headerMap = {};
+      let referer = null;
+      let userAgent = null;
+      (details.requestHeaders || []).forEach((h) => {
+        if (h.name && h.value) {
+          headerMap[h.name] = h.value;
+          const lowerName = h.name.toLowerCase();
+          if (lowerName === "referer") referer = h.value;
+          if (lowerName === "user-agent") userAgent = h.value;
+        }
+      });
+      if (!referer && details.documentUrl) referer = details.documentUrl;
+      nativePort.postMessage({
+        type: "media-stream-detected",
+        protocolVersion: PROTOCOL_VERSION,
+        url: details.url,
+        pageUrl: referer,
+        userAgent: userAgent,
+        headers: headerMap,
+      });
+    }
+  }
   if (!policy) return {};
   return {
     requestHeaders: CandyPrivacySignals.requestHeaders(details.requestHeaders, policy),
@@ -788,7 +851,42 @@ browser.webRequest.onBeforeSendHeaders.addListener((details) => {
 }, { urls: ["http://*/*", "https://*/*"] }, ["blocking", "requestHeaders"]);
 
 browser.webRequest.onHeadersReceived.addListener((details) => {
-  if (details.type !== "main_frame" || !nativePort || !Number.isInteger(details.statusCode)) {
+  if (!nativePort || !Number.isInteger(details.statusCode)) {
+    return;
+  }
+  // Check for media Content-Type responses (.m3u8, video/mp4, etc.)
+  if (details.statusCode >= 200 && details.statusCode < 400 && details.type !== "main_frame") {
+    const contentTypeHeader = (details.responseHeaders || []).find((h) =>
+      typeof h.name === "string" && h.name.toLowerCase() === "content-type"
+    );
+    const contentType = (contentTypeHeader?.value || "").toLowerCase();
+    const lowerUrl = details.url.toLowerCase();
+    const isSegment = lowerUrl.includes(".ts?") || lowerUrl.endsWith(".ts") ||
+      lowerUrl.includes(".m4s?") || lowerUrl.endsWith(".m4s") ||
+      lowerUrl.includes(".vtt") || lowerUrl.includes(".srt");
+    const isAd = lowerUrl.includes("doubleclick.net") || lowerUrl.includes("googleads");
+    const isYouTubeChunk = lowerUrl.includes("googlevideo.com") || lowerUrl.includes("/videoplayback");
+
+    if (!isSegment && !isAd && !isYouTubeChunk && (
+      contentType.includes("application/vnd.apple.mpegurl") ||
+      contentType.includes("application/x-mpegurl") ||
+      contentType.includes("application/dash+xml") ||
+      contentType.includes("video/mp4") ||
+      contentType.includes("video/webm") ||
+      details.type === "media" ||
+      lowerUrl.includes(".m3u8") ||
+      lowerUrl.includes(".mpd")
+    )) {
+      nativePort.postMessage({
+        type: "media-stream-detected",
+        protocolVersion: PROTOCOL_VERSION,
+        url: details.url,
+        pageUrl: details.documentUrl || details.initiator || null,
+      });
+    }
+  }
+
+  if (details.type !== "main_frame") {
     return;
   }
   const request = mainFrameRequestsById.get(details.requestId);
@@ -846,6 +944,24 @@ browser.runtime.onMessage.addListener((message, sender) => {
     const token = tokenByTab.get(sender.tab.id);
     const policy = token && policiesByToken.get(token);
     return Promise.resolve(contentPolicy(policy));
+  }
+  if (message.type === "media-stream-detected") {
+    if (nativePort && typeof message.url === "string") {
+      const page = message.pageUrl || sender.tab?.url || "";
+      const headers = message.headers || {};
+      if (page && !headers["Referer"]) headers["Referer"] = page;
+      headers["User-Agent"] = navigator.userAgent;
+      nativePort.postMessage({
+        type: "media-stream-detected",
+        protocolVersion: PROTOCOL_VERSION,
+        url: message.url,
+        title: message.title || "",
+        pageUrl: page,
+        userAgent: navigator.userAgent,
+        headers: headers,
+      });
+    }
+    return undefined;
   }
   if (message.type === "inline-video-state") {
     updateInlineVideoState(message, sender);

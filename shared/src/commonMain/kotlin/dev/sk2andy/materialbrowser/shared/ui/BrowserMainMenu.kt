@@ -577,6 +577,8 @@ private fun BrowserMainMenuContent(
             )
         }
 
+        extensionContent(onExtensionCommit)
+
         if (pageItems.isNotEmpty()) {
             BrowserMainMenuSectionTitle(
                 title = resources.sectionTitle(BrowserFeatureMenuSection.Page),
@@ -635,8 +637,6 @@ private fun BrowserMainMenuContent(
                 modifier = Modifier.testTag(BrowserMainMenuTestTags.CandyGroup),
             )
         }
-
-        extensionContent(onExtensionCommit)
 
         val browserItems = groupedItems[BrowserFeatureMenuSection.Browser].orEmpty()
         if (browserItems.isNotEmpty()) {
