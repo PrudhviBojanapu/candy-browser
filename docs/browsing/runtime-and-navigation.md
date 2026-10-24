@@ -39,9 +39,8 @@
 | Address text | `AddressSubmissionRules` → `AddressResolver` → controller | Unknown input becomes HTTPS host navigation or selected-engine search |
 | Trusted Google AMP URL | `AutoDeAmpRules` → shared main-frame navigation listener → controller-owned replacement load | When the default-on setting is enabled, unwrap only `google.com`/`www.google.com` `/amp/[s/]…` viewer URLs and reversible one-label `*.cdn.ampproject.org` `/c[/s]/…` or `/v[/s]/…` document-cache URLs; deny the wrapper before posting one publisher load |
 | Android intent | `IncomingBrowserIntent` → controller | Accept normalized HTTP(S) URLs from `ACTION_VIEW` data or the complete `EXTRA_TEXT` value of `ACTION_SEND` `text/plain` and `text/html` shares. Incoming URLs stay in Candy without automatically handing the initial URL or its redirects back to another app; a subsequent user tap can authorize a handoff. The optional external-link preview keeps a transient Gecko session outside the tab/session store until **Open in Candy** creates a regular tab in the chosen profile; when disabled, the immediate-tab path remains. Root Back returns to the calling app. |
-| Explicit web address, URL suggestion or scanned URL | `AddressResolver` → `submitAddressFromAddressBar` → external-app handling | Offer direct HTTP(S) input to matching apps according to Automatic / Always ask, including a blank tab without an existing engine session. Search text stays in Candy. Missing handlers continue the normalized URL in the source tab once, with the same bounded redirect grant. Internal navigation, incoming links and immediately returned app links retain the browser-only submission path. |
 | Explicit special-scheme address | `BrowserUriPolicy` → `ExternalAppLauncher` | Treat typed, pasted or scanned safe schemes as user-authorized app handoffs; keep internal schemes blocked |
-| App link or special scheme | `ExternalNavigationPolicy` → `BrowserUriPolicy` → `ExternalAppLauncher` | Keep a tapped same-site HTTP(S) redirector in the engine so its server redirect can resolve; route documented `play.google.com/store/` links explicitly to Google Play with web fallback; offer other cross-site targets and the remaining bounded redirect chain, including new-window and external-preview navigation, to matching non-browser apps in Automatic mode or a direct default handler in Always ask mode; either launch automatically or require confirmation according to the persisted browser setting; stop a redirected handoff before Android opens and restore only the validated source history entry; reopen an immediately returned same-site web link in its source Candy tab or existing external preview instead of creating another navigation surface; keep unavailable links in the engine; allow safe main-frame special-scheme handoffs; block unsafe/internal schemes and subframes |
+| App link or special scheme | `ExternalNavigationPolicy` → `BrowserUriPolicy` → `ExternalAppLauncher` | Keep a tapped same-site HTTP(S) redirector in the engine so its server redirect can resolve; route documented `play.google.com/store/` links explicitly to Google Play with web fallback; offer other cross-site targets and the remaining bounded redirect chain, including new-window and external-preview navigation, only to a direct non-browser default handler; either launch automatically or require confirmation according to the persisted browser setting; stop a redirected handoff before Android opens and restore only the validated source history entry; reopen an immediately returned same-site web link in its source Candy tab or existing external preview instead of creating another navigation surface; keep unavailable or ambiguous links in the engine; allow safe main-frame special-scheme handoffs; block unsafe/internal schemes and subframes |
 | APK link or redirect | `ApkDownloadNavigationRules` → browser download pipeline | Route a tapped main-frame APK link and its authorized redirect chain directly to the selected download manager instead of rendering a blank engine page |
 | Link Peek | `LinkPeekPreviewNavigationPolicy` → transient Gecko session | Keep only HTTP(S); do not hand off preview navigation |
 | Site Capsule | `CapsuleIntentRules` → capsule runtime | Apply capsule-specific navigation boundary before normal routing |
@@ -57,13 +56,11 @@
 | Gecko unsuccessful page stop | `GeckoBrowserEngineSessionAdapter` → shared engine events | A failed stop without a failure description or kind updates loading state only; show a native error page only for concrete error details, including details arriving after the stop. Replacing a load must not synthesize a temporary unreachable-page error. |
 | Offline page | failed main-frame navigation + `BrowserConnectivityMonitor` → controller → `PageErrorFeedbackRules` | Require Android's validated default internet capability, never cover an already loaded page merely because connectivity drops, auto-reload on reconnect only before the game starts, and preserve the game behind an explicit reload banner afterward |
 | Gecko first-page history and Root Back | `GeckoBootstrapHistoryRules` → engine history and `RootTabBackRules` | The first app-owned page replaces its internal Privacy bootstrap entry. Back/Forward skips legacy bootstrap entries using unchanged native indices; snapshots containing any bootstrap entry are rejected. With no real previous page, Back returns to an active opener first, keeping pinned children. Without an opener, Back closes into overview or returns a last/pinned website to Candy home. Android receives Back only once that terminal tab is already home. Only the current session's exact origin and token may authorize a bootstrap navigation. |
-| Gecko native new-window binding | `GeckoNativeSessionBindingRules`, `GeckoPrivacyHostRuntime`, Candy Privacy background | Authenticate the exact extension/session/token/challenge/revision through a denied internal `tabs.update`, without loading a document. The original HTTP request waits for that binding, preserving POST data, referrer and opener; timeout, tab removal and native disconnect cancel it. Route the informational initial URI through existing popup rules even when Gecko omits a child load-request callback. Native POST popups can report that same URI again as a current-window navigation with the original user gesture. |
-| Gecko automatic popup app lookup | Gecko navigation response → controller app lookup → native new-session binding | Hold user-triggered HTTP(S) new-window requests while resolving external apps. With no handler, allow the original Gecko request so cross-site POST data, referrer and `window.opener` survive. Transfer any still-active bounded redirect grant to the child. Independently consume the exact child session and initial URL once, even when lookup outlasts the redirect grant or the child retains the user gesture; never repeat app lookup or extend grant expiry. Preserve this identity through the native window’s initial `about:blank` commit; clear it on a mismatching request, real-document commit, failure, explicit navigation and teardown. App handoff, Stop, session removal, replaced requests and stale completion deny the pending request exactly once. Same-tab requests and System WebView retain their existing routing. |
+| Gecko native new-window binding | `GeckoNativeSessionBindingRules`, `GeckoPrivacyHostRuntime`, Candy Privacy background | Authenticate the exact extension/session/token/challenge/revision through a denied internal `tabs.update`, without loading a document. The original HTTP request waits for that binding, preserving POST data, referrer and opener; timeout, tab removal and native disconnect cancel it. Route the informational initial URI through the existing popup rules because Gecko does not emit another child load-request callback for it. |
 | Gecko identity popup routing | `FederatedLoginRules` → Gecko navigation request → native new-session binding | Keep user-triggered new-window navigation to known HTTPS Google identity endpoints in Gecko, including provider navigation inside an adopted native popup. External-app fallback would replace the child with a GET tab and lose `window.opener`. Existing popup rules still decide whether to admit the child; cookie compatibility remains separately consented. |
 | Gecko page-requested window close | Gecko content delegate → session/adapter close-request listener → controller | Honor `window.close()` only for native popup tabs adopted from Gecko in this process. Post closure through the existing tab-removal path, recheck exact session identity, and return to a valid opener only when the closing popup was selected. Background closure preserves the foreground selection; manual/restored/recreated tabs receive no close grant. Clear listeners on close/crash and remove grants on session replacement, tab removal, snooze and controller destruction. |
 | System WebView native popup adoption | System factory prepared-session slot → controller popup admission → `WebViewTransport` | Supply the exact configured child WebView instead of replaying its first URL in a new tab. Preserve opener, POST body and referrer; reject windows without a user gesture. First nonblank navigation uses Candy's popup filtering and existing pending-tab policy; initial POST uses the native `onPageStarted` fallback. `onCloseWindow` uses the same exact-session controller close grant. Blob popups download through the opener and remove the transient child. |
-| Stop and reload before the first document | Controller pending navigation → Gecko readiness queue | Stop cancels the user URL while preserving the Privacy bootstrap. Reload retries only that undispatched URL, waits for a fresh policy acknowledgement and the original viewport requirement, and rejects stale callbacks/session identities. Once the document has started, native reload preserves POST, history and scroll semantics. New navigation or session removal discards the stopped target. |
-| Pull to refresh | `BrowserPullToRefreshLayout` → `BrowserPullGestureRules` / `BrowserPullToRefreshRules`; Gecko touch admission: `GeckoPullToRefreshRules` → `BrowserController.reload()` | Admit a downward-dominant gesture on a visible, idle web page at document top; Gecko additionally requires the touched scroll chain to be at its top and permit vertical overscroll without website-owned input; on `instagram.com`, `tiktok.com`, `youtube.com` and their subdomains, require a start within 160 dp below the top safe inset; keep blank, obscured, Find-in-page, overview and video-only surfaces out of the gesture path |
+| Pull to refresh | `BrowserPullToRefreshLayout` → `BrowserPullGestureRules` / `BrowserPullToRefreshRules` → `BrowserController.reload()` | Admit a downward-dominant gesture anywhere on a visible, idle web page whose engine-reported document offset is at the top; on `instagram.com`, `tiktok.com`, `youtube.com` and their subdomains, require a start within 160 dp below the top safe inset so lower feed gestures stay with the page; keep blank, obscured, Find-in-page, overview and video-only surfaces out of the gesture path |
 
 ## Invariants
 
@@ -109,9 +106,7 @@
   margins with their maximum; a Compose safe-drawing host already owns keyboard space.
   On Activity resume and window-focus restoration, reconcile the current root insets and request
   a fresh content traversal. A hidden-IME callback missed while stopped or behind another window
-  must not leave the inner renderer cropped by the previous keyboard height. Ignore a nonzero IME
-  bottom inset whenever the effective insets report the keyboard hidden; some app handoffs retain
-  the stale height after dismissal.
+  must not leave the inner renderer cropped by the previous keyboard height.
   Address editing and Find in page retain chrome-owned
   IME suppression, so their keyboards do not resize the underlying website.
 - When an address suggestion selects an existing Gecko tab, dismiss the address editor and
@@ -205,47 +200,23 @@
 - In `Automatic` mode, use Android's direct non-browser default handler when one exists. Otherwise,
   search installed apps for a host-specific HTTP(S) handler off the UI thread. Open a sole matching
   app directly, or show Android's app chooser when several match; unavailable links continue in Candy.
-  Also declare visibility for launchable apps: on Android 15 a real app using URI-relative filter
-  groups (such as GitHub) can remain invisible to scheme-only web queries. Candidate selection still
-  requires the requested URL to resolve to a host-specific handler; launcher visibility alone never
-  authorizes a web handoff. Apps installed while Candy remains open are immediately eligible.
-  Recheck the source after lookup
+  Apps installed while Candy remains open are immediately eligible. Recheck the source after lookup
   and show handoff feedback only after Android accepts the external launch.
   Bind a regular-tab lookup to the exact engine session, document-start generation and main-frame
   request revision, while retaining selected-tab/profile/private-surface checks. A same-document
   History API URL update does not cancel the original tap or its browser fallback. A new document,
   newer main-frame request or explicit navigation/Stop command invalidates the lookup immediately.
-  Track the latest lookup independently for each tab or external preview. An authorized redirect
-  arriving from a background session cannot cancel the selected tab's lookup. Clear pending IDs
-  on completion, explicit navigation/Stop, session removal, preview release and controller destruction.
   Link Peek and confirmation prompts keep their existing strict URL/generation snapshots.
 - Honor Android's selection of Candy for incoming `ACTION_VIEW` and `ACTION_SEND` URLs. Neither
   the initial URL nor its automatic redirect chain receives an external-navigation grant; this prevents
   the calling app from returning the same link to Candy indefinitely. A subsequent user tap in the
   preview or regular tab follows the normal bounded external-navigation policy.
-- Normalize an empty HTTP(S) path to `/` only at Android app lookup/start boundaries through
-  `ExternalAppWebUrlRules`. Real app filters can require a slash (`https://github.com/`) and reject
-  the equivalent slashless web address. Apply the same target to default resolution, installed-app
-  scanning, explicit package launches and web-data `intent://` requests. Preserve raw query/fragment
-  escaping and retain the original address in browser fallback, handoff and feedback state. App-owned
-  routing can still return unsupported pages to a browser after Android accepts the launch.
 - Launch external activities with `FLAG_ACTIVITY_NEW_TASK` even from an Activity so standard-mode
   app activities use their own task affinity rather than joining Candy's Recents entry. Rebuild
   `intent://` requests with only `ACTION_VIEW`, browsable data, and the requested external package;
   discard supplied components, selectors, extras, and flags. Valid HTTP(S) intent data can reach the
   named app before its validated browser fallback, with non-browser/default-handler requirements;
   Candy's own package and unsafe/internal schemes remain ineligible.
-- Address-editor submissions, URL suggestions and QR scans use the explicit address-bar entry
-  point. Only input classified as a direct HTTP(S) address receives an app lookup; a search provider's
-  generated URL does not. Stop the previous engine load and cancel pending initial/privacy-ready
-  loads before capturing the new lookup snapshot. Preserve Automatic / Always ask, private source
-  identity, exact-session and stale-request guards. Browser fallbacks and immediately returned app links use the existing
-  browser-only continuation, so a rejected or returned handoff cannot repeat its initial app lookup.
-- Determine a regular tab's app-link source from the exact engine session's normalized current
-  history entry before falling back to displayed tab state. An engine can report
-  the target as started before its navigation request arrives; that optimistic target must not make
-  a cross-site Google-to-GitHub tap look like same-site browsing. Apply the same source to redirect
-  grants and app-link policy. Retain existing gesture, session, expiry and stale-completion checks.
 - Offer user-tapped HTTP(S) links to matching non-browser apps in `Automatic` mode. Keep browsers out
   of the app chooser; unavailable app links continue in Candy. A same-registrable-site
   redirector such as a search result's intermediate URL also stays in that session; its bounded
@@ -307,23 +278,6 @@
   Missing metrics fail closed. Offset the native refresh indicator below the top safe-drawing inset so it
   stays clear of display cutouts. Normal navigation does not show the pull indicator, and the existing
   menu reload remains the accessible non-gesture action.
-  For Gecko, document top alone is insufficient: a GitHub-style issue dialog can still have content
-  above its own scroll position. Dispatch each touch-down once through GeckoView 157's
-  `onTouchEventForDetailResult`, blocking parent interception until both its asynchronous hit-test
-  and the first downward drag permit the pull. Query at most one Move as well as Down, since a
-  touchmove listener may claim a gesture after Down. Keep the gesture with Gecko when the touched
-  scroll chain can scroll upward, the website consumes the drag, or CSS disallows vertical overscroll.
-  Lock the initial scroll-chain decision for the stream;
-  reaching the container top requires a fresh touch-down before a pull can refresh. Ignore delayed
-  answers after Up, Cancel, a second pointer, a replacement stream/session or view detachment.
-  Subsequent events use normal Gecko delivery; do not allocate a detail result on every Move.
-  Gecko also honors `overflow:hidden` on the root document: reaching an inner dialog's top does
-  not override that page-level lock. Tests for a permitted refresh use an unlocked root and retain
-  separate root-locked, nested-scrolled and content-owned controls.
-  Canceling a native pull hides its transient indicator and clears its captured refresh callback.
-  An already accepted refresh remains active until the normal loading completion; cancellation
-  does not reset that indicator or change its safe-area offsets.
-  This additional engine admission is Gecko-specific; System WebView retains its existing contract.
   Full-page pull admission is the default. Only Instagram, TikTok and YouTube (including subdomains)
   retain the 160 dp top start zone to protect Reels, video feeds and nested scrollers below that zone.
   Match the canonical HTTP(S) host, never URL path/query text or lookalike domain suffixes, and update
@@ -481,7 +435,7 @@ WebView's version-dependent native inset behavior is described in
 | Status-bar backdrop for protected headers | During document/header discovery, a viewport-wide fixed or sticky semantic header anchored to the top safe inset and an opaque active `theme-color` request a solid status-bar backdrop. At most 24 cached header/ancestor styles are checked in one discovery pass; recent additions take priority, and Reddit's open component roots report structural header changes. Repeated class states are ignored; changed states and Cover layout changes are coalesced after 150 ms. Scrolling never requests backdrop work. The backdrop only paints Candy's status-bar sibling; it does not alter the engine viewport, CSS inset, or native top margin. The report is revision/navigation-validated and cleared on navigation or tab removal. Theme metadata and media-query changes update or clear the color. Pages without a valid theme color keep the normal status-bar treatment. |
 | Other fixed / sticky | Bounded per-element stylesheet rules apply `originalTop + inset` to discovered nonnegative finite resolved CSS-pixel tops. Negative tops retain author geometry by default; the developer **Add inset to negative top values** switch restores addition. Fixed boxes extending into the lower half of the viewport are excluded because CSSOM can resolve an undeclared top on a bottom-anchored box; no positioned-element padding or inline top is added |
 | Full-viewport fixed modal | A fixed box with top and bottom at zero and geometry covering the viewport may receive the top inset while retaining bottom zero. A fixed full-viewport overlay containing a full-viewport dialog instead gives its border-box content top padding and lifts bounded absolute buttons in its first header below the inset, leaving the overlay behind the status bar. This covers ReactModal-style portals whose dialog is absolutely positioned and centered with a transform. Narrow dialogs, scrims, and bottom-anchored navigation retain their geometry. At startup and after DOM insertion, bounded candidates with an inline full-viewport inset or modal/dialog hint bypass the click gate; they are checked in the cooperative worker. Tracked boxes are rechecked when their class, style, or content changes, so hidden modals and drawers release protection. Cover pages still preserve author padding or child content already below the safe area and recheck when a tracked modal disappears. A nameless full-screen overlay with unsafe child content may be indistinguishable from a modal; named scrims and backdrops without a full-viewport dialog child are excluded. |
-| Predeclared selectors | Initial and event-driven CSS-source scans protect full selectors with literal `fixed`/`sticky` and a finite pixel `top` in the same CSS declaration block, even before any element matches that state. Split top/position declarations and competing inset declarations disqualify same-selector clones. Other scanned top/position/inset selectors become zero-specificity exclusions, so overlapping matches use the bounded DOM path and its resolved author styles instead of a clone that would override the real cascade. Ambiguous pseudo-element selectors retain authored geometry. Conflict exclusions share the 32-KiB selector-text budget. Negative declarations participate in same-selector source precedence but receive no protection rule unless the developer switch is on. Fixed selectors with a bottom anchor or inset shorthand require element geometry and stay on the bounded element path. |
+| Predeclared selectors | Initial and event-driven CSS-source scans protect full selectors with literal `fixed`/`sticky` and a finite pixel `top` in the same CSS declaration block, even before any element matches that state. Negative declarations participate in same-selector source precedence but receive no protection rule unless the developer switch is on. Fixed selectors with a bottom anchor or inset shorthand require element geometry and stay on the bounded element path. |
 | Selector ownership | Elements matching a protected selector do not receive a second element-level top addition. A refreshed known header receives its own author-top rule and a zero-specificity selector exclusion, so late selector builds cannot overwrite that correction. Body padding and unmatched element protection remain separate. Reddit keeps its scoped component ownership. |
 | Removed-node ownership | Child-list removals sweep bounded ownership metadata even outside the interaction/discovery window. Disconnected rule owners, negative-top markers, candidates and stylesheet sources are released without style or rectangle reads. Reddit component layers and observers also release detached roots after the structural discovery budget is exhausted; a removed header must not root an obsolete SPA subtree. |
 | Known header top changes | Retain at most eight semantic or header-hinted candidates. Actual `class`, `style`, or `hidden` changes on a candidate or its ancestors mark affected headers without a trusted-click requirement. Repeated attribute states are ignored. A deduplicated queue rechecks up to the smaller of eight and the configured element batch limit, with at least 50 ms between passes; pending work survives scroll cancellation and does not delay other ready worker tasks. Each pass snapshots primitive author styles with both Candy top sheets disabled once, then replaces only changed top declarations. Positive tops use the current author top plus one inset; static, unresolved, bottom-anchored and hidden negative states release unneeded top protection. Detached candidates release owned markers and free cache slots. Disable, policy and navigation-generation resets clear the queue and overrides. The browser's synchronous style flush may exceed the cooperative time budget; the candidate count remains bounded. |
@@ -492,7 +446,6 @@ WebView's version-dependent native inset behavior is described in
 | Other top values | Literal `auto` and unresolved values are not changed. Negative resolved CSS-pixel values are preserved by default; only explicit developer opt-in adds the inset. Nonnegative and above-inset tops remain included subject to the lower-half fixed-box guard. The switch defaults off, persists globally, resets with the shared defaults and rebuilds active protection when changed. |
 | Initial discovery | Protect the first available body without waiting for the worker; one bounded body traversal plus a coalesced semantic check when the DOM becomes interactive and again at final load; at most eight semantic candidates, 32 cached candidate/ancestor identities and eight fixed-header proofs are retained |
 | Later discovery | DOM subtrees retain trusted click/drop gates. Relevant semantic additions/class changes, trusted clicks and stylesheet loads also request the bounded semantic check, allowing late SPA hydration without a reload. Changes affecting cached headers use their local top queue instead of another semantic document query. CSS-source changes retain their separate queue without an interaction requirement. |
-| External-link previews | The transient session accepts current-generation native header and emergency top fallback reports, removes duplicate CSS correction, and applies the same native renderer inset ownership as regular tabs. New documents and same-document routes clear the fallback and advance a separate navigation generation; stale reports cannot alter the replacement page. |
 | Same-document routes | A same-document URL change while loading stays false starts a new safe-area generation even when the document remains alive. Candy clears the previous route's native top-header fallback and status-bar backdrop, then republishes the policy. The prototype rechecks an unchanged `viewport-fit=cover` declaration for the new route. During the next two seconds, ordinary element moves in the document or Reddit's observed open component roots can request at most three debounced cover rechecks; these are mutation-driven and never triggered by scrolling. Title-only state changes retain the current generation. |
 | Foreground tab policy updates | Changing the selected tab toggles scroll-metrics reporting and advances the delivery revision. Revision-only updates retain the existing CSS layers, markers, discovery work and layout. Cached native header fallback and status-bar backdrop reports (including a clear) are replayed with current revision/navigation freshness. Navigation, inset, enable and actual safe-area settings changes still rebuild the affected protection. |
 | Domain changes | Before loading another normalized HTTP(S) host, Candy clears automatic top fallback, header fallback and status-bar backdrop, advances the safe-area generation and removes their native top margin. Explicit per-site Force safe area settings remain authoritative. Gecko also emits a navigation start when the host changes during an already-running load. Content policies carry the current host; the outgoing document ignores a foreign-host policy before changing its revision/generation. Fallback and backdrop reports require the current normalized host and top frame. These event-driven guards add no DOM scan or scroll work; same-host reloads and routes retain their existing lifecycle. |
@@ -526,10 +479,7 @@ The CSS-source queue registers at most 128 stylesheet identities, visits at most
 source version, and caps the configuration epoch at 65,536 rule visits, 4,096 source events and
 131,072 cooperative CSS work steps. Unsupported entries consume these budgets. It admits at
 most 256 distinct selectors, at most 2,048 characters per selector and 32,768 characters in the
-combined ownership matcher, including conflict exclusions. Conflict collection is independent of
-the smaller configured output-rule cap. A truncated conflict inventory cannot prove a clone safe,
-so exhausted source/selector budgets withdraw selector clones while bounded DOM protection remains.
-The configured total protection-rule cap also applies. Source top
+combined ownership matcher. The configured total protection-rule cap also applies. Source top
 importance is retained when choosing between eligible rules with exactly the same selector;
 accepted protection declarations themselves are important. Element and selector rules share the
 configured protection cap, with one slot reserved for body protection. Body protection is processed
@@ -558,13 +508,9 @@ would discard CSSOM-only insertions. Persisting canonical text retains the rules
 and committed rule references are refreshed. This adds bounded text preparation/parsing, not
 scroll-driven work. Original Page Source remains distinct from the live injected style element.
 
-Only plain loaded stylesheets and ordinary complete selector rules produce clones.
-Grouping contexts (`@media`, `@supports`, `@layer`) and nontrivial sheet media are traversed only
-for possible conflict selectors, without evaluating their conditions; nested rules consume the same
-source/work budgets and at most 16 grouping levels. Unrelated passive selectors remain eligible.
-Imports and keyframes remain unsupported. Unresolved CSS nesting marks the conflict inventory
-incomplete. Split position/top declarations and non-pixel top expressions are recorded as conflicts;
-they never produce their own protection clone.
+Only plain loaded stylesheets and ordinary complete selector rules are admitted in this first
+iteration. Grouping contexts (`@media`, `@supports`, `@layer`), nontrivial sheet media, imports,
+keyframes, CSS nesting, split position/top declarations and non-pixel top expressions are skipped.
 Inaccessible cross-origin `cssRules` are skipped without fetching a second copy of page CSS.
 Direct `insertRule`/`deleteRule`/`replace`/`replaceSync` edits without DOM source events, adopted
 stylesheets and shadow-tree sources are not monitored; no page-world API hooks are installed.
@@ -630,10 +576,7 @@ definition/structural event remain limitations. Disable removes only the helper'
 and pending task. There is no page-world `attachShadow` hook, polling or network request.
 
 Same-block declarations
-are candidates, not a general proof of the final cascade. Within the scanned source budget,
-split declarations and overlapping selectors exclude ambiguous matches from cloned rules;
-bounded element discovery uses their resolved author geometry. Unvisited conflicting states keep
-their authored geometry until admitted by the existing discovery gates. Inline-important and other stronger
+are candidates, not a general proof of the final cascade; inline-important and other stronger
 rules remain boundaries. Real Amazon CDN accessibility and product-state coverage require separate
 manual verification, not inference from the synthetic class-switch regression.
 
@@ -649,8 +592,8 @@ is disabled/reconfigured; element-level captures retain their existing ownership
 
 `top` has the CSS initial value `auto`, not zero. CSSOM `getComputedStyle()` may return a resolved
 used pixel value for a positioned visible box; the prototype filters the returned value, not author
-stylesheet declarations. The bounded selector scan clones explicit declaration pairs only. It records
-split declarations as conflicts instead of reconstructing their cascade or overriding them with a stale pair.
+stylesheet declarations. The bounded selector scan reads explicit declaration pairs only; it does
+not reconstruct the cascade of arbitrary split declarations.
 
 The lower-half guard leaves bottom-anchored fixed controls and taller bottom panels alone when
 CSSOM resolves an undeclared `top` into pixels. It can also leave an explicitly top-anchored
@@ -848,35 +791,10 @@ WebView request state.
 | WebView touch-stream ownership | `BrowserScrollInstrumentedTest#browserWebViewRetainsTouchStreamFromInterceptingParent` plus `#fullBrowserWindowKeepsWebViewTouchStreamsComplete` on API 34+ |
 | WebView reverse-flick momentum | `BrowserMomentumRecoveryRulesTest` plus `BrowserScrollInstrumentedTest#busyLongPageKeepsEveryRapidAlternatingFlick` on the affected WebView version |
 | Draggable page scrollbar | `BrowserScrollBarRulesTest`, `CandyPrivacyHostContractTest`, `BrowserScrollBarInstrumentedTest`, and `GeckoBottomBarScrollInstrumentedTest#realGeckoScrollbarPortReadsAndMovesLongDocument` on API 34+ |
-| Pull to refresh | `BrowserPullGestureRulesTest`, `BrowserPullToRefreshRulesTest`, `GeckoPullToRefreshRulesTest`, `BrowserPullToRefreshLayoutInstrumentedTest`, and real-engine `GeckoPullToRefreshInstrumentedTest` on an API 34+ emulator; the latter uses a local GitHub-shaped dialog, not an authenticated live GitHub page |
+| Pull to refresh | `BrowserPullGestureRulesTest`, `BrowserPullToRefreshRulesTest`, and `BrowserPullToRefreshLayoutInstrumentedTest` on an API 34+ emulator |
 | Android web-content fullscreen chrome | `FullscreenVideoRulesTest` plus `FullscreenVideoChromeInstrumentedTest` in the Full and System WebView builds on a dedicated API 34+ emulator |
 | Edge-to-edge window, safe web viewport, focused search, and representative site layouts | `SystemWebViewEdgeToEdgeInstrumentedTest` and `GeckoEdgeToEdgeInstrumentedTest` run deterministic layout profiles derived from YouTube, Google, ESPN, NYTimes, CNN, Reddit, Facebook, IKEA, GitHub, Discord, Instagram, TapTap, Vimeo, Wikipedia, Stack Overflow, and DuckDuckGo on API 34+; the TapTap profile asserts safety immediately in the scroll task so delayed post-scroll repair cannot mask a jumping sticky header; live sites remain manual/nightly smoke targets rather than merge gates |
 | Gecko media, fullscreen and PiP policy | `GeckoMediaRulesTest`, `FullscreenVideoRulesTest`, `GeckoBrowserEngineAdapterTest` and `GeckoPictureInPictureInstrumentedTest` on a dedicated API 34+ emulator |
 | Long background/resume page continuity | `GeckoContentPresentationGateTest` and `BrowserPageResumeInstrumentedTest` on a dedicated API 34+ emulator; repeated 31-second intervals, real input/rendered pixels, scroll/history, no reload, regular/private Gecko and System WebView |
 | Android intent routing | `IncomingBrowserIntentInstrumentedTest`, `ExternalAppLauncherInstrumentedTest`, and `MainActivityIncomingNavigationInstrumentedTest` for cold/warm incoming links, initial redirects, and subsequent tapped handoffs |
 | Distribution and TLS channels | `./gradlew testFullDebugUnitTest testFossDebugUnitTest testFullUserCaDebugUnitTest assembleFullDebug assembleFossDebug assembleFullUserCaDebug`, then `python3 scripts/test_network_security_apks.py` |
-
-
-## External-app return and website exceptions
-
-| Contract | Behavior / owner |
-| --- | --- |
-| Accepted app handoff | Only `ExternalLaunchResult.Launched` offers **Opened in app → Open in Candy**; an unresolved lookup, unsupported app or unconfirmed Android chooser does not claim success |
-| Return action | The exact safe HTTP(S) target opens in the original tab/private context or external-link preview; no external launch lookup for this return |
-| Follow-up | **Do you want to always open this site in Candy?** offers visible **Yes** and **Cancel**; cancel changes no saved preference |
-| Scope | One registrable website, including all subdomains and paths, across all profiles; `ExternalAppSiteRules` reuses `SiteDomainRules` and the public-suffix boundary |
-| Routing | Saved exceptions override both Automatically and Always ask for HTTP(S) links and app intents with a safe web target; explicit **Open in app** remains available |
-| Lifetime | Snackbar offer survives background/resume. Token and tab/profile/session checks reject stale actions; new explicit navigation or tab selection dismisses the previous offer |
-| Private mode | Existing global exceptions apply. New private confirmations stay in memory for the private session, clear with private data, and never enter preferences or archives |
-| Storage | `BrowserSessionStore` stores at most 64 normalized sorted website domains in global `external_app_site_exceptions`; no paths or private targets are saved |
-| Settings | Browser → Links & apps → Open links in apps contains the existing global mode, individual exception reset and confirmed reset-all; reset restores the chosen global mode |
-| Presentation | `ExternalAppFeedbackSnackbar` owns lifecycle-aware feedback; `ExternalAppLinksSettingsPage` and shared `ExternalApps` artwork use existing Material theme mapping |
-| Tests | `ExternalAppSiteRulesTest`, focused `BrowserSessionStoreInstrumentedTest` / `BrowserControllerGeckoViewBindingInstrumentedTest`, `ExternalAppFeedbackSnackbarInstrumentedTest`, `ExternalAppLinksSettingsPageInstrumentedTest` |
-
-
-| Verification (2026-10-21) | Result |
-| --- | --- |
-| Full / Foss JVM suites | 2,067 tests each; shared Android JVM suite: 342 tests |
-| Controlled Android API 35 tests | 54 distinct passing cases across controller/store, Snackbar, settings navigation and header artwork; failed fixture setups were corrected and their four cases passed on rerun |
-| Visual coverage | All three palettes × Light/Dark/AMOLED for all headers; external-app page at 320 dp / 200% text; Snackbar confirmation at 100/200% text in Light/Dark |
-| Launch boundary | Controller tests use recording app-launch contexts and fake engine sessions for deterministic handoff/source checks; header and navigation tests render real Compose screens |

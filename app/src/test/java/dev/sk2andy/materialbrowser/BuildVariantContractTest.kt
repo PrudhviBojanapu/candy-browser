@@ -7,8 +7,8 @@ class BuildVariantContractTest {
     @Test
     fun `user certificate trust matches build type`() {
         val expected = when (BuildConfig.BUILD_TYPE) {
-            "debug", "release", "localRelease", "playRelease", "nightly" -> false
-            "userCaDebug", "userCaRelease", "userCaNightly" -> true
+            "debug", "release", "localRelease", "playRelease" -> false
+            "userCaDebug", "userCaRelease" -> true
             else -> error("Unknown build type: ${BuildConfig.BUILD_TYPE}")
         }
 
@@ -18,23 +18,12 @@ class BuildVariantContractTest {
     @Test
     fun `github updater is enabled only for github release channels`() {
         val expected = when (BuildConfig.BUILD_TYPE) {
-            "release", "userCaRelease", "nightly", "userCaNightly" -> true
+            "release", "userCaRelease" -> true
             "debug", "localRelease", "playRelease", "userCaDebug" -> false
             else -> error("Unknown build type: ${BuildConfig.BUILD_TYPE}")
         }
 
         assertEquals(expected, BuildConfig.ENABLE_GITHUB_UPDATES)
-    }
-
-    @Test
-    fun `nightly updates match distribution channel`() {
-        val expected = BuildConfig.BUILD_TYPE in listOf("nightly", "userCaNightly") ||
-            (BuildConfig.BUILD_TYPE == "playRelease" && BuildConfig.VERSION_NAME.contains("-nightly."))
-
-        assertEquals(
-            expected,
-            BuildConfig.NIGHTLY_BUILD,
-        )
     }
 
     @Test
@@ -61,8 +50,6 @@ class BuildVariantContractTest {
         val buildTypeSuffix = when (BuildConfig.BUILD_TYPE) {
             "release", "playRelease" -> ""
             "userCaRelease" -> ".ca"
-            "nightly" -> ".nightly"
-            "userCaNightly" -> ".ca.nightly"
             "debug", "localRelease", "userCaDebug" -> return
             else -> error("Unknown build type: ${BuildConfig.BUILD_TYPE}")
         }

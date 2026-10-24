@@ -41,7 +41,6 @@ class SnoozedTabStoreInstrumentedTest {
                 profileId = "work",
                 isPinned = true,
                 title = "Candy",
-                snoozePurpose = "Check returns",
                 url = "https://example.com",
             ),
             wakeAtMillis = 88L,
@@ -69,11 +68,7 @@ class SnoozedTabStoreInstrumentedTest {
 
     @Test
     fun privateTabsNeverReachPersistentJson() {
-        val privateTab = SnoozedTab(
-            BrowserTab("private", 1L, isIncognito = true, snoozePurpose = "Secret purpose"),
-            10L,
-            2L,
-        )
+        val privateTab = SnoozedTab(BrowserTab("private", 1L, isIncognito = true), 10L, 2L)
 
         SnoozedTabStore(context).save(listOf(privateTab))
 
@@ -81,25 +76,6 @@ class SnoozedTabStoreInstrumentedTest {
         assertFalse(
             preferences.getString(SnoozedTabStore.KEY_TABS, "").orEmpty().contains("private"),
         )
-        assertFalse(
-            preferences.getString(SnoozedTabStore.KEY_TABS, "").orEmpty().contains("Secret purpose"),
-        )
-    }
-
-    @Test
-    fun legacyRecordLoadsWithoutPurposeAndPurposeIsNormalizedAtStorageBoundary() {
-        preferences.edit().putString(
-            SnoozedTabStore.KEY_TABS,
-            """[{"id":"legacy","wakeAtMillis":100}]""",
-        ).commit()
-        assertEquals("", SnoozedTabStore(context).load().single().tab.snoozePurpose)
-
-        SnoozedTabStore(context).save(
-            listOf(SnoozedTab(BrowserTab("bounded", 1L, snoozePurpose = " x ".repeat(400)), 100L, 1L)),
-        )
-        val purpose = SnoozedTabStore(context).load().single().tab.snoozePurpose
-        assertTrue(purpose.length <= 240)
-        assertFalse(purpose.contains("  "))
     }
 
     @Test
@@ -124,11 +100,7 @@ class SnoozedTabStoreInstrumentedTest {
     @Test
     fun activeAndSnoozedMoveUsesOnePersistentSnapshot() {
         val sessionStore = BrowserSessionStore(context)
-        val pending = SnoozedTab(
-            BrowserTab("due", 1L, snoozePurpose = "Discuss with Lisa"),
-            10L,
-            2L,
-        )
+        val pending = SnoozedTab(BrowserTab("due", 1L), 10L, 2L)
         assertTrue(
             sessionStore.saveTabsAndSnoozedImmediately(
                 tabs = listOf(BrowserTab("active", 1L)),
@@ -145,9 +117,7 @@ class SnoozedTabStoreInstrumentedTest {
             ),
         )
 
-        val restored = BrowserSessionStore(context).loadTabs().first
-        assertEquals(listOf("active", "due"), restored.map { it.id })
-        assertEquals("Discuss with Lisa", restored.last().snoozePurpose)
+        assertEquals(listOf("active", "due"), BrowserSessionStore(context).loadTabs().first.map { it.id })
         assertEquals(emptyList<SnoozedTab>(), SnoozedTabStore(context).load())
     }
 
@@ -155,11 +125,7 @@ class SnoozedTabStoreInstrumentedTest {
     fun failedAtomicSnapshotRestoresSharedPreferencesMemoryState() {
         val preferences = FailingSharedPreferences()
         val sessionStore = BrowserSessionStore(preferences)
-        val pending = SnoozedTab(
-            BrowserTab("due", 1L, snoozePurpose = "Check returns"),
-            10L,
-            2L,
-        )
+        val pending = SnoozedTab(BrowserTab("due", 1L), 10L, 2L)
         assertTrue(
             sessionStore.saveTabsAndSnoozedImmediately(
                 tabs = listOf(BrowserTab("active", 1L)),
@@ -180,7 +146,6 @@ class SnoozedTabStoreInstrumentedTest {
         assertEquals(listOf("active"), sessionStore.loadTabs().first.map { it.id })
         val rawSnoozed = preferences.getString(SnoozedTabStore.KEY_TABS, null).orEmpty()
         assertTrue(rawSnoozed.contains("due"))
-        assertTrue(rawSnoozed.contains("Check returns"))
     }
 }
 

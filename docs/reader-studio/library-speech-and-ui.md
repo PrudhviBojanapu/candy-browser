@@ -5,7 +5,7 @@
 | Piece | Responsibility |
 | --- | --- |
 | `ReaderLibraryRules` | Settings, progress, snapshot ordering, private-mode no-op policy |
-| `ReaderLibraryStore` | Bounded local encoding and storage budget; one process-wide lock serializes repository writes and independent document/search readers |
+| `ReaderLibraryStore` | Bounded local encoding and storage budget |
 | `ReaderLibraryRepository` | Serialize I/O operations and return callbacks on main thread |
 | `ReaderStudioScreen` | Shared Android/iOS typography, themes, alignment, save/delete, progress and speech controls |
 
@@ -15,7 +15,6 @@
 | Font scale | 0.8–1.6 |
 | Reading progress | 0–1 |
 | Private reader state | Fresh in-memory state; no settings, progress or snapshots persisted |
-| Android document picker | Newly saved regular snapshots record their source profile. Unprotected local profiles can expose those snapshots as offline PDFs through [Candy's document provider](../browsing/documents-provider.md); legacy snapshots without provenance stay within Candy. |
 
 Link Peek can extract the fully loaded, committed preview WebView and save its sanitized reader
 document directly for offline reading. The extraction remains bound to the preview WebView,
@@ -32,15 +31,7 @@ page before persistence. Private tabs never expose this action.
 | Piece | Responsibility |
 | --- | --- |
 | `ReaderSpeechRules` | Pure status reducer and current excerpt selection |
-| `ReaderSpeechController` | Shared first-use voice choice, backend routing, pending-play cancellation and cleanup |
-| `AndroidReaderSpeechController` | Android `TextToSpeech`, chunk queue and range callbacks |
-| `OfflineReaderSpeechController`, `OfflineSpeechEngine` | Bounded sentence synthesis with Supertonic 3 / ONNX Runtime and memory-only PCM playback |
-| `PocketSpeechEngine`, `pocket-runtime` | CPU-only Pocket TTS synthesis through pinned native ONNX/SentencePiece code |
-| `PocketSpeechCatalog`, `PocketSpeechModelRepository`, `PocketSpeechModelFiles` | Independent integrity-checked language downloads, cancellation, deletion and model leases |
-| `ReaderSpeechLanguageDetector` | Bounded on-device language detection using bundled profiles, without persisting article text |
-| `ReaderSpeechModelRepository`, `OfflineSpeechModelFiles` | App-wide voice preference; explicit, pinned, integrity-checked model download and deletion |
-| `ReaderSpeechPreparationRepository`, `PlatformReaderSpeechPreparation` | Optional Gemini Nano availability, Android-managed download, adult confirmation and bounded foreground inference; FOSS reports unavailable |
-| `ReaderSpeechPreparationRules` | Fixed German/English abbreviation and number readings; strict model-choice validation and original-text offset mapping |
+| `ReaderSpeechController` | Android `TextToSpeech`, chunk queue, range callbacks and cleanup |
 | `ReaderDocument.speechText` | Stable title+block text projection |
 
 The iOS host maps its tab/session-bound WebKit extraction into `ReaderExtractionResult` and renders this
@@ -50,119 +41,3 @@ parallel SwiftUI Reader surface exists.
 - Drive state transitions through `ReaderSpeechEvent`; keep Android callbacks out of reducer logic.
 - Close speech controller with screen/session lifecycle.
 - Test reducer/library behavior on JVM; test store, TTS wiring and Compose semantics only where platform behavior matters.
-
-| Offline speech behavior | Contract |
-| --- | --- |
-| First request | Reader and selected-text speech share one choice: download the local model or use Android voices. Dismissal cancels playback without recording a choice. |
-| Download | Explicit public model download, about 145 MB; never sends article text. Pinned individual assets are size/SHA-256 checked before use; partial files are cleaned up. |
-| Settings | Browser → Read aloud offers download, delete and enable/disable. Disabling preserves files and uses Android voices. Deleting disables local speech and removes model assets. |
-| Private content | Text and generated audio stay in memory. Only the app-wide voice choice and public model files persist; model files are excluded from backup. |
-| Playback | Language-agnostic multilingual input, bounded sentence chunks with one sentence prepared ahead of playback; pause resumes from the current sentence. No word-level timing is fabricated. |
-| Lifecycle | Leaving the screen or backgrounding cancels pending playback and active audio. Download completion cannot restart a cancelled session. Native inference resources close after playback. Audio-focus loss pauses speech. |
-| License | Supertonic 3 model weights use OpenRAIL-M; reference inference code is MIT. Notices and license text ship with the app. |
-
-| Pocket TTS alternative | Contract |
-| --- | --- |
-| Choice | Optional alongside Android and existing Supertonic. Existing choices migrate unchanged. Switching back retains downloaded Pocket packs. |
-| Languages | English, German, Italian, Portuguese and Spanish; each is an explicit independent download of approximately 207 MB. Multiple packs can coexist. |
-| Routing | Detect the original article language locally before Nano preparation; choose only its installed Pocket model. Unsupported, missing or uncertain languages show voice/language selection instead of silently reading in another language. A manual correction applies only to the current session. |
-| Detection | Bundled Optimaize character n-gram profiles include unsupported languages. Samples cover beginning, middle and end within 9,002 characters. Low-confidence or short input requires a manual choice. Profiles are loaded off-main, then released; article text is neither uploaded nor stored. |
-| Detector logging | All variants package the SLF4J 1.7.36 no-operation binding. This supplies the logger binder required by R8 without emitting detector logs. |
-| Downloads | Pinned v0.5.4 FP32 archives and per-file SHA-256 values. Validate bounded archive entries and paths, clean partial data on error/cancellation, publish only complete models. No download starts from language detection. |
-| Removal | Deleting a language stops playback using that model before native resources and its directory are removed. Other language packs and the existing Supertonic model remain independent. |
-| Playback | Reuses bounded sentence buffering, focus handling, speed and lifecycle cancellation. Pocket emits 24 kHz PCM; text/audio stay in memory and native voice caches never write to disk. |
-| Licenses | Model weights and bundled reference voices: CC BY 4.0. Native adapter: MIT, SentencePiece: Apache 2.0; notices and complete licenses ship in assets. |
-
-| Optional Gemini Nano preparation | Contract |
-| --- | --- |
-| Availability | Full and System WebView query ML Kit Prompt API 1.0.0-beta4 at runtime, rather than maintaining a phone allowlist. FOSS has no Google ML Kit dependency or Nano controls. |
-| Choice | Disabled by default. Available/downloadable models appear beside the first voice choice and in Browser → Read aloud. Enabling or downloading first requires confirmation of age 18 or older; this device-local confirmation is excluded from cloud backup and device transfer. It is a self-declaration, not age verification. |
-| Download | Explicit Android-managed shared model download. Candy displays bytes received, supports cancelling its own request, and can refresh the status of a download managed by Android or another app. Download success enables preparation but never starts speech by itself. |
-| Model ownership | Android/AICore owns the model shared by apps. Candy can disable its use, but has no model deletion control. |
-| Text boundary | Only the first 24 supported candidates within the first 20,000 UTF-16 characters can be prepared. A prompt of at most 6,000 characters contains bounded context and fixed reading choices. German/English abbreviations, integers 0–9,999 and euro amounts are supported; other text, dates, URLs and versions remain untouched. |
-| Response boundary | Nano returns only indexed choices. Invalid/incomplete/oversized responses are rejected; generated prose never enters the article. The visible article remains unchanged, and speech progress maps to original offsets. |
-| Fallback | Six-second preparation limit, foreground-only requests, cancellation on stop/close, and original-text playback after unavailable/busy/error/invalid response. Preference changes invalidate cached preparation. No inference retries or automatic model download during playback. |
-| Privacy | Article text, prompts, model responses, prepared text and audio remain in memory. Inference is local. Google's SDK/AICore can process device, usage and performance metrics; the UI and privacy policy disclose this separately from article processing. |
-| Distribution | Candy's declared Play target audience is 18+ with Restrict Minor Access enabled. Play review controls when the declaration becomes effective; this setting does not enforce age on outside-store APKs or remove existing installations. Nano's own opt-in confirmation also applies to those installations. |
-
-Sentence chunking preserves common abbreviations, initials, decimal/date separators and URL punctuation
-within the existing bounded chunks. This improves the default local voice even when Nano is disabled.
-
-Android selected-text actions reuse `ReaderSpeechController` for temporary read-aloud sessions without creating
-Reader documents or library snapshots. These sessions stop when their activity leaves the foreground and
-close their speech engine on destruction. See [`selected-text-actions.md`](../browsing/selected-text-actions.md).
-
-## Reader controls
-
-The article uses a flat surface behind the system status bar down to the navigation inset, with no
-Reader Studio header or separate settings toolbar. Text has readable internal gutters and the last
-paragraph can scroll above the floating controls. The large bottom pill displays the current article
-URL as read-only text and an ellipsis settings action. Scrolling down accumulates 24 dp before
-switching to a compact domain/settings pill; scrolling up accumulates 16 dp before restoring the full
-URL pill, matching the browser thresholds. Direction changes reset that distance, and reaching the
-article top expands the pill. Both sizes retain the same settings action; there is no eye button.
-Saved-progress restoration and layout changes do not count as user scrolling. There is no URL editor or keyboard in Reader Studio; returning to the
-original closes the reader before browser navigation.
-
-The Material bottom sheet contains font size, serif/sans typeface, alignment, system/light/paper/night
-colors, offline saving and library access, progress, and speech transport. Settings apply immediately;
-dismissing the sheet by Back, scrim, swipe, or Continue reading keeps the article open. Typeface is
-stored compatibly with older settings (missing/unknown font falls back to Sans). Private settings
-remain in memory.
-
-Hide controls completely removes both pills. Android Back first restores the compact pill; another
-Back closes the reader. Ordinary scrolling and taps on article text never restore controls. Pill and
-sheet state survive configuration restoration for the same source/private session. Android handles
-Back through the shared screen's platform callback. Hosts without a Back callback, including iOS,
-show an inset-aware Back button with the same restore, library, and dismissal behavior.
-
-Android wraps Reader Studio in the same default predictive Back shrink used by Settings. Gesture
-progress drives scale, horizontal translation and corner rounding; cancellation restores the reader
-without taking its Back action. Commit retains the shared restore/library/dismiss order above.
-The settings bottom sheet continues to handle its own Back gesture before the reader surface.
-
-
-Paper is the default for new, missing, or invalid theme settings; explicit saved choices are retained.
-Light remains bright regardless of the browser/system dark appearance. The article has no origin chip
-above its title; the read-only floating pill is its sole URL display. Initial content starts below the
-status icons using a spacer inside the scroll content. This spacer scrolls away, so text moves behind
-the status bar. A theme-colored status scrim and matching system-icon appearance preserve contrast;
-horizontal cutouts and the bottom navigation inset still protect controls. The offline library keeps
-its status-bar inset and enough trailing space to scroll its final entry above the pill.
-
-## Motion and save feedback
-
-| Surface | Behavior | State boundary |
-| --- | --- | --- |
-| Android reader entry | Short fade with an 8 dp upward settle; controls remain immediately available | No delayed dismissal or extra reader session |
-| Extraction | Article gently fades in after loading | No additional extraction or repository operation |
-| Offline library | Short horizontal transition; Back reverses direction | Article and library retain their scroll positions; restored progress is not reapplied on return |
-| Save offline | Download icon crossfades to a checkmark after the repository callback returns the matching document snapshot; one small pulse acknowledges completion | Empty, evicted, private, or mismatching snapshots never confirm a save; no new persistence |
-| Reduced motion | iOS Reduce Motion skips content/icon transitions and pulse; Android uses the existing animation duration policy | Saved state and navigation remain available with animations disabled |
-
-Only the current destination remains composed during navigation; outgoing content cannot intercept touches or accessibility actions. The save checkmark also
-exposes the localized offline state on its button. Returning to settings retains the checkmark without
-starting another save. A save completed while the library is open still updates its list. Pulse feedback remains bound to the article; closing or replacing the Reader session rejects its stale library callback.
-
-## Offline speech model provenance
-
-| Asset or contract | Source / invariant |
-| --- | --- |
-| Inference | Supertonic 3, existing ONNX Runtime Android 1.24.3 CPU provider; no separate native runtime |
-| Reference algorithm | [Supertone Java example](https://github.com/supertone-oss-archive/supertonic/tree/main/java), MIT; notice included in both app variants |
-| Weights | [sherpa-onnx INT8 conversion](https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11), revision `cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4` |
-| Model license | [Open RAIL-M](https://huggingface.co/supertone-oss-archive/supertonic-3/blob/aafc6e32416a594460b32413efc49d7fe4ce6d46/LICENSE), bundled and downloaded; distinct from the reference code's MIT license |
-| Transfer | 145,310,775 bytes across individually pinned files, including license; `.part` files never count as ready |
-| Audio | 44,100 Hz mono float PCM, matching the pinned model configuration; first preset F1 |
-| Text | At most 300 UTF-16 characters per inference, NFKD normalization, language-agnostic `<na>` tags for local multilingual synthesis |
-| Limits | Eight denoising steps, two CPU inference threads, bounded 45-second prediction per chunk; cancellation checked between stages and steps |
-| Verification | `OfflineSpeechModelFilesTest`, `OfflineSpeechTextRulesTest`, `OfflineSpeechModelFilesInstrumentedTest`; optional `OfflineSpeechEngineInstrumentedTest` requires preloaded assets and `offlineSpeechModelDirectory` instrumentation argument |
-
-## Shared listening voice
-
-| Concern | Contract |
-| --- | --- |
-| Voice selection | Reader, selected text and the feed listening queue use `ReaderSpeechController` and the same persisted voice choice. A missing selected offline model opens setup; it never silently substitutes Android TTS |
-| Background queue | `FeedMediaPlaybackService` owns audio focus, lifecycle and completion for both Android TTS and local synthesis. Queue speech options do not stop speech when the Activity backgrounds; ordinary Reader speech retains its existing foreground-only behavior |
-| Transport | Android-local `ReaderSpeechTransport` adds saved-position resume and rate for both engines. Nano-expanded speech offsets map in both directions to the unchanged article |
-| Gemini Nano | Optional pronunciation preparation for abbreviations and numbers, not a voice model. Settings explicitly retain the chosen system or offline voice |

@@ -26,6 +26,19 @@
       "license": "GPL-3.0-only",
       "sha256": "42922f61cfc53e2103e492ddbe5736caf503d9dad4a88690efc4c64dac10d5c7",
       "size": 567285
+    },
+    {
+      "id": "{446900e4-71c2-419f-a6a7-df9c091e268b}",
+      "name": "Bitwarden Password Manager",
+      "version": "2026.9.3",
+      "delivery": "bundled",
+      "installUri": "resource://android/assets/gecko_default_extensions/bitwarden_password_manager-2026.9.3.xpi",
+      "assetPath": "gecko_default_extensions/bitwarden_password_manager-2026.9.3.xpi",
+      "sourceUrl": "https://addons.mozilla.org/firefox/downloads/file/5076543/bitwarden_password_manager-2026.9.3.xpi",
+      "sourceCodeUrl": "https://github.com/bitwarden/clients",
+      "license": "GPL-3.0-only",
+      "sha256": "5dd6efa5d228dbeac7a0c6a883f951787dc66e57985322ce549210b0df8d054c",
+      "size": 21121082
     }
   ]
 }

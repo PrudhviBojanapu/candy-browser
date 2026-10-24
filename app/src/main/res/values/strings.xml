@@ -1,4 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <string name="app_name">Candy Browser</string>
     <string name="widget_name">Candy search</string>
     <string name="widget_description">Open Candy, start a search, or create a tab in a profile</string>
@@ -20,7 +20,7 @@
     <string name="onboarding_title">Learn Candy gestures</string>
     <string name="onboarding_progress">%1$d of %2$d</string>
     <string name="onboarding_try_here">Try the gesture in the card</string>
-    <string name="onboarding_required_hint">You can practice any of these gestures, or skip the tutorial at any time.</string>
+    <string name="onboarding_required_hint">All three gestures are required to continue.</string>
     <string name="onboarding_accessibility_complete_action">Mark this gesture as completed</string>
     <string name="onboarding_switch_tabs_title">Switch tabs</string>
     <string name="onboarding_switch_tabs_description">Swipe the address bar left or right.</string>
@@ -183,6 +183,8 @@
     <string name="action_desktop_view_description">Request the desktop version for this domain</string>
     <string name="action_always_block_popups">Always block pop-ups</string>
     <string name="action_always_block_popups_description">Silently block every pop-up opened by this domain</string>
+    <string name="action_all_ad_blockers">All Ad Blockers</string>
+    <string name="action_all_ad_blockers_description">Toggle ad blocking, cosmetic filtering, and tracking protection throughout the browser</string>
     <string name="browser_menu_title">Menu</string>
     <string name="browser_menu_page_group">Page</string>
     <string name="browser_menu_navigation_group">Navigation</string>
@@ -357,10 +359,7 @@
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_home_group_browsing">Browsing</string>
-    <string name="settings_home_group_tabs">Tabs</string>
-    <string name="settings_home_group_controls">Gestures &amp; controls</string>
     <string name="settings_home_group_personalization">Personalization</string>
-    <string name="settings_home_group_extensions">Extensions</string>
     <string name="settings_home_group_privacy_data">Privacy &amp; data</string>
     <string name="settings_home_group_about">More information</string>
     <string name="settings_browser_group_general">Browser setup</string>
@@ -370,20 +369,11 @@
     <string name="settings_browser_group_links">Links &amp; apps</string>
     <string name="settings_protection_group_tools">Privacy tools</string>
     <string name="settings_protection_group_app_data">App data</string>
-    <string name="settings_appearance_title">Theme &amp; interface</string>
-    <string name="settings_home_tabs_title">Tabs</string>
-    <string name="settings_home_tabs_summary">Layout, organization, profiles, and retention</string>
-    <string name="settings_home_gestures_title">Gestures &amp; controls</string>
-    <string name="settings_home_gestures_summary">Address bar, link actions, and menus</string>
-    <string name="settings_home_app_icon_summary">Choose Candy’s launcher icon</string>
-    <string name="settings_home_history_title">History &amp; browser data</string>
-    <string name="settings_home_history_summary">History, exit cleanup, and browser data</string>
+    <string name="settings_appearance_title">Appearance</string>
     <string name="settings_home_appearance_summary">Colors, website text, surfaces, and shape</string>
     <string name="settings_appearance_mode">Appearance</string>
     <string name="settings_app_icon">App icon</string>
     <string name="app_icon_classic">Classic</string>
-    <string name="app_icon_outline_light">Outline light</string>
-    <string name="app_icon_outline_dark">Outline dark</string>
     <string name="app_icon_cookie">Cookie</string>
     <string name="app_icon_cotton_candy">Cotton candy</string>
     <string name="app_icon_lemon">Lemon</string>
@@ -438,60 +428,20 @@
     <string name="settings_home_player_summary">Video playback, autoplay, and double-tap skips</string>
     <string name="settings_home_browser_summary">Startup, favorites, web pages, links, and default browser</string>
     <string name="settings_downloads_title">Downloads</string>
-    <string name="rss_settings_title" tools:ignore="MissingTranslation">RSS feeds</string>
-    <string name="rss_settings_summary" tools:ignore="MissingTranslation">Follow feeds and get new articles in Reader Studio</string>
-    <string name="rss_feeds_title" tools:ignore="MissingTranslation">RSS feeds</string>
-    <string name="rss_discovery_title" tools:ignore="MissingTranslation">Find feeds on this page</string>
-    <string name="rss_discover_action" tools:ignore="MissingTranslation">Find feeds</string>
-    <string name="rss_available_feeds" tools:ignore="MissingTranslation">Available feeds</string>
-    <string name="rss_subscribe_action" tools:ignore="MissingTranslation">Follow</string>
-    <string name="rss_subscribed_feeds" tools:ignore="MissingTranslation">Following</string>
-    <string name="rss_empty_state" tools:ignore="MissingTranslation">No feeds yet. Open a page and look for its feeds here.</string>
-    <string name="rss_no_feed_found" tools:ignore="MissingTranslation">No RSS or Atom feed found on this page.</string>
-    <string name="rss_load_failed" tools:ignore="MissingTranslation">Could not load feed. Check the address or connection and try again.</string>
-    <string name="rss_subscribed" tools:ignore="MissingTranslation">Following %1$s</string>
-    <string name="rss_already_subscribed" tools:ignore="MissingTranslation">You already follow this feed.</string>
-    <string name="rss_remove_feed" tools:ignore="MissingTranslation">Remove feed</string>
-    <string name="rss_notifications_per_feed" tools:ignore="MissingTranslation">Notify me about new articles</string>
-    <string name="rss_notifications_permission_denied" tools:ignore="MissingTranslation">Allow Candy notifications in Android settings to receive feed alerts.</string>
-    <string name="rss_no_articles" tools:ignore="MissingTranslation">No articles yet. Feed updates run in the background.</string>
-    <string name="rss_feed_address" tools:ignore="MissingTranslation">Feed address</string>
-    <string name="rss_feed_address_hint" tools:ignore="MissingTranslation">https://example.com/feed.xml</string>
-    <string name="rss_manual_entry_action" tools:ignore="MissingTranslation">Enter feed address</string>
-    <string name="rss_open_feed" tools:ignore="MissingTranslation">Open %1$s feed</string>
-    <string name="rss_notifications_feed_hint" tools:ignore="MissingTranslation">Show new articles from this feed</string>
-    <string name="rss_refresh_interval" tools:ignore="MissingTranslation">Check for new articles</string>
-    <string name="rss_refresh_interval_summary" tools:ignore="MissingTranslation">Choose how often Candy checks followed feeds.</string>
-    <string name="rss_refresh_android_note" tools:ignore="MissingTranslation">Android may delay background checks to save battery or while offline.</string>
-    <string name="rss_manage_feeds" tools:ignore="MissingTranslation">Manage feeds</string>
-    <string name="rss_widget_title" tools:ignore="MissingTranslation">Recent articles</string>
-    <string name="rss_widget_count" tools:ignore="MissingTranslation">%1$d articles</string>
-    <string name="rss_widget_all_feeds" tools:ignore="MissingTranslation">View all feeds</string>
-    <string name="rss_widget_empty" tools:ignore="MissingTranslation">Follow a feed to see its latest articles here.</string>
-    <string name="rss_widget_description" tools:ignore="MissingTranslation">Recent articles from followed feeds</string>
-    <string name="rss_notifications_channel_name" tools:ignore="MissingTranslation">RSS updates</string>
-    <string name="rss_notifications_channel_description" tools:ignore="MissingTranslation">New articles from feeds you chose to notify you.</string>
-    <string name="rss_refresh_15" tools:ignore="MissingTranslation">15 minutes</string>
-    <string name="rss_refresh_30" tools:ignore="MissingTranslation">30 minutes</string>
-    <string name="rss_refresh_60" tools:ignore="MissingTranslation">1 hour</string>
-    <string name="rss_refresh_180" tools:ignore="MissingTranslation">3 hours</string>
-    <string name="rss_refresh_360" tools:ignore="MissingTranslation">6 hours</string>
-    <string name="rss_refresh_720" tools:ignore="MissingTranslation">12 hours</string>
-    <string name="rss_refresh_1440" tools:ignore="MissingTranslation">24 hours</string>
     <string name="settings_home_capsules_summary">Manage saved Site Capsules and shortcuts</string>
-    <string name="settings_protection_data_title">Protection</string>
-    <string name="settings_home_protection_summary">Tracking protection, cookies, and permissions</string>
+    <string name="settings_protection_data_title">Protection &amp; data</string>
+    <string name="settings_home_protection_summary">Tracking protection, cookies, permissions, and browsing data</string>
     <string name="data_archive_export_title">Export all app data</string>
     <string name="data_archive_export_summary">Save settings, tabs, rules, cookies, and website storage as a ZIP file</string>
     <string name="data_archive_import_title">Import app data</string>
     <string name="data_archive_import_summary">Replace current data from a Candy ZIP backup</string>
     <string name="data_archive_export_warning_title">Export sensitive app data?</string>
-    <string name="data_archive_export_warning_message">The unencrypted ZIP contains persistent Candy settings and data, plus raw Gecko and WebView profile files such as cookies and site storage. Anyone with the file may be able to read them or access accounts. Store it somewhere protected. Website logins may not work after restore, especially on another device or browser-engine version. Candy restarts once to create a consistent backup.</string>
-    <string name="data_archive_export_protected_warning_message">At least one profile uses biometric protection. After choosing a location, strong biometric authentication is required. The unencrypted ZIP contains persistent Candy settings and data, plus raw Gecko and WebView profile files, including protected profile contents. Anyone with the file can read them or may access accounts. Website logins may not work after restore, especially on another device or browser-engine version. Candy restarts once to create a consistent backup.</string>
+    <string name="data_archive_export_warning_message">The ZIP contains website logins, cookies, local storage, browsing data, settings, and rules. Anyone with the file may be able to access your accounts. Store it somewhere protected. Candy restarts once to create a consistent backup.</string>
+    <string name="data_archive_export_protected_warning_message">At least one profile uses biometric protection. After choosing a location, strong biometric authentication is required. Protected profile data is written readable into the ZIP; the ZIP itself is not biometrically protected or encrypted. Anyone with the file can read its contents. Candy restarts once to create a consistent backup.</string>
     <string name="data_archive_export_action">Choose storage location</string>
     <string name="data_archive_import_confirm_title">Replace all Candy data?</string>
     <string name="data_archive_import_confirm_message">Only import a backup you created or trust. It may contain enabled userscripts that run code on websites. This backup was created by Candy %1$s and contains %2$d files. Import replaces current settings, tabs, snoozes, rules, cookies, and website storage. Candy restarts afterward.</string>
-    <string name="data_archive_import_version_warning">Warning: this backup was created with a different app, Android, or browser-engine version. Raw website sessions may fail to restore; sites can also bind logins to the original device.</string>
+    <string name="data_archive_import_version_warning">Warning: this backup was created with a different app, Android, or browser-engine version. Website sessions or newer settings may not restore correctly.</string>
     <string name="data_archive_import_action">Import and restart</string>
     <string name="data_archive_import_mismatch_action">Import anyway</string>
     <string name="data_archive_preparing">Preparing app data…</string>
@@ -567,7 +517,7 @@
     <string name="settings_searxng_suggestion_fallback">Suggestion fallback</string>
     <string name="settings_searxng_suggestion_fallback_summary">Used only if the SearXNG suggestion request fails. This sends the typed query to the fallback provider too. Disabled in private tabs.</string>
     <string name="toast_searxng_instance_required">Set a valid SearXNG instance URL first</string>
-    <string name="settings_section_browser">Browser behavior</string>
+    <string name="settings_section_browser">Browser</string>
     <string name="settings_browser_engine_title">Web engine</string>
     <string name="settings_browser_engine_gecko">Extensions · GeckoView</string>
     <string name="settings_browser_engine_system">Memory saver · Android System WebView</string>
@@ -654,9 +604,6 @@
     <string name="settings_link_long_press_action">Long-press link action</string>
     <string name="settings_address_bar_long_press_title">Long-press address bar action</string>
     <string name="settings_address_bar_long_press_summary">Choose what happens when you touch and hold the address bar</string>
-    <string name="settings_link_peek_swipe_action">Link Peek right-swipe action</string>
-    <string name="settings_link_peek_swipe_action_summary">Swipe right to perform your chosen action. Swipe left to close Link Peek.</string>
-    <string name="action_open_link_new_stack">Open in a new tab stack</string>
     <string name="settings_link_peek_actions_title">Link Peek buttons</string>
     <string name="settings_link_peek_actions_summary">Choose and arrange up to three quick actions</string>
     <string name="settings_link_peek_actions_instructions">Long-press and drag actions into empty slots. Drag one back to Available actions to leave its slot empty. The pulsing + always stays in the third slot and opens a background tab.</string>
@@ -802,7 +749,6 @@
     <string name="downloads_pause">Pause</string>
     <string name="downloads_resume">Resume</string>
     <string name="downloads_control_failed">Download could not be updated</string>
-    <string name="downloads_open_source">Open source</string>
     <string name="downloads_open_failed">No app can open this download</string>
     <string name="downloads_status_pending">Pending · %1$s</string>
     <string name="downloads_status_running">Downloading · %1$s</string>
@@ -812,10 +758,6 @@
     <string name="downloads_status_cancelled">Cancelled · %1$s</string>
     <string name="toast_download_handed_off">Sent to %1$s</string>
     <string name="download_manager_chooser_title">Download with</string>
-    <string name="download_again_title">Download again?</string>
-    <string name="download_again_message">A file named “%1$s” is already in Downloads. Do you want to download it again?</string>
-    <string name="download_again_action">Download again</string>
-    <string name="download_open_existing">Open existing file</string>
     <string name="error_download_invalid_address">Invalid download address</string>
     <string name="error_download_start_failed">Download could not be started</string>
     <string name="error_page_unreachable">Website not found</string>
@@ -1266,20 +1208,12 @@
     <string name="settings_translation_provider_kagi_summary">Kagi Translate currently requires an active Kagi subscription. On translate, the full page address is sent to Kagi.</string>
     <string name="settings_external_link_preview_title">Preview links from other apps</string>
     <string name="settings_external_link_preview_subtitle">Open external links without creating a new tab first.</string>
-    <string name="settings_external_link_preview_profile_title">Default profile for previews</string>
-    <string name="settings_external_link_preview_profile_last_used">Last used unlocked profile</string>
-    <string name="settings_external_link_preview_profile_unavailable">Saved profile unavailable · using last used unlocked profile</string>
     <string name="external_link_preview_close_description">Close preview</string>
     <string name="external_link_preview_open_description">Open in Candy with profile %1$s</string>
     <string name="external_link_preview_profile_description">Choose target profile, %1$s selected</string>
     <string name="external_link_preview_copy_link">Copy link</string>
     <string name="external_link_preview_copy_label">Candy link</string>
     <string name="toast_link_copied">Link copied</string>
-    <string name="sync_extension_stores_title">Candy Sync extensions</string>
-    <string name="sync_extension_stores_summary">Install Candy Sync on your desktop browser or share its store link.</string>
-    <string name="sync_extension_chrome_store">Chrome Web Store</string>
-    <string name="sync_extension_firefox_store">Firefox Add-ons</string>
-    <string name="sync_extension_share_link">Share %1$s link</string>
     <string name="sync_settings_title">Sync</string>
     <string name="settings_home_sync_summary">Self-hosted, end-to-end encrypted device tabs</string>
     <string name="sync_setup_guide_title">Set up Candy Sync</string>
@@ -1353,8 +1287,8 @@
     <string name="captcha_compatibility_allow_for_tab">Allow for tab</string>
     <string name="captcha_compatibility_allow_for_profile">Allow for profile</string>
     <string name="captcha_compatibility_deny">Don’t allow</string>
-    <string name="gecko_extensions_title">Firefox extensions</string>
-    <string name="gecko_extensions_summary">Browse with Gecko and install Mozilla-signed add-ons</string>
+    <string name="gecko_extensions_title">Extensions (Bitwarden &amp; Add-ons)</string>
+    <string name="gecko_extensions_summary">Manage Bitwarden, uBlock Origin, and installed add-ons</string>
     <string name="gecko_invalid_address">This address cannot be opened.</string>
     <string name="gecko_extension_invalid_xpi">Use a direct HTTPS URL to a Mozilla-signed XPI package.</string>
     <string name="gecko_extension_install_network_failure">Download failed. Check your connection and the XPI address, then try again.</string>
@@ -1556,59 +1490,16 @@
     <string name="browser_menu_page_controls">Page controls</string>
     <string name="browser_menu_dismiss">Close menu</string>
     <string name="browser_menu_page_actions">Page actions</string>
-    <string name="browser_menu_empty_section_message">There’s room for your favorites here. Enable menu items in settings.</string>
-    <string name="browser_menu_empty_section_action">Open settings</string>
     <string name="settings_menu_bottom_sheet_toolbar_title">Bottom sheet toolbar</string>
     <string name="settings_menu_bottom_sheet_toolbar_summary">Choose five actions from left to right. Actions already assigned to another slot swap places. Leave a slot empty to hide its button.</string>
     <string name="settings_menu_bottom_sheet_toolbar_slot">Action %1$d</string>
     <string name="settings_menu_bottom_sheet_toolbar_empty">Empty slot</string>
-    <string name="reader_settings">Reading settings</string>
-    <string name="reader_compact_controls">Use compact controls</string>
-    <string name="reader_expand_controls">Show URL and controls</string>
-    <string name="reader_hide_controls">Hide controls completely</string>
-    <string name="reader_hidden_controls_hint">Android Back shows the controls again.</string>
-    <string name="reader_continue_reading">Continue reading</string>
-    <string name="reader_font_serif">Serif</string>
-    <string name="reader_font_sans">Sans</string>
-    <string name="reader_theme_light">Light</string>
-    <!-- Profile-local semantic page map. -->
-    <string name="constellations_title">Candy Constellations</string>
-    <string name="constellations_profile">Map for %1$s</string>
-    <string name="constellations_description">Discover how your visited pages connect by topic. Candy stores a short excerpt and finds topic connections on this device. Each profile has its own map. Private pages are excluded.</string>
-    <string name="constellations_enable">Enable for this profile</string>
-    <string name="constellations_disable">Disable and delete this map</string>
-    <string name="constellations_download_description">Download the multilingual model (about 138 MB) from Hugging Face once. Page content stays on this device. The model works offline after download.</string>
-    <string name="constellations_download_model">Download model</string>
-    <string name="constellations_downloading">Downloading model: %1$d%%</string>
-    <string name="constellations_indexing">Connecting your pages…</string>
-    <string name="constellations_empty">Your map grows as you visit readable pages in this profile. Existing history is not fetched in the background.</string>
-    <string name="constellations_error">Could not update your map. Check free storage and retry. A model download also needs an internet connection.</string>
-    <string name="constellations_graph_hint">Pinch to zoom and drag to explore. Connections show topic similarity, not agreement. Select a page below to explore its neighbors.</string>
-    <string name="constellations_pages">Pages in this profile</string>
-    <string name="constellations_related_pages">Related pages</string>
-    <string name="constellations_no_connections">No close topic matches yet.</string>
-    <string name="constellations_connection">%1$d%% topic similarity</string>
-    <string name="constellations_page_count">%1$d pages</string>
-    <string name="constellations_search">Search this map</string>
-    <string name="constellations_search_no_results">No matching pages in this profile.</string>
-    <string name="constellations_search_position">%1$d of %2$d matches</string>
-    <string name="status_bar_scroll_accessibility_service_label">Candy status bar scroll</string>
-    <string name="status_bar_scroll_accessibility_service_description">Allows a tap in the center of the status bar to scroll the current Candy page to the top. Candy does not read window content.</string>
-    <string name="status_bar_scroll_target_description">Scroll the current page to the top</string>
-    <string name="settings_status_bar_scroll_title">Tap the status bar to scroll to the top</string>
-    <string name="settings_status_bar_scroll_summary">Adds an invisible tap area in the center of the Android status bar. Candy Accessibility access is required.</string>
-    <string name="settings_status_bar_scroll_width_title">Tap area width</string>
-    <string name="settings_status_bar_scroll_width_summary">%1$d%% of screen width</string>
-    <string name="settings_status_bar_scroll_accessibility_dialog_title">Enable Candy Accessibility access?</string>
-    <string name="settings_status_bar_scroll_accessibility_dialog_message">Android requires an Accessibility service to receive taps in the system status bar. Continue to Android Accessibility settings, then turn on Candy status bar scroll. Candy uses the service only for this tap and does not read window content.</string>
-    <string name="settings_status_bar_scroll_accessibility_open">Open Accessibility settings</string>
-    <string name="settings_status_bar_scroll_enable_for_domain">Enable status bar scroll for this site</string>
-    <string name="settings_status_bar_scroll_disable_for_domain">Disable status bar scroll for this site</string>
-    <string name="settings_translations_title">Translations</string>
-    <string name="form_drafts_available">Unsent text is available for this page.</string>
-    <string name="form_drafts_clear_failed">Saved drafts could not be deleted. Please try again.</string>
-    <string name="form_drafts_restore">Restore</string>
-    <string name="form_drafts_restore_failed">No matching empty field found. Saved text stays available until it expires.</string>
-    <string name="form_drafts_settings_summary">Keep unsent multiline text encrypted on this device for 24 hours. Private drafts stay in memory until the tab closes. Sensitive fields are excluded. Turning this off deletes all drafts.</string>
-    <string name="form_drafts_settings_title">Rescue form drafts</string>
+    <string name="action_video_player_redirect">Video Player Redirect</string>
+    <string name="action_video_player_redirect_description">Sniff website videos and redirect to video player (profile)</string>
+    <string name="settings_status_bar_scroll_title" translatable="false">Tap the status bar to scroll to the top</string>
+    <string name="settings_status_bar_scroll_summary" translatable="false">Adds an invisible tap area in the center of the status bar to scroll the current page to the top.</string>
+    <string name="settings_status_bar_scroll_width_title" translatable="false">Tap area width</string>
+    <string name="settings_status_bar_scroll_width_summary" translatable="false">%1$d%% of screen width</string>
+    <string name="settings_status_bar_scroll_enable_for_domain" translatable="false">Enable status bar scroll for this site</string>
+    <string name="settings_status_bar_scroll_disable_for_domain" translatable="false">Disable status bar scroll for this site</string>
 </resources>

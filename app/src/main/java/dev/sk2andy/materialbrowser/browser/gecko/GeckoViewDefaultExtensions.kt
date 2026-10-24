@@ -27,7 +27,10 @@ import org.mozilla.geckoview.WebExtensionController
 
 internal object GeckoDefaultExtensionCatalog {
     private const val CATALOG_ASSET = "gecko_default_extensions/catalog.json"
-    val retiredExtensionIds = setOf("jid1-KKzOGWgsW3Ao4Q@jetpack")
+    val retiredExtensionIds = setOf(
+        "jid1-KKzOGWgsW3Ao4Q@jetpack",
+        "{aecec67f-0d10-4fa7-b7c7-609a2db280cf}",
+    )
 
     suspend fun load(context: Context): List<GeckoDefaultExtension> =
         withContext(Dispatchers.IO) {

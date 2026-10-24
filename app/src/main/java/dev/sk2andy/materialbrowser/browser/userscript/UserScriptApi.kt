@@ -25,6 +25,10 @@ internal object UserScriptApi {
         }
         val definitions = mutableListOf<String>()
         definitions += defineValue("GM_info", info.toString())
+        definitions += """
+            const unsafeWindow = (typeof window !== "undefined" && window.wrappedJSObject) ? window.wrappedJSObject : globalThis;
+            globalThis.unsafeWindow = unsafeWindow;
+        """.trimIndent()
         if (UserScriptGrant.AddStyle in script.grants) {
             definitions += defineFunction(
                 "GM_addStyle",

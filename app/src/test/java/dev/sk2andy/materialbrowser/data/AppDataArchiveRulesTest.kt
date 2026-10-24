@@ -14,23 +14,6 @@ class AppDataArchiveRulesTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
-    fun `guest lock markers never leave device or enter through archive restore`() {
-        listOf(
-            "no_backup/guest_bubble",
-            "no_backup/guest_bubble/session",
-            "no_backup/guest_bubble/session.bak",
-            "no_backup/guest_bubble/session.new",
-            "no_backup/guest_bubble/session.guard",
-        ).forEach { path ->
-            assertFalse(path, AppDataArchiveRules.shouldExportRelativePath(path))
-            assertNull(path, AppDataArchiveRules.dataRelativePath("data/$path", isDirectory = false))
-            assertNull(path, AppDataArchiveRules.dataRelativePath("data/$path/", isDirectory = true))
-        }
-        assertTrue(AppDataArchiveRules.shouldExportRelativePath("no_backup/guest_bubble_extra/session"))
-        assertTrue(AppDataArchiveRules.shouldExportRelativePath("shared_prefs/guest_bubble.xml"))
-    }
-
-    @Test
     fun `persistent roots retain non Recall no backup data`() {
         val dataDirectory = temporaryFolder.newFolder("data")
         listOf(
@@ -59,7 +42,7 @@ class AppDataArchiveRulesTest {
     }
 
     @Test
-    fun `archive includes supported engine files but excludes Recall and guest state`() {
+    fun `archive excludes Recall and engine files from no backup`() {
         listOf(
             "candy_recall.db",
             "candy_recall.db-journal",
@@ -74,36 +57,13 @@ class AppDataArchiveRulesTest {
         assertTrue(
             AppDataArchiveRules.shouldExportRelativePath("no_backup/candy_trails/trail.json"),
         )
-        assertTrue(
+        assertFalse(
             AppDataArchiveRules.shouldExportRelativePath("no_backup/gecko_session_states/tab.json"),
         )
-        assertTrue(
+        assertFalse(
             AppDataArchiveRules.shouldExportRelativePath("no_backup/tab_webview_states/tab.bin"),
         )
-        assertTrue(AppDataArchiveRules.shouldExportRelativePath("files/mozilla/profile"))
-        assertTrue(AppDataArchiveRules.shouldExportRelativePath("app_webview/Cookies"))
-        assertFalse(AppDataArchiveRules.shouldExportRelativePath("app_webview_guest_bubble/Cookies"))
-    }
-
-    @Test
-    fun `persistent device search settings join manual archive`() {
-        val path = "shared_prefs/device_search.xml"
-        assertTrue(AppDataArchiveRules.shouldExportRelativePath(path))
-        assertEquals(path, AppDataArchiveRules.dataRelativePath("data/$path", isDirectory = false))
-        assertTrue(AppDataArchiveRules.shouldExportRelativePath("shared_prefs/device_search_extra.xml"))
-    }
-
-    @Test
-    fun `keystore-bound sync secrets stay on their source device`() {
-        listOf(
-            "no_backup/candy_sync_vault_v1",
-            "no_backup/candy_sync_vault_v1.bak",
-            "no_backup/candy_sync_cache_v1",
-            "no_backup/candy_sync_cache_v1.bak",
-        ).forEach { path ->
-            assertFalse(path, AppDataArchiveRules.shouldExportRelativePath(path))
-            assertNull(path, AppDataArchiveRules.dataRelativePath("data/$path", isDirectory = false))
-        }
+        assertFalse(AppDataArchiveRules.shouldExportRelativePath("files/mozilla/profile"))
     }
 
     @Test
@@ -136,45 +96,6 @@ class AppDataArchiveRulesTest {
             assertTrue(path, AppDataArchiveRules.shouldExportRelativePath(path))
             assertEquals(path, AppDataArchiveRules.dataRelativePath("data/$path", isDirectory = false))
         }
-    }
-
-    @Test
-    fun `archive excludes site widget captures and bindings without excluding lookalike paths`() {
-        listOf(
-            "no_backup/site_widget_snapshots_v1",
-            "no_backup/site_widget_snapshots_v1/bindings.json",
-            "no_backup/site_widget_snapshots_v1/capture.png",
-            "no_backup/site_widget_snapshots_v1/capture.json",
-            "no_backup/site_widget_snapshots_v1/capture.json.bak",
-            "no_backup/site_widget_snapshots_v1/nested/capture.png",
-        ).forEach { path ->
-            assertFalse(path, AppDataArchiveRules.shouldExportRelativePath(path))
-            assertNull(path, AppDataArchiveRules.dataRelativePath("data/$path", isDirectory = false))
-            assertNull(path, AppDataArchiveRules.dataRelativePath("data/$path/", isDirectory = true))
-        }
-        listOf(
-            "no_backup/site_widget_snapshots_v10/capture.png",
-            "no_backup/site_widget_snapshots_v1_backup/capture.png",
-            "no_backup/site_widget_snapshots_v1.json",
-            "files/site_widget_snapshots_v1/capture.png",
-            "no_backup/candy_trails/trail.json",
-        ).forEach { path ->
-            assertTrue(path, AppDataArchiveRules.shouldExportRelativePath(path))
-            assertEquals(path, AppDataArchiveRules.dataRelativePath("data/$path", isDirectory = false))
-            assertEquals(path, AppDataArchiveRules.dataRelativePath("data/$path/", isDirectory = true))
-        }
-    }
-
-    @Test
-    fun `download document provenance never migrates to another device`() {
-        listOf(
-            "no_backup/download_document_sources_v1.json",
-            "no_backup/download_document_sources_v1.json.bak",
-        ).forEach { path ->
-            assertFalse(AppDataArchiveRules.shouldExportRelativePath(path))
-            assertNull(AppDataArchiveRules.dataRelativePath("data/$path", isDirectory = false))
-        }
-        assertTrue(AppDataArchiveRules.shouldExportRelativePath("files/download_document_sources_v1.json"))
     }
 
     @Test
@@ -261,7 +182,7 @@ class AppDataArchiveRulesTest {
                 current,
                 manifest().copy(
                     webViewVersion = "126.0",
-                    websiteState = AppDataArchiveWebsiteState.EngineStateIncluded,
+                    websiteState = AppDataArchiveWebsiteState.LegacyWebsiteStateExcluded,
                 ),
             ),
         )
@@ -269,10 +190,7 @@ class AppDataArchiveRulesTest {
             AppDataArchiveCompatibility.Same,
             AppDataArchiveRules.compatibility(
                 current,
-                manifest().copy(
-                    webViewVersion = "126.0",
-                    websiteState = AppDataArchiveWebsiteState.CandyOwnedOnly,
-                ),
+                manifest().copy(webViewVersion = "126.0"),
             ),
         )
         assertEquals(
@@ -311,16 +229,9 @@ class AppDataArchiveRulesTest {
             ),
         )
         assertEquals(
-            AppDataArchiveWebsiteState.EngineStateIncluded,
-            AppDataArchiveRules.websiteStateFor(
-                formatVersion = AppDataArchiveRules.FORMAT_VERSION,
-                entries = emptyList(),
-            ),
-        )
-        assertEquals(
             AppDataArchiveWebsiteState.CandyOwnedOnly,
             AppDataArchiveRules.websiteStateFor(
-                formatVersion = AppDataArchiveRules.PREVIOUS_FORMAT_VERSION,
+                formatVersion = AppDataArchiveRules.FORMAT_VERSION,
                 entries = emptyList(),
             ),
         )

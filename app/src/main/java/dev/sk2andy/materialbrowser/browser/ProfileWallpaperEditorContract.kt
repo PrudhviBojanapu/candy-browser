@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContract
-import dev.sk2andy.materialbrowser.ProfileWallpaperEditorActivity
 
 data class ProfileWallpaperEditorRequest(
     val profileId: String,
@@ -21,7 +20,7 @@ data class ProfileWallpaperEditorSubmission(
 class ProfileWallpaperEditorContract :
     ActivityResultContract<ProfileWallpaperEditorRequest, ProfileWallpaperEditorSubmission?>() {
     override fun createIntent(context: Context, input: ProfileWallpaperEditorRequest): Intent =
-        Intent(context, ProfileWallpaperEditorActivity::class.java).apply {
+        Intent().apply {
             putExtra(EXTRA_PROFILE_ID, input.profileId)
             putExtra(EXTRA_TARGET, input.target.wireValue)
             input.wallpaper?.let { wallpaper ->

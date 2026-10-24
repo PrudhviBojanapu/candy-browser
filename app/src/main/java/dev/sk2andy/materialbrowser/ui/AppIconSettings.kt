@@ -28,6 +28,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.data.AppIconOption
 import dev.sk2andy.materialbrowser.data.AppIconSelection
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
 
 internal object AppIconSettingsTestTags {
     fun choice(option: AppIconOption): String = "appearance_settings_app_icon_${option.name}"
@@ -96,8 +98,6 @@ private fun AppIconOption.label(): String {
 private val AppIconOption.labelRes: Int
     get() = when (this) {
         AppIconOption.Classic -> R.string.app_icon_classic
-        AppIconOption.OutlineLight -> R.string.app_icon_outline_light
-        AppIconOption.OutlineDark -> R.string.app_icon_outline_dark
         AppIconOption.Cookie, AppIconOption.CookieMaxed -> R.string.app_icon_cookie
         AppIconOption.CottonCandy, AppIconOption.CottonCandyFreeform -> R.string.app_icon_cotton_candy
         AppIconOption.Lemon, AppIconOption.LemonMaxed -> R.string.app_icon_lemon
@@ -108,8 +108,6 @@ private val AppIconOption.labelRes: Int
 private val AppIconOption.iconRes: Int
     get() = when (this) {
         AppIconOption.Classic -> R.mipmap.ic_launcher
-        AppIconOption.OutlineLight -> R.mipmap.ic_launcher_outline_light
-        AppIconOption.OutlineDark -> R.mipmap.ic_launcher_outline_dark
         AppIconOption.Cookie -> R.mipmap.ic_launcher_cookie
         AppIconOption.CookieMaxed -> R.mipmap.ic_launcher_cookie_maxed
         AppIconOption.CottonCandy -> R.mipmap.ic_launcher_cotton_candy

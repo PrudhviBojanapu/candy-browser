@@ -18,18 +18,20 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +40,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.key
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -49,9 +49,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.rememberCoroutineScope
+import android.content.res.Configuration
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
+import dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader
+import dev.sk2andy.materialbrowser.browser.PreloadedYouTubeStream
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -77,15 +88,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sk2andy.materialbrowser.R
-import dev.sk2andy.materialbrowser.feeds.FeedRepository
-import dev.sk2andy.materialbrowser.ui.feeds.FeedsEntry
-import dev.sk2andy.materialbrowser.ui.feeds.rememberFeedsEntryState
-import dev.sk2andy.materialbrowser.ui.feeds.FeedsHost
 import dev.sk2andy.materialbrowser.browser.AddressResolver
 import dev.sk2andy.materialbrowser.browser.SearchShortcutRules
 import dev.sk2andy.materialbrowser.browser.BLANK_URL
-import dev.sk2andy.materialbrowser.browser.integration.linkrouting.LinkRoutingRules
-import dev.sk2andy.materialbrowser.browser.integration.linkrouting.LinkRoutingReaderRequest
 import dev.sk2andy.materialbrowser.browser.BrowserController
 import dev.sk2andy.materialbrowser.browser.BrowserProfile
 import dev.sk2andy.materialbrowser.browser.BrowserTab
@@ -123,8 +128,6 @@ import dev.sk2andy.materialbrowser.browser.commands.CommandSuggestion
 import dev.sk2andy.materialbrowser.capsule.SiteCapsule
 import dev.sk2andy.materialbrowser.capsule.CapsuleIconMode
 import dev.sk2andy.materialbrowser.capsule.SiteCapsuleDraft
-import dev.sk2andy.materialbrowser.capsule.SiteCapsuleEditorContract
-import dev.sk2andy.materialbrowser.capsule.SiteCapsuleEditorRequest
 import dev.sk2andy.materialbrowser.data.AddressSuggestion
 import dev.sk2andy.materialbrowser.data.FavoriteMutation
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionResult
@@ -132,14 +135,15 @@ import dev.sk2andy.materialbrowser.reader.ReaderExtractionFailure
 import dev.sk2andy.materialbrowser.reader.ReaderLibraryRepository
 import dev.sk2andy.materialbrowser.reader.ReaderStudioSession
 import dev.sk2andy.materialbrowser.reader.ReaderStudioSessionRules
-import dev.sk2andy.materialbrowser.reader.ReaderSnapshot
-import dev.sk2andy.materialbrowser.reader.rss.RssInboxRepository
-import dev.sk2andy.materialbrowser.reader.rss.RssReaderLoadAction
-import dev.sk2andy.materialbrowser.reader.rss.RssReaderLoadRules
-import dev.sk2andy.materialbrowser.reader.rss.RssReaderLaunchRequest
 import dev.sk2andy.materialbrowser.shared.browser.AddressBarLongPressAction
 import dev.sk2andy.materialbrowser.recall.RecallMatch
 import eightbitlab.com.blurview.BlurTarget
+import androidx.compose.runtime.FloatState
+import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.State
+import dev.sk2andy.materialbrowser.data.SnoozedTab
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
@@ -151,7 +155,6 @@ import kotlin.coroutines.resume
 
 private enum class BrowserBackTarget {
     ReaderStudio,
-    FeedsReturn,
     FilterStudio,
     SnoozedTabs,
     SettingsSubpage,
@@ -236,8 +239,6 @@ internal fun BrowserScreen(
     webViewVideoOnlyPresentation: Boolean = false,
     videoOnlyPresentation: Boolean = webViewVideoOnlyPresentation,
     incomingBrowserNavigationRequestId: Int = 0,
-    rssReaderLaunchRequest: RssReaderLaunchRequest? = null,
-    onRssReaderLaunchConsumed: (Int) -> Unit = {},
     externalLaunchTabId: String? = null,
     onReturnToExternalApp: () -> Unit = {},
     onExternalPreviewCommitted: (String) -> Unit = {},
@@ -245,7 +246,6 @@ internal fun BrowserScreen(
     onOpenFavorites: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
-    onOpenRssFeeds: (String, Boolean) -> Unit = { _, _ -> },
     onImportUserScript: () -> Unit = {},
     onImportFavoriteBookmarks: () -> Unit = {},
     onExportAppData: () -> Unit = {},
@@ -260,24 +260,14 @@ internal fun BrowserScreen(
     openAddressEditorOnLaunch: Boolean = false,
     launcherAddressEditorRequestId: Int = 0,
     hardwareTabChangeRequestId: Int = 0,
-    openFeedsRequestId: Int = 0,
-    openFeedQueue: Boolean = false,
-    openFeedCatalog: Boolean = false,
-    openFeedArticleId: String? = null,
+    onOpenMpvRx: ((String, String?) -> Unit)? = null,
 ) {
     val activeProfileLocked = controller.isActiveProfileLocked
     LaunchedEffect(controller, activeProfileLocked) {
         if (activeProfileLocked) controller.publishStatusBarScrollPageContext(visible = false)
     }
-    LaunchedEffect(controller.selectedTab, controller.isActiveProfileLocked) {
-        controller.inlineTranslation.validate()
-    }
     if (activeProfileLocked) return
     WebAnnotationDialogs(controller.webAnnotations, onOpenLink = controller::openWebAnnotationLink)
-    InlineTranslationDialog(
-        coordinator = controller.inlineTranslation,
-        providerName = controller.pageTranslationProvider.displayName,
-    )
     val hideBrowserChrome = FullscreenVideoRules.hidesBrowserChrome(
         isWebContentFullscreen = controller.isSelectedWebContentFullscreen,
         placement = controller.fullscreenVideoPlacement(videoOnlyPresentation),
@@ -286,18 +276,6 @@ internal fun BrowserScreen(
     val currentTabOverviewPortraitLockChanged by rememberUpdatedState(
         onTabOverviewPortraitLockChanged,
     )
-    controller.activeSiteCapsule?.let { capsule ->
-        LaunchedEffect(capsule.id) {
-            currentTabOverviewPortraitLockChanged(false)
-        }
-        SiteCapsuleBrowserScreen(
-            controller = controller,
-            capsule = capsule,
-            webViewVideoOnlyPresentation = webViewVideoOnlyPresentation,
-            videoOnlyPresentation = hideBrowserChrome,
-        )
-        return
-    }
     controller.externalLinkPreviewState?.let { state ->
         ExternalLinkPreviewScreen(
             controller = controller,
@@ -314,7 +292,7 @@ internal fun BrowserScreen(
     var candyTrailSourceBounds by remember { mutableStateOf<Rect?>(null) }
     var addressEditorVisible by remember { mutableStateOf(openAddressEditorOnLaunch) }
     val aiModeSelectedState = remember { mutableStateOf(false) }
-    var settingsVisible by rememberSaveable { mutableStateOf(false) }
+    var settingsVisible by remember { mutableStateOf(false) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.Home) }
     var snoozedTabsVisible by rememberSaveable { mutableStateOf(false) }
     var snoozeTabId by remember { mutableStateOf<String?>(null) }
@@ -328,13 +306,6 @@ internal fun BrowserScreen(
     var readerStudioSession by remember { mutableStateOf<ReaderStudioSession?>(null) }
     var readerStudioResult by remember { mutableStateOf<ReaderExtractionResult?>(null) }
     var readerStudioRequestId by remember { mutableIntStateOf(0) }
-    var readerStudioHomeVisible by rememberSaveable { mutableStateOf(false) }
-    var readerStudioHomeGeneration by rememberSaveable { mutableIntStateOf(0) }
-    var readerStudioHomeInitialTab by remember { mutableStateOf(ReaderStudioHomeTab.Library) }
-    var readerStudioSnapshot by remember { mutableStateOf<ReaderSnapshot?>(null) }
-    var pendingFeedReader by remember { mutableStateOf<LinkRoutingReaderRequest?>(null) }
-    var readerStudioFeedEntry by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var readerStudioFeedSourceUrl by remember { mutableStateOf<String?>(null) }
     var clearDialogVisible by remember { mutableStateOf(false) }
     var pendingCapsuleDelete by remember { mutableStateOf<SiteCapsule?>(null) }
     var addressValue by remember {
@@ -407,20 +378,8 @@ internal fun BrowserScreen(
         exitHeroVisible = overviewExitHeroVisible,
     )
     val selectedTab = controller.selectedTab
-    var feedsEntry by rememberFeedsEntryState(
-        controller.activeProfileId,
-        selectedTab.id,
-        selectedTab.isIncognito,
-    )
-    var feedsReturnEntry by rememberFeedsEntryState(
-        controller.activeProfileId,
-        selectedTab.id,
-        selectedTab.isIncognito,
-    )
-    val feedsSavedState = rememberSaveableStateHolder()
-    val feedsProgressScope = rememberCoroutineScope()
     val statusBarScrollPageVisible = !settingsVisible && !tabOverviewVisible &&
-        !addressEditorVisible && !hideBrowserChrome && feedsEntry == null
+        !addressEditorVisible && !hideBrowserChrome
     LaunchedEffect(
         controller,
         selectedTab.id,
@@ -480,79 +439,12 @@ internal fun BrowserScreen(
     }
     val context = LocalContext.current
     val readerLibraryRepository = remember(context) { ReaderLibraryRepository.get(context) }
-    val rssInboxRepository = remember(context) { RssInboxRepository.get(context) }
-    val feedRepository = remember(controller.activeProfileId, selectedTab.isIncognito) {
-        FeedRepository.get(context, controller.activeProfileId, selectedTab.isIncognito)
-    }
-    val feedState by feedRepository.state.collectAsState()
-    LaunchedEffect(feedRepository) { feedRepository.load() }
     val accessibilityManager = remember(context) {
         context.getSystemService(AccessibilityManager::class.java)
     }
     val density = LocalDensity.current
     val rootView = LocalView.current
-    val siteCapsuleEditorLauncher = rememberLauncherForActivityResult(
-        contract = SiteCapsuleEditorContract(),
-    ) { submission ->
-        submission ?: return@rememberLauncherForActivityResult
-        val existing = submission.existingId?.let { id ->
-            controller.siteCapsules.firstOrNull { it.id == id }
-        }
-        if (submission.existingId != null && existing == null) {
-            Toast.makeText(
-                context,
-                context.getString(R.string.capsule_invalid_configuration),
-                Toast.LENGTH_SHORT,
-            ).show()
-            return@rememberLauncherForActivityResult
-        }
-        var profileId = submission.selectedProfileId
-        var ownsDedicated = existing?.ownsDedicatedProfile == true &&
-            existing.profileId == profileId
-        val previousProfileId = controller.activeProfileId
-        if (existing == null && submission.createDedicatedProfile) {
-            profileId = controller.createProfile(
-                emoji = submission.dedicatedEmoji,
-                isolationEnabled = submission.isolatedStorageRequested,
-            ) ?: return@rememberLauncherForActivityResult
-            ownsDedicated = true
-        }
-        val result = controller.upsertSiteCapsule(
-            draft = SiteCapsuleDraft(
-                id = existing?.id,
-                name = submission.name,
-                startUrl = submission.startUrl,
-                profileId = profileId,
-                ownsDedicatedProfile = ownsDedicated,
-                isolatedStorageRequested = submission.isolatedStorageRequested,
-                navigationMode = submission.navigationMode,
-                chromeMode = submission.chromeMode,
-                opensInOwnWindow = submission.opensInOwnWindow,
-                iconMode = submission.iconMode,
-                iconEmoji = submission.iconEmoji,
-                iconColor = submission.iconColor,
-            ),
-            sourceFavicon = submission.sourceFavicon,
-            customIcon = submission.customIcon,
-        )
-        if (controller.activeProfileId != previousProfileId) {
-            controller.requestProfileSelection(previousProfileId) {}
-        }
-        val message = when (result) {
-            CapsuleSaveResult.PinRequested -> R.string.capsule_pin_requested
-            CapsuleSaveResult.PinningUnsupported -> R.string.capsule_pinning_unsupported
-            CapsuleSaveResult.PinRequestFailed -> R.string.capsule_pin_failed
-            CapsuleSaveResult.Updated -> R.string.capsule_updated
-            CapsuleSaveResult.UpdateFailed -> R.string.capsule_update_failed
-            CapsuleSaveResult.IconSaveFailed -> R.string.capsule_icon_save_failed
-            CapsuleSaveResult.LimitReached -> R.string.capsule_limit_reached
-            CapsuleSaveResult.Invalid -> R.string.capsule_invalid_configuration
-        }
-        Toast.makeText(context, context.getString(message), Toast.LENGTH_SHORT).show()
-        if (result == CapsuleSaveResult.PinRequested || result == CapsuleSaveResult.Updated) {
-            rootView.performConfirmHaptic()
-        }
-    }
+
     var pendingProfileConfiguration by rememberSaveable(
         stateSaver = PendingProfileConfigurationSaver,
     ) {
@@ -647,51 +539,10 @@ internal fun BrowserScreen(
         )
     }
     fun openProfileWallpaperEditor(profileId: String, wallpaperTarget: ProfileWallpaperTarget) {
-        configureProfile(profileId, listOf(wallpaperTarget))
+        // Debloated
     }
     fun openSiteCapsuleEditor(existing: SiteCapsule?, sourceTab: BrowserTab?) {
-        if (existing == null && sourceTab == null) return
-        val sourceTitle = existing?.name ?: sourceTab?.title.orEmpty().ifBlank {
-            sourceTab?.url?.let(AddressResolver::displayText).orEmpty()
-        }
-        val sourceUrl = existing?.startUrl ?: sourceTab?.url.orEmpty()
-        val storedSourceIcon = existing?.let { capsule ->
-            controller.siteCapsuleSourceIcon(capsule.id)
-        }
-        val storedCustomIcon = existing?.let { capsule ->
-            controller.siteCapsuleCustomIcon(capsule.id)
-        }
-        val legacyRenderedIcon = existing
-            ?.takeIf { capsule ->
-                capsule.iconMode == CapsuleIconMode.Favicon && storedSourceIcon == null
-            }
-            ?.let { capsule -> controller.siteCapsuleRenderedIcon(capsule.id) }
-        siteCapsuleEditorLauncher.launch(
-            SiteCapsuleEditorRequest(
-                existing = existing,
-                sourceTabId = sourceTab?.id,
-                sourceTitle = sourceTitle,
-                sourceUrl = sourceUrl,
-                profiles = visibleProfiles.filterNot { profile ->
-                    profile.id in controller.lockedProfileIds
-                },
-                activeProfileId = controller.activeProfileId.takeIf { id ->
-                    visibleProfiles.any { it.id == id }
-                } ?: visibleProfiles.first().id,
-                profileIsolationSupported = controller.isProfileIsolationSupported,
-                pinningSupported = controller.isCapsulePinningSupported,
-                canCreate = controller.canCreateSiteCapsule,
-                canCreateDedicatedProfile = controller.profilesEnabled &&
-                    controller.localBrowserProfiles.size < MAX_PROFILES &&
-                    controller.tabs.size < MAX_TABS,
-                previewIcon = storedSourceIcon
-                    ?: legacyRenderedIcon
-                    ?: sourceTab?.let { controller.favicons[it.id] },
-                previewIconIsRendered = legacyRenderedIcon != null,
-                customIcon = storedCustomIcon,
-            ),
-        )
-        rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        // Debloated
     }
     val keyboard = LocalSoftwareKeyboardController.current
     val addressTabImeHandoff = rememberBrowserImeHandoff()
@@ -728,8 +579,6 @@ internal fun BrowserScreen(
     }
     BrowserOfferSnackbarEffects(controller, feedbackSnackbarHostState)
     ClosedTabUndoSnackbarEffect(controller, feedbackSnackbarHostState)
-    ExternalAppFeedbackSnackbarEffect(controller, feedbackSnackbarHostState)
-    DownloadCompletionSnackbarEffect(feedbackSnackbarHostState)
     val tabSwitchGapPx = with(density) { 8.dp.toPx() }
     val tabSwitchTravelPx = browserWidthPx + tabSwitchGapPx
     val settleOverviewGesture: () -> Unit = {
@@ -783,14 +632,7 @@ internal fun BrowserScreen(
             activeCommandExecutionId = null
             pendingCommand = null
             commandFeedback = null
-            feedsEntry = null
-            feedsReturnEntry = null
             readerStudioSession = null
-            readerStudioHomeVisible = false
-            pendingFeedReader = null
-            readerStudioFeedEntry = null
-            readerStudioFeedSourceUrl = null
-            readerStudioSnapshot = null
             readerStudioRequestId++
             candyTrailTabId = null
             candyTrailSourceBounds = null
@@ -804,26 +646,17 @@ internal fun BrowserScreen(
     val openAddressEditor: () -> Unit = {
         if (activeCommandExecutionId == null) {
             controller.closeFindInPage()
-            val openGeneration = ++addressEditorOpenGeneration
-            val requestedTabId = controller.selectedTabId
-            controller.refreshSelectedTabPreview {
-                if (
-                    openGeneration != addressEditorOpenGeneration ||
-                    requestedTabId != controller.selectedTabId
-                ) {
-                    return@refreshSelectedTabPreview
-                }
-                val initialAddress = controller.selectedTab.url
-                    .takeUnless { it == BLANK_URL }
-                    .orEmpty()
-                addressValue = TextFieldValue(
-                    text = initialAddress,
-                    selection = TextRange(initialAddress.length, 0),
-                )
-                addressEditorVisible = true
-                highlightedSuggestionIndex = -1
-                addressFocusNonce++
-            }
+            addressEditorOpenGeneration++
+            val initialAddress = controller.selectedTab.url
+                .takeUnless { it == BLANK_URL }
+                .orEmpty()
+            addressValue = TextFieldValue(
+                text = initialAddress,
+                selection = TextRange(initialAddress.length, 0),
+            )
+            addressEditorVisible = true
+            highlightedSuggestionIndex = -1
+            addressFocusNonce++
         }
     }
     LaunchedEffect(launcherAddressEditorRequestId) {
@@ -870,32 +703,11 @@ internal fun BrowserScreen(
             controller.refreshSelectedTabPreview(createAndEdit)
         }
     }
-    fun dismissReaderStudioArticle() {
-        readerStudioSession = null
-        pendingFeedReader = null
-        readerStudioSnapshot = null
-        readerStudioFeedEntry = null
-        readerStudioFeedSourceUrl = null
-        readerStudioRequestId++
-    }
-    fun openFeedCollection(entry: FeedsEntry) {
-        dismissReaderStudioArticle()
-        readerStudioHomeVisible = false
-        feedsReturnEntry = null
-        feedsEntry = entry
-    }
-    fun openReaderStudio(fromFeed: Boolean = false) {
-        if (!fromFeed) {
-            pendingFeedReader = null
-            readerStudioFeedEntry = null
-            readerStudioFeedSourceUrl = null
-        }
-        readerStudioSnapshot = null
+    fun openReaderStudio() {
         readerStudioResult = null
         val requestId = ++readerStudioRequestId
         readerStudioSession = ReaderStudioSession(
             tabId = selectedTab.id,
-            sourceProfileId = selectedTab.profileId,
             sourceUrl = selectedTab.url,
             isPrivate = selectedTab.isIncognito,
             requestId = requestId,
@@ -905,52 +717,6 @@ internal fun BrowserScreen(
                 readerStudioResult = result
             }
         }
-    }
-    fun openFeedInReader(url: String, entry: Pair<String, String>? = null) {
-        if (!controller.incomingLinkRouter.openInReader(url)) {
-            Toast.makeText(context, R.string.reader_extraction_failed_title, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val request = controller.incomingLinkRouter.readerRequest ?: return
-        controller.incomingLinkRouter.clearReaderRequest()
-        pendingFeedReader = request
-        readerStudioFeedEntry = entry
-        readerStudioFeedSourceUrl = url
-        readerStudioSnapshot = null
-        readerStudioResult = null
-        readerStudioSession = ReaderStudioSession(
-            tabId = request.tabId,
-            sourceUrl = request.sourceUrl,
-            isPrivate = false,
-            sourceProfileId = controller.selectedTab.profileId,
-            requestId = ++readerStudioRequestId,
-        )
-    }
-    LaunchedEffect(openFeedsRequestId) {
-        if (openFeedsRequestId > 0 && !selectedTab.isIncognito) {
-            closeTabOverview()
-            openFeedCollection(
-                FeedsEntry(
-                    queueRequestId = openFeedsRequestId.takeIf { openFeedQueue } ?: 0,
-                    openCatalog = openFeedCatalog,
-                    articleId = openFeedArticleId,
-                ),
-            )
-        }
-    }
-    LaunchedEffect(rssReaderLaunchRequest?.id) {
-        val request = rssReaderLaunchRequest ?: return@LaunchedEffect
-        onRssReaderLaunchConsumed(request.id)
-        feedsEntry = null
-        feedsReturnEntry = null
-        if (request.articleUrl == null && controller.selectedTab.isIncognito) {
-            controller.createTab(initialUrl = BLANK_URL, isIncognito = false)
-            if (controller.selectedTab.isIncognito) return@LaunchedEffect
-        }
-        readerStudioHomeGeneration++
-        readerStudioHomeInitialTab = ReaderStudioHomeTab.Feeds
-        readerStudioHomeVisible = true
-        request.articleUrl?.let { openFeedInReader(it) }
     }
     fun performAddressBarLongPress(action: AddressBarLongPressAction) {
         when (action) {
@@ -1040,35 +806,53 @@ internal fun BrowserScreen(
     ) {
         localRecallMatches = emptyList()
         if (!addressEditorVisible || activeSearchShortcut != null) return@LaunchedEffect
+        if (addressValue.text.isNotEmpty()) {
+            delay(50)
+        }
         localRecallMatches = suspendCancellableCoroutine { continuation ->
             controller.searchRecallForAddress(addressValue.text) { matches ->
                 if (continuation.isActive) continuation.resume(matches)
             }
         }
     }
-    val suggestionItems by remember {
-        derivedStateOf {
-            if (addressEditorVisible) {
-                controller.addressSuggestionItems(
-                    query = addressValue.text,
-                    searchQueries = remoteSearchSuggestions,
-                    recallMatches = localRecallMatches,
-                    limit = 10,
-                )
-            } else {
-                emptyList()
-            }
+    var suggestionItems by remember { mutableStateOf<List<AddressSuggestionItem>>(emptyList()) }
+    LaunchedEffect(
+        addressEditorVisible,
+        addressValue.text,
+        remoteSearchSuggestions,
+        localRecallMatches,
+    ) {
+        if (!addressEditorVisible) {
+            suggestionItems = emptyList()
+            return@LaunchedEffect
+        }
+        suggestionItems = withContext(Dispatchers.Default) {
+            controller.addressSuggestionItems(
+                query = addressValue.text,
+                searchQueries = remoteSearchSuggestions,
+                recallMatches = localRecallMatches,
+                limit = 10,
+            )
         }
     }
-    val domainCompletion = if (
-        addressEditorVisible &&
-        activeSearchShortcut == null &&
-        addressValue.selection.start == addressValue.selection.end &&
-        addressValue.selection.end == addressValue.text.length
+    var domainCompletion by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(
+        addressEditorVisible,
+        addressValue.text,
+        addressValue.selection,
     ) {
-        controller.addressDomainCompletion(addressValue.text)
-    } else {
-        null
+        if (
+            addressEditorVisible &&
+            activeSearchShortcut == null &&
+            addressValue.selection.start == addressValue.selection.end &&
+            addressValue.selection.end == addressValue.text.length
+        ) {
+            domainCompletion = withContext(Dispatchers.Default) {
+                controller.addressDomainCompletion(addressValue.text)
+            }
+        } else {
+            domainCompletion = null
+        }
     }
     val showAiModeToggle = addressEditorVisible && activeSearchShortcut == null && AddressAiModeRules.isToggleVisible(
         input = addressValue.text,
@@ -1198,7 +982,7 @@ internal fun BrowserScreen(
         addressEditorVisible = false
         if (target == null) {
             rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            controller.submitAddressFromAddressBar(suggestion.url)
+            controller.submitAddress(suggestion.url)
         } else {
             val sourceTabId = controller.selectedTabId
             val sourceProfileId = controller.activeProfileId
@@ -1223,7 +1007,7 @@ internal fun BrowserScreen(
                     backAnimationScope.launch { tabHandoffAlpha.snapTo(1f) }
                     rootView.performConfirmHaptic()
                 } else {
-                    controller.submitAddressFromAddressBar(suggestion.url)
+                    controller.submitAddress(suggestion.url)
                 }
             }
             if (controller.usesGeckoEngine) {
@@ -1292,7 +1076,7 @@ internal fun BrowserScreen(
         ) {
             is AddressSubmission.Select -> selectSuggestion(submission.suggestion)
             is AddressSubmission.Navigate -> {
-                controller.submitAddressFromAddressBar(submission.input, searchModeFor(submission.input))
+                controller.submitAddress(submission.input, searchModeFor(submission.input))
                 addressEditorVisible = false
             }
             AddressSubmission.None -> Unit
@@ -1308,9 +1092,9 @@ internal fun BrowserScreen(
         }
     }
 
-    LaunchedEffect(addressValue.text, suggestionItems.map(AddressSuggestionItem::stableId)) {
+    LaunchedEffect(addressValue.text) {
         highlightedSuggestionIndex = if (
-            CommandMatcher.isExplicitCommandQuery(addressValue.text) && suggestionItems.isNotEmpty()
+            CommandMatcher.isExplicitCommandQuery(addressValue.text)
         ) {
             0
         } else {
@@ -1377,96 +1161,19 @@ internal fun BrowserScreen(
         }
     }
 
-    LaunchedEffect(controller.pendingCustomWorkflowReader, selectedTab.id) {
-        val request = controller.consumeCustomWorkflowReader() ?: return@LaunchedEffect
-        if (request.input.tabId == selectedTab.id && request.input.profileId == selectedTab.profileId &&
-            request.input.isPrivate == selectedTab.isIncognito
-        ) {
-            readerStudioSnapshot = null
-            readerStudioFeedEntry = null
-            readerStudioFeedSourceUrl = null
-            readerStudioSession = ReaderStudioSession(
-                tabId = selectedTab.id,
-                sourceUrl = request.document.sourceUrl,
-                isPrivate = request.input.isPrivate,
-                sourceProfileId = request.input.profileId,
-                requestId = ++readerStudioRequestId,
-            )
-            readerStudioResult = ReaderExtractionResult.Success(request.document)
-        }
-    }
-
-    LaunchedEffect(controller.deviceSearchReaderSnapshot, selectedTab.id) {
-        val snapshot = controller.consumeDeviceSearchReaderSnapshot() ?: return@LaunchedEffect
-        if (!selectedTab.isIncognito && selectedTab.profileId == snapshot.sourceProfileId) {
-            readerStudioSnapshot = snapshot
-            readerStudioFeedEntry = null
-            readerStudioFeedSourceUrl = null
-            readerStudioSession = ReaderStudioSession(
-                tabId = selectedTab.id,
-                sourceUrl = snapshot.document.sourceUrl,
-                isPrivate = false,
-                sourceProfileId = snapshot.sourceProfileId,
-                requestId = ++readerStudioRequestId,
-            )
-            readerStudioResult = ReaderExtractionResult.Success(snapshot.document)
-        }
-    }
-
-    LaunchedEffect(pendingFeedReader, selectedTab.id, selectedTab.isLoading, selectedTab.url, selectedTab.error) {
-        val request = pendingFeedReader ?: return@LaunchedEffect
-        when (RssReaderLoadRules.action(
-            requestedTabId = request.tabId,
-            selectedTabId = selectedTab.id,
-            url = selectedTab.url,
-            isLoading = selectedTab.isLoading,
-            isPrivate = selectedTab.isIncognito,
-            hasError = selectedTab.error != null,
-        )) {
-            RssReaderLoadAction.Wait -> Unit
-            RssReaderLoadAction.Cancel -> dismissReaderStudioArticle()
-            RssReaderLoadAction.Extract -> {
-                pendingFeedReader = null
-                openReaderStudio(fromFeed = true)
-            }
-            RssReaderLoadAction.Unsupported, RssReaderLoadAction.Failed -> {
-                pendingFeedReader = null
-                readerStudioResult = ReaderExtractionResult.Failure(
-                    if (selectedTab.error != null) ReaderExtractionFailure.InvalidResponse
-                    else ReaderExtractionFailure.UnsupportedPage,
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(readerStudioResult, readerStudioSession, readerStudioFeedEntry, readerStudioFeedSourceUrl) {
-        val session = readerStudioSession ?: return@LaunchedEffect
-        if (!session.isPrivate && readerStudioResult is ReaderExtractionResult.Success) {
-            val entry = readerStudioFeedEntry
-            if (entry != null) rssInboxRepository.markRead(entry.first, entry.second)
-            else rssInboxRepository.markReadUrl(readerStudioFeedSourceUrl ?: session.sourceUrl)
-        }
-    }
-
-    LaunchedEffect(
-        controller.incomingLinkRouter.readerRequest,
-        selectedTab.id,
-        selectedTab.isLoading,
-        selectedTab.url,
-        selectedTab.error,
-    ) {
-        val request = controller.incomingLinkRouter.readerRequest ?: return@LaunchedEffect
-        if (LinkRoutingRules.shouldCancelReaderRequest(request, selectedTab)) {
-            controller.incomingLinkRouter.clearReaderRequest()
-        } else if (LinkRoutingRules.canOpenReader(request, selectedTab)) {
-            controller.incomingLinkRouter.clearReaderRequest()
-            openReaderStudio()
+    LaunchedEffect(tabHandoff?.visualIdentity) {
+        val handoff = tabHandoff ?: return@LaunchedEffect
+        delay(600)
+        if (tabHandoff === handoff) {
+            tabHandoffAlpha.animateTo(0f, tween(150))
+            tabHandoff = null
         }
     }
 
     LaunchedEffect(selectedTab.id, readerStudioSession) {
         if (ReaderStudioSessionRules.shouldClose(readerStudioSession, selectedTab.id)) {
-            dismissReaderStudioArticle()
+            readerStudioSession = null
+            readerStudioRequestId++
         }
     }
 
@@ -1492,13 +1199,12 @@ internal fun BrowserScreen(
         tabOverviewVisible,
         settingsVisible,
         readerStudioSession,
-        readerStudioHomeVisible,
     ) {
         if (
             addressEditorVisible ||
             tabOverviewVisible ||
             settingsVisible ||
-            readerStudioSession != null || readerStudioHomeVisible
+            readerStudioSession != null
         ) {
             controller.closeFindInPage()
         }
@@ -1507,7 +1213,7 @@ internal fun BrowserScreen(
 
     val currentBackTarget by rememberUpdatedState(
         when {
-            readerStudioSession != null || readerStudioHomeVisible -> BrowserBackTarget.ReaderStudio
+            readerStudioSession != null -> BrowserBackTarget.ReaderStudio
             filterStudioVisible -> BrowserBackTarget.FilterStudio
             snoozedTabsVisible -> BrowserBackTarget.SnoozedTabs
             settingsVisible && settingsDestination != SettingsDestination.Home ->
@@ -1518,7 +1224,6 @@ internal fun BrowserScreen(
             candyTrailTabId != null -> BrowserBackTarget.CandyTrail
             tabOverviewVisible || tabOverviewOpening -> BrowserBackTarget.TabOverview
             controller.isSelectedWebContentFullscreen -> BrowserBackTarget.WebContentFullscreen
-            feedsReturnEntry != null -> BrowserBackTarget.FeedsReturn
             selectedTab.canGoBack -> BrowserBackTarget.WebHistory
             selectedTab.id == externalLaunchTabId -> BrowserBackTarget.ExternalApp
             controller.selectedRootTabBackDecision ==
@@ -1526,7 +1231,7 @@ internal fun BrowserScreen(
             else -> BrowserBackTarget.RootTab
         },
     )
-    PredictiveBackHandler(enabled = feedsEntry == null && currentBackTarget != BrowserBackTarget.System) { events ->
+    PredictiveBackHandler(enabled = currentBackTarget != BrowserBackTarget.System) { events ->
         controller.cancelSelectedBrowserEngineTouch()
         val target = currentBackTarget
         var receivedProgress = false
@@ -1544,18 +1249,21 @@ internal fun BrowserScreen(
                 }
             }
             when (target) {
-                BrowserBackTarget.ReaderStudio -> {
-                    if (readerStudioSession != null) dismissReaderStudioArticle()
-                    else readerStudioHomeVisible = false
-                }
-                BrowserBackTarget.FeedsReturn -> {
-                    feedsEntry = feedsReturnEntry
-                    feedsReturnEntry = null
-                }
+                BrowserBackTarget.ReaderStudio -> readerStudioSession = null
                 BrowserBackTarget.FilterStudio -> filterStudioVisible = false
                 BrowserBackTarget.SnoozedTabs -> snoozedTabsVisible = false
                 BrowserBackTarget.SettingsSubpage -> {
-                    settingsDestination = SettingsBackRules.parentDestination(settingsDestination)
+                    settingsDestination = when (settingsDestination) {
+                        SettingsDestination.ToppingCatalog -> SettingsDestination.Userscripts
+                        SettingsDestination.AddressBarLongPressActions,
+                        SettingsDestination.AddressBarActions ->
+                            SettingsDestination.TabsAndGestures
+                        SettingsDestination.MenuActions ->
+                            SettingsDestination.TabsAndGestures
+                        SettingsDestination.LinkPeekActions ->
+                            SettingsDestination.TabsAndGestures
+                        else -> SettingsDestination.Home
+                    }
                 }
                 BrowserBackTarget.Settings -> {
                     settingsPredictiveBackCommitted = receivedProgress
@@ -1700,78 +1408,44 @@ internal fun BrowserScreen(
             }
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.tertiaryContainer,
-                            MaterialTheme.colorScheme.surface,
-                        ),
-                    ),
-                ),
+        BrowserMainViewportContent(
+            controller = controller,
+            selectedTab = selectedTab,
+            profileWallpaperRuntime = profileWallpaperRuntime,
+            showFirefoxExtensionOptionsChrome = showFirefoxExtensionOptionsChrome,
+            firefoxExtensionOptionsTitle = firefoxExtensionOptionsTitle,
+            fullscreenVideoGestureState = fullscreenVideoGestureState,
+            webViewVideoOnlyPresentation = webViewVideoOnlyPresentation,
+            hideBrowserChrome = hideBrowserChrome,
+            browserDragOffset = browserDragOffset,
+            tabSwitchTravelPx = tabSwitchTravelPx,
+            browserHeightPx = browserHeightPx,
+            bottomBarTopPx = bottomBarTopPx,
+            tabHandoff = tabHandoff,
+            tabHandoffAlpha = tabHandoffAlpha.value,
+            liveFrameTabId = liveFrameTabId,
+            tabOverviewVisible = tabOverviewVisible,
+            reportLiveFrame = reportLiveFrame,
+            showInteractiveBlankStart = showInteractiveBlankStart,
+            addressEditorVisible = addressEditorVisible,
+            openAddressEditor = openAddressEditor,
+            onOpenFavorites = onOpenFavorites,
+            blankTabModeProgress = blankTabModeProgress,
+            blankTabModeRevealOrigin = blankTabModeRevealOrigin,
+            browserContentBlurTarget = browserContentBlurTarget,
+            onBlurTargetAttached = { target -> browserContentBlurTarget = target },
+            onBlurTargetReleased = { target ->
+                if (browserContentBlurTarget === target) browserContentBlurTarget = null
+            },
+            settingsVisible = settingsVisible,
+            readerStudioSession = readerStudioSession,
+            onOpenMpvRx = onOpenMpvRx,
+            onAddressEditorDismiss = { addressEditorVisible = false },
+            onHandoffExpired = { expired ->
+                if (tabHandoff === expired) tabHandoff = null
+            },
         )
-        CompositionLocalProvider(LocalProfileWallpaper provides profileWallpaperRuntime) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (showFirefoxExtensionOptionsChrome) {
-                    FirefoxExtensionOptionsTopBar(
-                        title = requireNotNull(firefoxExtensionOptionsTitle),
-                        onBack = controller::goBack,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (fullscreenVideoGestureState != null) {
-                                Color.Black
-                            } else {
-                                Color.Transparent
-                            },
-                        ),
-                ) {
-                    BrowserViewport(
-                        controller = controller,
-                        fullscreenVideoGestureState = fullscreenVideoGestureState,
-                        webViewVideoOnlyPresentation = webViewVideoOnlyPresentation,
-                        videoOnlyPresentation = hideBrowserChrome,
-                        selectedTab = selectedTab,
-                        dragOffset = browserDragOffset,
-                        travelDistance = tabSwitchTravelPx,
-                        rootHeightPx = browserHeightPx,
-                        bottomBarTopPx = bottomBarTopPx,
-                        handoff = tabHandoff,
-                        handoffAlpha = tabHandoffAlpha.value,
-                        liveFrameTabId = liveFrameTabId,
-                        tabOverviewVisible = tabOverviewVisible,
-                        onLiveFrame = reportLiveFrame,
-                        onHandoffExpired = { expired ->
-                            if (tabHandoff === expired) tabHandoff = null
-                        },
-                        onSearch = if (showInteractiveBlankStart) {
-                            { addressEditorVisible = false }
-                        } else {
-                            openAddressEditor
-                        },
-                        onFavorite = { url ->
-                            addressEditorVisible = false
-                            controller.submitAddress(url)
-                        },
-                        onOpenFavorites = onOpenFavorites,
-                        onReorderFavorite = controller::reorderFavorite,
-                        blankTabModeProgress = blankTabModeProgress,
-                        blankTabModeRevealOrigin = blankTabModeRevealOrigin,
-                        onRetry = controller::retryFailedPage,
-                        onBlurTargetAttached = { target -> browserContentBlurTarget = target },
-                        onBlurTargetReleased = { target ->
-                            if (browserContentBlurTarget === target) browserContentBlurTarget = null
-                        },
-                    )
-                }
-            }
-        }
+
 
         controller.findInPageState
             ?.takeIf { firefoxExtensionOptionsTitle == null && !hideBrowserChrome }
@@ -1809,349 +1483,209 @@ internal fun BrowserScreen(
             )
         }
 
-        if (firefoxExtensionOptionsTitle == null && !hideBrowserChrome && feedsEntry == null) {
+        if (firefoxExtensionOptionsTitle == null && !hideBrowserChrome) {
             BrowserAddressChrome(
-            controller = controller,
-            selectedTab = selectedTab,
-            addressEditorVisible = addressEditorVisible,
-            showInteractiveBlankStart = showInteractiveBlankStart,
-            blankTabModeProgress = blankTabModeProgress,
-            blankTabModeRevealOrigin = blankTabModeRevealOrigin,
-            profileWallpaperRuntime = profileWallpaperRuntime,
-            commandFeedback = commandFeedback,
-            suggestionItems = suggestionItems,
-            highlightedSuggestionIndex = highlightedSuggestionIndex,
-            browserHeightPx = browserHeightPx,
-            bottomBarTopPx = bottomBarTopPx,
-            browserContentBlurTarget = browserContentBlurTarget,
-            linkPeekAddressBarExpanded = linkPeekAddressBarExpanded,
-            castUiState = castUiState,
-            settingsVisible = settingsVisible,
-            menuDismissRequestId = incomingBrowserNavigationRequestId,
-            addressValue = addressValue,
-            domainCompletion = domainCompletion,
-            addressFocusNonce = addressFocusNonce,
-            showAiModeToggle = showAiModeToggle,
-            aiModeSelectedState = aiModeSelectedState,
-            browserDragOffset = browserDragOffset,
-            browserWidthPx = browserWidthPx,
-            tabSwitchTravelPx = tabSwitchTravelPx,
-            tabHandoffAlpha = tabHandoffAlpha,
-            tabOverviewOpening = tabOverviewOpening,
-            tabOverviewVisible = tabOverviewVisible,
-            overviewGestureProgress = overviewGestureProgress,
-            addressBarMorphInFront = addressBarMorphInFront,
-            browserRootBottomInWindowPx = browserRootBottomInWindowPx,
-            visibleSnoozedTabCount = visibleSnoozedTabs.size,
-            onToggleCastPlayback = onToggleCastPlayback,
-            onSeekCast = onSeekCast,
-            onCastVolumeChange = onCastVolumeChange,
-            onDisconnectCast = onDisconnectCast,
-            openAddressEditor = openAddressEditor,
-            onAddressEditorDismiss = { addressEditorVisible = false },
-            onAddressValueChanged = {
-                addressValue = AddressSearchShortcutRules.edit(addressValue, it, controller.searchShortcuts)
-            },
-            onHighlightedSuggestionChanged = { highlightedSuggestionIndex = it },
-            selectSuggestion = ::selectSuggestion,
-            fillAddressFromSuggestion = ::fillAddressFromSuggestion,
-            moveSuggestionHighlight = ::moveSuggestionHighlight,
-            submitAddressOrCommand = ::submitAddressOrCommand,
-            onLiveFrameCleared = { liveFrameTabId = null },
-            onTabHandoffChanged = { tabHandoff = it },
-            onTabs = {
-                if (addressEditorVisible) {
-                    addressEditorVisible = false
-                    overviewGestureScope.launch {
-                        withFrameNanos { }
-                        withFrameNanos { }
+                controller = controller,
+                selectedTab = selectedTab,
+                addressEditorVisible = addressEditorVisible,
+                showInteractiveBlankStart = showInteractiveBlankStart,
+                blankTabModeProgress = blankTabModeProgress,
+                blankTabModeRevealOrigin = blankTabModeRevealOrigin,
+                profileWallpaperRuntime = profileWallpaperRuntime,
+                commandFeedback = commandFeedback,
+                suggestionItems = suggestionItems,
+                highlightedSuggestionIndex = highlightedSuggestionIndex,
+                browserHeightPx = browserHeightPx,
+                bottomBarTopPx = bottomBarTopPx,
+                browserContentBlurTarget = browserContentBlurTarget,
+                linkPeekAddressBarExpanded = linkPeekAddressBarExpanded,
+                castUiState = castUiState,
+                settingsVisible = settingsVisible,
+                menuDismissRequestId = incomingBrowserNavigationRequestId,
+                addressValue = addressValue,
+                domainCompletion = domainCompletion,
+                addressFocusNonce = addressFocusNonce,
+                showAiModeToggle = showAiModeToggle,
+                aiModeSelectedState = aiModeSelectedState,
+                browserDragOffset = browserDragOffset,
+                browserWidthPx = browserWidthPx,
+                tabSwitchTravelPx = tabSwitchTravelPx,
+                tabHandoffAlpha = tabHandoffAlpha,
+                tabOverviewOpening = tabOverviewOpening,
+                tabOverviewVisible = tabOverviewVisible,
+                overviewGestureProgress = overviewGestureProgress,
+                addressBarMorphInFront = addressBarMorphInFront,
+                browserRootBottomInWindowPx = browserRootBottomInWindowPx,
+                visibleSnoozedTabCount = visibleSnoozedTabs.size,
+                onToggleCastPlayback = onToggleCastPlayback,
+                onSeekCast = onSeekCast,
+                onCastVolumeChange = onCastVolumeChange,
+                onDisconnectCast = onDisconnectCast,
+                openAddressEditor = openAddressEditor,
+                onAddressEditorDismiss = { addressEditorVisible = false },
+                onAddressValueChanged = {
+                    addressValue = AddressSearchShortcutRules.edit(addressValue, it, controller.searchShortcuts)
+                },
+                onHighlightedSuggestionChanged = { highlightedSuggestionIndex = it },
+                selectSuggestion = ::selectSuggestion,
+                fillAddressFromSuggestion = ::fillAddressFromSuggestion,
+                moveSuggestionHighlight = ::moveSuggestionHighlight,
+                submitAddressOrCommand = ::submitAddressOrCommand,
+                onLiveFrameCleared = { liveFrameTabId = null },
+                onTabHandoffChanged = { tabHandoff = it },
+                onTabs = {
+                    if (addressEditorVisible) {
+                        addressEditorVisible = false
+                        overviewGestureScope.launch {
+                            withFrameNanos { }
+                            withFrameNanos { }
+                            openTabOverview()
+                        }
+                    } else {
                         openTabOverview()
                     }
-                } else {
-                    openTabOverview()
-                }
-            },
-            onOverviewGestureStarted = { overviewGestureSettleJob?.cancel() },
-            onOverviewGestureCancelled = settleOverviewGesture,
-            openNewTabAndEdit = { openNewTabAndEdit() },
-            toggleFavoriteWithFeedback = toggleFavoriteWithFeedback,
-            onBlankTabModeRevealOriginChanged = { blankTabModeRevealOrigin = it },
-            onSnoozedTabs = { snoozedTabsVisible = true },
-            onOpenFavorites = onOpenFavorites,
-            onOpenDownloads = onOpenDownloads,
-            onOpenHistory = onOpenHistory,
-            onOpenRssFeeds = if (selectedTab.isIncognito) null else {
-                { onOpenRssFeeds(selectedTab.url, selectedTab.isIncognito) }
-            },
-            onOpenFeeds = if (selectedTab.isIncognito) null else {
-                { openFeedCollection(FeedsEntry()) }
-            },
-            onOpenLibrary = if (selectedTab.isIncognito) null else {
-                { openFeedCollection(FeedsEntry(libraryOnly = true)) }
-            },
-            onDiscoverFeeds = { openFeedCollection(FeedsEntry(openCatalog = true)) },
-            unreadFeedCount = feedState.unreadCount,
-            onSettings = {
-                settingsDestination = SettingsDestination.Home
-                settingsVisible = true
-            },
-            onManageWorkflows = {
-                settingsDestination = SettingsDestination.CustomWorkflows
-                settingsVisible = true
-            },
-            onOpenMenuSettings = {
-                settingsDestination = SettingsDestination.MenuActions
-                settingsVisible = true
-            },
-            onPrivacyXRay = {
-                privacyXRayTabId = selectedTab.id
-                permissionRadarOrigin = null
-            },
-            onNewTabButtonBoundsChanged = { addressNewTabButtonBounds = it },
-            onReaderStudio = { performAddressBarLongPress(AddressBarLongPressAction.OpenReader) },
-            onOpenCandyTrail = {
-                performAddressBarLongPress(AddressBarLongPressAction.OpenCandyTrail)
-            },
-            onSnooze = { snoozeTabId = selectedTab.id },
-            onAddSiteCapsule = {
-                performAddressBarLongPress(AddressBarLongPressAction.CreateSiteCapsule)
-            },
-            canCreateSiteWidget = controller.canCreateSiteWidget,
-            onCreateSiteWidget = { controller.requestSiteWidgetEditor() },
-            onAddressBarLongPressAction = ::performAddressBarLongPress,
-            )
-        }
-
-        SiteWidgetEditorHost(controller)
-
-        feedsEntry?.let { entry ->
-            val content: @Composable () -> Unit = {
-                key(feedRepository) {
-                    FeedsHost(
-                        repository = feedRepository,
-                        entry = entry,
-                        catalogOnly = settingsVisible,
-                        modifier = Modifier.zIndex(if (settingsVisible) 21f else 0f),
-                        progressScope = feedsProgressScope,
-                        onOpenOriginal = { url ->
-                            settingsVisible = false
-                            feedsReturnEntry = entry.copy(discoveryUrl = null, queueRequestId = 0, articleId = null)
-                            feedsEntry = null
-                            dismissReaderStudioArticle()
-                            readerStudioHomeVisible = false
-                            controller.openUrl(url)
-                        },
-                        onDismiss = {
-                            feedsEntry = null
-                            feedsReturnEntry = null
-                        },
-                    )
-                }
-            }
-            if (feedRepository.isPrivate) {
-                CompositionLocalProvider(LocalSaveableStateRegistry provides null, content = content)
-            } else {
-                feedsSavedState.SaveableStateProvider(
-                    "${controller.activeProfileId}:${selectedTab.id}:${entry.libraryOnly}",
-                    content,
-                )
-            }
-        }
-
-        fun selectOverviewTab(tabId: String, forceHandoff: Boolean) {
-            val target = controller.activeTabs.firstOrNull { tab -> tab.id == tabId }
-            if (target != null && (forceHandoff || target.id != controller.selectedTabId)) {
-                liveFrameTabId = null
-                tabHandoff = TabHandoff(
-                    tab = target,
-                    preview = controller.previews[target.id].takeUnless { target.isIncognito },
-                    favicon = controller.favicons[target.id],
-                    previewTopInsetPx = controller.previewTopInsetPx(target.id),
-                    isRestoring = TabHandoffRules.isRestoring(
-                        target,
-                        controller.isTabSessionResident(target.id),
-                    ),
-                )
-            }
-            controller.selectTab(tabId)
-        }
-
-        CompositionLocalProvider(LocalProfileWallpaper provides profileWallpaperRuntime) {
-            TabOverview(
-                controller = controller,
-                backgroundWallpaper = tabSwitcherWallpaperRuntime,
-                visible = tabOverviewVisible,
-                bottomBarTopPx = bottomBarTopPx,
-                onClose = closeTabOverview,
-                onSelect = { tabId ->
-                    selectOverviewTab(tabId = tabId, forceHandoff = false)
                 },
-                onSelectDismissAnchor = { tabId ->
-                    selectOverviewTab(tabId = tabId, forceHandoff = true)
-                },
-                onNewTab = {
-                    val previousTabId = controller.selectedTabId
-                    openNewTabAndEdit()
-                    if (controller.selectedTabId != previousTabId) closeTabOverview()
-                },
-                onOpenSettings = {
+                onOverviewGestureStarted = { overviewGestureSettleJob?.cancel() },
+                onOverviewGestureCancelled = settleOverviewGesture,
+                openNewTabAndEdit = { openNewTabAndEdit() },
+                toggleFavoriteWithFeedback = toggleFavoriteWithFeedback,
+                onBlankTabModeRevealOriginChanged = { blankTabModeRevealOrigin = it },
+                onSnoozedTabs = { snoozedTabsVisible = true },
+                onOpenFavorites = onOpenFavorites,
+                onOpenDownloads = onOpenDownloads,
+                onOpenHistory = onOpenHistory,
+                onSettings = {
                     settingsDestination = SettingsDestination.Home
                     settingsVisible = true
                 },
-                onOpenReaderStudio = {
-                    readerStudioHomeInitialTab = ReaderStudioHomeTab.Library
-                    readerStudioHomeGeneration++
-                    readerStudioHomeVisible = true
+                onPrivacyXRay = {
+                    privacyXRayTabId = selectedTab.id
+                    permissionRadarOrigin = null
                 },
-                onOpenSyncSettings = {
-                    settingsDestination = SettingsDestination.Sync
-                    settingsVisible = true
+                onNewTabButtonBoundsChanged = { addressNewTabButtonBounds = it },
+                onReaderStudio = { performAddressBarLongPress(AddressBarLongPressAction.OpenReader) },
+                onOpenCandyTrail = {
+                    performAddressBarLongPress(AddressBarLongPressAction.OpenCandyTrail)
                 },
-                onEditProfileWallpaper = ::openProfileWallpaperEditor,
-                onConfigureCreatedProfile = { profileId, options ->
-                    configureProfile(
-                        profileId = profileId,
-                        wallpaperTargets = options.wallpaperTargets.toList(),
-                        protection = options.protection,
-                    )
+                onSnooze = { snoozeTabId = selectedTab.id },
+                onAddSiteCapsule = {
+                    performAddressBarLongPress(AddressBarLongPressAction.CreateSiteCapsule)
                 },
-                destinationChromeVisible = overviewDestinationChromeVisible,
-                onEntryHeroStarted = { animated ->
-                    overviewMorphJob?.cancel()
-                    overviewMorphProgress.floatValue = 0f
-                    overviewEntryHeroCompleted = false
-                    if (animated) {
-                        overviewMorphJob = overviewGestureScope.launch {
-                            val progress = Animatable(0f)
-                            progress.animateTo(
-                                targetValue = 1f,
-                                animationSpec = tween(
-                                    durationMillis = TabOverviewHeroRules.ENTRY_DURATION_MILLIS,
-                                    easing = FastOutSlowInEasing,
-                                ),
-                            ) { overviewMorphProgress.floatValue = value }
-                        }
-                    } else {
-                        overviewMorphProgress.floatValue = 1f
-                    }
-                },
-                onEntryHeroCompleted = { overviewEntryHeroCompleted = true },
-                onExitHeroVisibilityChanged = { overviewExitHeroVisible = it },
-                candyTrailTabId = candyTrailTabId,
-                candyTrailSourceBounds = candyTrailSourceBounds,
-                candyTrailBackProgress = candyTrailBackProgress.value,
-                candyTrailBackEdgeSign = candyTrailBackEdgeSign,
-                candyTrailPredictiveBackCommitted = candyTrailPredictiveBackCommitted,
-                onOpenCandyTrail = { tabId, bounds ->
-                    candyTrailSourceBounds = bounds
-                    candyTrailTabId = tabId
-                },
-                onCloseCandyTrail = {
-                    candyTrailTabId = null
-                    candyTrailSourceBounds = null
-                },
-                onToggleFavoriteTab = toggleFavoriteWithFeedback,
-                onAddSiteCapsule = { tabId ->
-                    openSiteCapsuleEditor(
-                        existing = null,
-                        sourceTab = controller.tabs.firstOrNull { it.id == tabId },
-                    )
-                },
-                onSnoozeTab = { tabId -> snoozeTabId = tabId },
+                onAddressBarLongPressAction = ::performAddressBarLongPress,
+                onManageFirefoxExtensions = onManageFirefoxExtensions ?: {},
             )
         }
 
-        if (readerStudioHomeVisible && feedsEntry == null) {
-            key(readerStudioHomeGeneration) {
-                ReaderStudioHomeHost(
-                    repository = readerLibraryRepository,
-                    isActive = readerStudioSession == null,
-                    onDismiss = { readerStudioHomeVisible = false },
-                    onOpenSnapshot = { snapshot ->
-                        readerStudioSnapshot = snapshot
-                        readerStudioFeedEntry = null
-                        readerStudioSession = ReaderStudioSession(
-                            tabId = selectedTab.id,
-                            sourceUrl = snapshot.document.sourceUrl,
-                            isPrivate = false,
-                            sourceProfileId = snapshot.sourceProfileId,
-                            requestId = ++readerStudioRequestId,
+        BrowserReaderOverlay(
+            readerStudioSession = readerStudioSession,
+            readerStudioResult = readerStudioResult,
+            readerLibraryRepository = readerLibraryRepository,
+            selectedTab = selectedTab,
+            onRetry = {
+                val session = readerStudioSession ?: return@BrowserReaderOverlay
+                readerStudioResult = null
+                val requestId = ++readerStudioRequestId
+                readerStudioSession = session.copy(requestId = requestId)
+                controller.extractSelectedPageForReader { result ->
+                    if (ReaderStudioSessionRules.acceptsResult(
+                            readerStudioSession,
+                            requestId,
                         )
-                        readerStudioResult = ReaderExtractionResult.Success(snapshot.document)
-                    },
-                    onOpenArticle = { feed, article ->
-                        openFeedInReader(article.url, feed.id to article.id)
-                    },
-                    initialTab = readerStudioHomeInitialTab,
-                    onManageFeeds = {
-                        openFeedCollection(FeedsEntry(openCatalog = true))
-                    },
-                )
-            }
-        }
-
-        readerStudioSession?.takeIf { feedsEntry == null }?.let { session ->
-            ReaderStudioScreen(
-                result = readerStudioResult,
-                sourceUrl = session.sourceUrl,
-                isPrivate = session.isPrivate,
-                repository = readerLibraryRepository,
-                sourceProfileId = session.sourceProfileId,
-                initialSnapshot = readerStudioSnapshot,
-                onOpenLibrary = if (session.isPrivate) null else {
-                    {
-                        val returnToEarlierCollection = readerStudioHomeVisible
-                        dismissReaderStudioArticle()
-                        if (returnToEarlierCollection) {
-                            readerStudioHomeInitialTab = ReaderStudioHomeTab.Library
-                            readerStudioHomeGeneration++
-                        } else {
-                            feedsReturnEntry = null
-                            feedsEntry = FeedsEntry(libraryOnly = true)
-                        }
+                    ) {
+                        readerStudioResult = result
                     }
-                },
-                onRetry = {
-                    readerStudioResult = null
-                    val requestId = ++readerStudioRequestId
-                    readerStudioSession = session.copy(requestId = requestId)
-                    controller.extractSelectedPageForReader { result ->
-                        if (ReaderStudioSessionRules.acceptsResult(
-                                readerStudioSession,
-                                requestId,
-                            )
-                        ) {
-                            readerStudioResult = result
-                        }
-                    }
-                },
-                onDismiss = ::dismissReaderStudioArticle,
-                onOpenOriginal = { url ->
-                    dismissReaderStudioArticle()
-                    readerStudioHomeVisible = false
-                    closeTabOverview()
-                    if (url != selectedTab.url) controller.openUrl(url)
-                },
-                onOpenLink = { url ->
-                    dismissReaderStudioArticle()
-                    readerStudioHomeVisible = false
-                    closeTabOverview()
-                    controller.openUrl(url)
-                },
-            )
-        }
+                }
+            },
+            onDismiss = { readerStudioSession = null },
+            onOpenOriginal = { url ->
+                readerStudioSession = null
+                if (url != selectedTab.url) controller.openUrl(url)
+            },
+            onOpenLink = { url ->
+                readerStudioSession = null
+                controller.openUrl(url)
+            },
+        )
 
-        SnoozeTabDialog(
-            tab = pendingLinkSnooze?.displayTab()
-                ?: snoozeTabId?.let { id -> controller.tabs.firstOrNull { it.id == id } },
-            onSnooze = { wakeAtMillis, purpose ->
+        BrowserAuxiliaryOverlays(
+            controller = controller,
+            profileWallpaperRuntime = profileWallpaperRuntime,
+            tabSwitcherWallpaperRuntime = tabSwitcherWallpaperRuntime,
+            tabOverviewVisible = tabOverviewVisible,
+            bottomBarTopPx = bottomBarTopPx,
+            closeTabOverview = closeTabOverview,
+            selectOverviewTab = { tabId, forceHandoff ->
+                val target = controller.activeTabs.firstOrNull { tab -> tab.id == tabId }
+                if (target != null && (forceHandoff || target.id != controller.selectedTabId)) {
+                    liveFrameTabId = null
+                    tabHandoff = TabHandoff(
+                        tab = target,
+                        preview = controller.previews[target.id].takeUnless { target.isIncognito },
+                        favicon = controller.favicons[target.id],
+                        previewTopInsetPx = controller.previewTopInsetPx(target.id),
+                    )
+                }
+                controller.selectTab(tabId)
+            },
+            openNewTabAndEdit = {
+                val previousTabId = controller.selectedTabId
+                openNewTabAndEdit()
+                if (controller.selectedTabId != previousTabId) closeTabOverview()
+            },
+            settingsDestination = settingsDestination,
+            onSettingsDestinationChanged = { settingsDestination = it },
+            settingsVisible = settingsVisible,
+            onSettingsVisibleChanged = { settingsVisible = it },
+            openProfileWallpaperEditor = ::openProfileWallpaperEditor,
+            configureProfile = ::configureProfile,
+            overviewDestinationChromeVisible = overviewDestinationChromeVisible,
+            onEntryHeroStarted = { animated ->
+                overviewMorphJob?.cancel()
+                overviewMorphProgress.floatValue = 0f
+                overviewEntryHeroCompleted = false
+                if (animated) {
+                    overviewMorphJob = overviewGestureScope.launch {
+                        val progress = Animatable(0f)
+                        progress.animateTo(
+                            targetValue = 1f,
+                            animationSpec = tween(
+                                durationMillis = TabOverviewHeroRules.ENTRY_DURATION_MILLIS,
+                                easing = FastOutSlowInEasing,
+                            ),
+                        ) { overviewMorphProgress.floatValue = value }
+                    }
+                } else {
+                    overviewMorphProgress.floatValue = 1f
+                }
+            },
+            onEntryHeroCompleted = { overviewEntryHeroCompleted = true },
+            onExitHeroVisibilityChanged = { overviewExitHeroVisible = it },
+            candyTrailTabId = candyTrailTabId,
+            candyTrailSourceBounds = candyTrailSourceBounds,
+            candyTrailBackProgress = candyTrailBackProgress.value,
+            candyTrailBackEdgeSign = candyTrailBackEdgeSign,
+            candyTrailPredictiveBackCommitted = candyTrailPredictiveBackCommitted,
+            onOpenCandyTrail = { tabId, bounds ->
+                candyTrailSourceBounds = bounds
+                candyTrailTabId = tabId
+            },
+            onCloseCandyTrail = {
+                candyTrailTabId = null
+                candyTrailSourceBounds = null
+            },
+            toggleFavoriteWithFeedback = toggleFavoriteWithFeedback,
+            openSiteCapsuleEditor = ::openSiteCapsuleEditor,
+            snoozeTabId = snoozeTabId,
+            onSnoozeTabIdChanged = { snoozeTabId = it },
+            pendingLinkSnooze = pendingLinkSnooze,
+            onPendingLinkSnoozeChanged = { pendingLinkSnooze = it },
+            onSnoozeTab = { wakeAtMillis ->
                 pendingLinkSnooze?.let { pending ->
                     val undoToken = controller.snoozeContextLink(
                         url = pending.url,
                         title = pending.title,
                         wakeAtMillis = wakeAtMillis,
                         sourceTabId = pending.sourceTabId,
-                        purpose = purpose,
                     )
                     if (undoToken != null) {
                         feedbackSnackbarJob?.cancel()
@@ -2165,10 +1699,10 @@ internal fun BrowserScreen(
                             }
                         }
                     }
-                    return@SnoozeTabDialog undoToken != null
+                    return@BrowserAuxiliaryOverlays undoToken != null
                 }
-                val tabId = snoozeTabId ?: return@SnoozeTabDialog false
-                val undoToken = controller.snoozeTab(tabId, wakeAtMillis, purpose = purpose)
+                val tabId = snoozeTabId ?: return@BrowserAuxiliaryOverlays false
+                val undoToken = controller.snoozeTab(tabId, wakeAtMillis)
                 if (undoToken != null) {
                     feedbackSnackbarJob?.cancel()
                     feedbackSnackbarJob = backAnimationScope.launch {
@@ -2183,60 +1717,26 @@ internal fun BrowserScreen(
                 }
                 undoToken != null
             },
-            onDismiss = {
-                snoozeTabId = null
-                pendingLinkSnooze = null
-            },
-        )
-
-        MoveTabToProfileDialog(
-            tab = moveTabToProfileId?.let { tabId ->
-                controller.tabs.firstOrNull { tab -> tab.id == tabId }
-            },
-            profiles = moveTabToProfileId
-                ?.let(controller::compatibleMoveTargetProfiles)
-                .orEmpty(),
-            onMove = { profileId ->
-                val tabId = moveTabToProfileId ?: return@MoveTabToProfileDialog
-                moveTabToProfileId = null
-                if (controller.moveTabToProfile(tabId, profileId)) {
-                    rootView.performConfirmHaptic()
-                }
-            },
-            onDismiss = { moveTabToProfileId = null },
-        )
-
-        BrowserSettingsOverlay(
-            controller = controller,
-            visible = settingsVisible,
-            backEnabled = feedsEntry == null,
-            destination = settingsDestination,
-            predictiveBackCommitted = settingsPredictiveBackCommitted,
-            predictiveBackProgress = settingsBackProgress.value,
-            predictiveBackEdgeSign = settingsBackEdgeSign,
+            moveTabToProfileId = moveTabToProfileId,
+            onMoveTabToProfileIdChanged = { moveTabToProfileId = it },
+            settingsPredictiveBackCommitted = settingsPredictiveBackCommitted,
+            settingsBackProgress = settingsBackProgress.value,
+            settingsBackEdgeSign = settingsBackEdgeSign,
             selectedTab = selectedTab,
             visibleProfileIds = visibleProfileIds,
-            onDestinationChanged = { settingsDestination = it },
-            onDiscoverFeeds = { openFeedCollection(FeedsEntry(openCatalog = true)) },
-            onOpenPrivacyXRay = {
-                privacyXRayTabId = selectedTab.id
-                rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            },
-            onOpenPermissionRadar = {
-                permissionRadarTabId = selectedTab.id
-                permissionRadarOrigin = null
-                rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            },
-            onEditCapsule = { capsule ->
-                openSiteCapsuleEditor(existing = capsule, sourceTab = null)
-            },
-            onDeleteCapsule = { capsule -> pendingCapsuleDelete = capsule },
+            privacyXRayTabId = privacyXRayTabId,
+            onPrivacyXRayTabIdChanged = { privacyXRayTabId = it },
+            permissionRadarTabId = permissionRadarTabId,
+            onPermissionRadarTabIdChanged = { permissionRadarTabId = it },
+            permissionRadarOrigin = permissionRadarOrigin,
+            onPermissionRadarOriginChanged = { permissionRadarOrigin = it },
+            onPendingCapsuleDeleteChanged = { pendingCapsuleDelete = it },
             onImportUserScript = onImportUserScript,
             onImportFavoriteBookmarks = onImportFavoriteBookmarks,
-            onOpenFilterStudio = {
-                filterStudioSelectedRuleId = null
-                filterStudioVisible = true
-            },
+            filterStudioSelectedRuleId = filterStudioSelectedRuleId,
+            onFilterStudioSelectedRuleIdChanged = { filterStudioSelectedRuleId = it },
+            filterStudioVisible = filterStudioVisible,
+            onFilterStudioVisibleChanged = { filterStudioVisible = it },
             onExportAppData = onExportAppData,
             onExportAppLogs = onExportAppLogs,
             onClearAppLogs = onClearAppLogs,
@@ -2251,94 +1751,448 @@ internal fun BrowserScreen(
                 settingsVisible = false
                 onShowReleaseNotes()
             },
-            onClearData = { clearDialogVisible = true },
-            onOpenLegalUrl = { url ->
-                settingsVisible = false
-                controller.openUrl(url, inNewTab = true)
-            },
-            onOpenFirefoxExtensions = onManageFirefoxExtensions,
-            onDismiss = { settingsVisible = false },
-        )
-
-        BrowserModalSurfaces(
-            controller = controller,
-            privacyXRayTabId = privacyXRayTabId,
-            permissionRadarTabId = permissionRadarTabId,
-            permissionRadarOrigin = permissionRadarOrigin,
-            filterStudioVisible = filterStudioVisible,
-            filterStudioSelectedRuleId = filterStudioSelectedRuleId,
+            clearDialogVisible = clearDialogVisible,
+            onClearDialogVisibleChanged = { clearDialogVisible = it },
+            onManageFirefoxExtensions = onManageFirefoxExtensions,
             browserContentBlurTarget = browserContentBlurTarget,
             visibleProfiles = visibleProfiles,
             favoriteFeedbackEvent = favoriteFeedbackEvent,
-            feedbackSnackbarHostState = feedbackSnackbarHostState,
-            snoozedTabsVisible = snoozedTabsVisible,
-            visibleSnoozedTabs = visibleSnoozedTabs,
-            onOpenFilterStudio = { ruleId ->
-                filterStudioSelectedRuleId = ruleId
-                privacyXRayTabId = null
-                filterStudioVisible = true
-            },
-            onClearSiteData = { target ->
-                privacyXRayTabId = null
-                selectCommand(
-                    AndroidCommandCatalog(rootView.context).localize(
-                        commands = listOf(BrowserCommandRegistry.siteDataCommand(target)),
-                        cookieScope = controller.commandCookieScope,
-                    ).single(),
-                )
-            },
-            onPrivacyXRayDismiss = { privacyXRayTabId = null },
-            onPermissionOriginSelected = { permissionRadarOrigin = it },
-            onPermissionRadarDismiss = {
-                permissionRadarTabId = null
-                permissionRadarOrigin = null
-            },
-            onFilterStudioDismiss = {
-                filterStudioVisible = false
-                filterStudioSelectedRuleId = null
-            },
-            onFavoriteFeedbackFinished = { completedId ->
+            onFavoriteFeedbackEventFinished = { completedId ->
                 if (favoriteFeedbackEvent?.id == completedId) favoriteFeedbackEvent = null
             },
-            onSnoozedTabsDismiss = { snoozedTabsVisible = false },
+            feedbackSnackbarHostState = feedbackSnackbarHostState,
+            snoozedTabsVisible = snoozedTabsVisible,
+            onSnoozedTabsVisibleChanged = { snoozedTabsVisible = it },
+            visibleSnoozedTabs = visibleSnoozedTabs,
+            selectCommand = ::selectCommand,
+            pendingCommand = pendingCommand,
+            onPendingCommandDismiss = {
+                pendingCommand = null
+                addressFocusNonce++
+            },
+            onPendingCommandConfirmed = { command ->
+                pendingCommand = null
+                runCommand(command)
+            },
+            addressNewTabButtonBounds = addressNewTabButtonBounds,
+            pendingCapsuleDelete = pendingCapsuleDelete,
+            showFavoriteMutation = showFavoriteMutation,
         )
-
-        if (!settingsVisible) controller.customWorkflowRunState?.let { state ->
-            CustomWorkflowFeedback(
-                state = state,
-                onCancel = controller::cancelCustomWorkflow,
-                onDismiss = controller::dismissCustomWorkflowResult,
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .navigationBarsPadding().padding(start = 12.dp, end = 12.dp, bottom = 88.dp)
-                    .zIndex(30f),
-            )
-        }
-
     }
+}
+
+@Composable
+private fun BoxScope.BrowserMainViewportContent(
+    controller: BrowserController,
+    selectedTab: BrowserTab,
+    profileWallpaperRuntime: ProfileWallpaperRuntime?,
+    showFirefoxExtensionOptionsChrome: Boolean,
+    firefoxExtensionOptionsTitle: String?,
+    fullscreenVideoGestureState: FullscreenVideoGestureState?,
+    webViewVideoOnlyPresentation: Boolean,
+    hideBrowserChrome: Boolean,
+    browserDragOffset: MutableFloatState,
+    tabSwitchTravelPx: Float,
+    browserHeightPx: Float,
+    bottomBarTopPx: FloatState,
+    tabHandoff: TabHandoff?,
+    tabHandoffAlpha: Float,
+    liveFrameTabId: String?,
+    tabOverviewVisible: Boolean,
+    reportLiveFrame: (String) -> Unit,
+    showInteractiveBlankStart: Boolean,
+    addressEditorVisible: Boolean,
+    openAddressEditor: () -> Unit,
+    onOpenFavorites: () -> Unit,
+    blankTabModeProgress: Float,
+    blankTabModeRevealOrigin: Offset,
+    browserContentBlurTarget: BlurTarget?,
+    onBlurTargetAttached: (BlurTarget) -> Unit,
+    onBlurTargetReleased: (BlurTarget) -> Unit,
+    settingsVisible: Boolean,
+    readerStudioSession: Any?,
+    onOpenMpvRx: ((String, String?) -> Unit)?,
+    onAddressEditorDismiss: () -> Unit,
+    onHandoffExpired: (TabHandoff) -> Unit = {},
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.tertiaryContainer,
+                        MaterialTheme.colorScheme.surface,
+                    ),
+                ),
+            ),
+    )
+    CompositionLocalProvider(LocalProfileWallpaper provides profileWallpaperRuntime) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (showFirefoxExtensionOptionsChrome) {
+                FirefoxExtensionOptionsTopBar(
+                    title = requireNotNull(firefoxExtensionOptionsTitle),
+                    onBack = controller::goBack,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        if (fullscreenVideoGestureState != null) {
+                            Color.Black
+                        } else {
+                            Color.Transparent
+                        },
+                    ),
+            ) {
+                BrowserViewport(
+                    controller = controller,
+                    fullscreenVideoGestureState = fullscreenVideoGestureState,
+                    webViewVideoOnlyPresentation = webViewVideoOnlyPresentation,
+                    videoOnlyPresentation = hideBrowserChrome,
+                    selectedTab = selectedTab,
+                    dragOffset = browserDragOffset,
+                    travelDistance = tabSwitchTravelPx,
+                    rootHeightPx = browserHeightPx,
+                    bottomBarTopPx = bottomBarTopPx,
+                    handoff = tabHandoff,
+                    handoffAlpha = tabHandoffAlpha,
+                    liveFrameTabId = liveFrameTabId,
+                    tabOverviewVisible = tabOverviewVisible,
+                    onLiveFrame = reportLiveFrame,
+                    onHandoffExpired = onHandoffExpired,
+                    onSearch = if (showInteractiveBlankStart) {
+                        onAddressEditorDismiss
+                    } else {
+                        openAddressEditor
+                    },
+                    onFavorite = { url ->
+                        onAddressEditorDismiss()
+                        controller.submitAddress(url)
+                    },
+                    onOpenFavorites = onOpenFavorites,
+                    onReorderFavorite = controller::reorderFavorite,
+                    blankTabModeProgress = blankTabModeProgress,
+                    blankTabModeRevealOrigin = blankTabModeRevealOrigin,
+                    onRetry = controller::retryFailedPage,
+                    onBlurTargetAttached = onBlurTargetAttached,
+                    onBlurTargetReleased = onBlurTargetReleased,
+                )
+
+                BrowserMediaStreamLaunchBadge(
+                    selectedTab = selectedTab,
+                    isVideoDetectionRedirectEnabled = controller.isVideoDetectionRedirectEnabled,
+                    hideBrowserChrome = hideBrowserChrome,
+                    tabOverviewVisible = tabOverviewVisible,
+                    addressEditorVisible = addressEditorVisible,
+                    settingsVisible = settingsVisible,
+                    readerStudioSession = readerStudioSession,
+                    controller = controller,
+                    onOpenMpvRx = onOpenMpvRx,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowserReaderOverlay(
+    readerStudioSession: ReaderStudioSession?,
+    readerStudioResult: ReaderExtractionResult?,
+    readerLibraryRepository: ReaderLibraryRepository,
+    selectedTab: BrowserTab,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    onOpenOriginal: (String) -> Unit,
+    onOpenLink: (String) -> Unit,
+) {
+    readerStudioSession?.let { session ->
+        ReaderStudioScreen(
+            result = readerStudioResult,
+            sourceUrl = session.sourceUrl,
+            isPrivate = session.isPrivate,
+            repository = readerLibraryRepository,
+            onRetry = onRetry,
+            onDismiss = onDismiss,
+            onOpenOriginal = onOpenOriginal,
+            onOpenLink = onOpenLink,
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.BrowserAuxiliaryOverlays(
+    controller: BrowserController,
+    profileWallpaperRuntime: ProfileWallpaperRuntime?,
+    tabSwitcherWallpaperRuntime: ProfileWallpaperRuntime?,
+    tabOverviewVisible: Boolean,
+    bottomBarTopPx: FloatState,
+    closeTabOverview: () -> Unit,
+    selectOverviewTab: (tabId: String, forceHandoff: Boolean) -> Unit,
+    openNewTabAndEdit: () -> Unit,
+    settingsDestination: SettingsDestination,
+    onSettingsDestinationChanged: (SettingsDestination) -> Unit,
+    settingsVisible: Boolean,
+    onSettingsVisibleChanged: (Boolean) -> Unit,
+    openProfileWallpaperEditor: (String, ProfileWallpaperTarget) -> Unit,
+    configureProfile: (profileId: String, wallpaperTargets: List<ProfileWallpaperTarget>, protection: ProfileProtection?) -> Unit,
+    overviewDestinationChromeVisible: Boolean,
+    onEntryHeroStarted: (Boolean) -> Unit,
+    onEntryHeroCompleted: () -> Unit,
+    onExitHeroVisibilityChanged: (Boolean) -> Unit,
+    candyTrailTabId: String?,
+    candyTrailSourceBounds: Rect?,
+    candyTrailBackProgress: Float,
+    candyTrailBackEdgeSign: Int,
+    candyTrailPredictiveBackCommitted: Boolean,
+    onOpenCandyTrail: (String, Rect?) -> Unit,
+    onCloseCandyTrail: () -> Unit,
+    toggleFavoriteWithFeedback: (String) -> Unit,
+    openSiteCapsuleEditor: (SiteCapsule?, BrowserTab?) -> Unit,
+    snoozeTabId: String?,
+    onSnoozeTabIdChanged: (String?) -> Unit,
+    pendingLinkSnooze: PendingLinkSnooze?,
+    onPendingLinkSnoozeChanged: (PendingLinkSnooze?) -> Unit,
+    onSnoozeTab: (Long) -> Boolean,
+    moveTabToProfileId: String?,
+    onMoveTabToProfileIdChanged: (String?) -> Unit,
+    settingsPredictiveBackCommitted: Boolean,
+    settingsBackProgress: Float,
+    settingsBackEdgeSign: Int,
+    selectedTab: BrowserTab,
+    visibleProfileIds: Set<String>,
+    privacyXRayTabId: String?,
+    onPrivacyXRayTabIdChanged: (String?) -> Unit,
+    permissionRadarTabId: String?,
+    onPermissionRadarTabIdChanged: (String?) -> Unit,
+    permissionRadarOrigin: String?,
+    onPermissionRadarOriginChanged: (String?) -> Unit,
+    onPendingCapsuleDeleteChanged: (SiteCapsule?) -> Unit,
+    onImportUserScript: () -> Unit,
+    onImportFavoriteBookmarks: () -> Unit,
+    filterStudioSelectedRuleId: String?,
+    onFilterStudioSelectedRuleIdChanged: (String?) -> Unit,
+    filterStudioVisible: Boolean,
+    onFilterStudioVisibleChanged: (Boolean) -> Unit,
+    onExportAppData: () -> Unit,
+    onExportAppLogs: () -> Unit,
+    onClearAppLogs: () -> Unit,
+    onExportGeckoLogs: () -> Unit,
+    onClearGeckoLogs: () -> Unit,
+    onImportAppData: () -> Unit,
+    onShowGestureOnboarding: () -> Unit,
+    onShowReleaseNotes: () -> Unit,
+    clearDialogVisible: Boolean,
+    onClearDialogVisibleChanged: (Boolean) -> Unit,
+    onManageFirefoxExtensions: (() -> Unit)?,
+    browserContentBlurTarget: BlurTarget?,
+    visibleProfiles: List<BrowserProfile>,
+    favoriteFeedbackEvent: FavoriteFeedbackEvent?,
+    onFavoriteFeedbackEventFinished: (Int) -> Unit,
+    feedbackSnackbarHostState: SnackbarHostState,
+    snoozedTabsVisible: Boolean,
+    onSnoozedTabsVisibleChanged: (Boolean) -> Unit,
+    visibleSnoozedTabs: List<SnoozedTab>,
+    selectCommand: (CommandSuggestion) -> Unit,
+    pendingCommand: CommandSuggestion?,
+    onPendingCommandDismiss: () -> Unit,
+    onPendingCommandConfirmed: (BrowserCommand) -> Unit,
+    addressNewTabButtonBounds: Rect?,
+    pendingCapsuleDelete: SiteCapsule?,
+    showFavoriteMutation: (FavoriteMutation) -> Unit,
+) {
+    val rootView = LocalView.current
+
+    CompositionLocalProvider(LocalProfileWallpaper provides profileWallpaperRuntime) {
+        TabOverview(
+            controller = controller,
+            backgroundWallpaper = tabSwitcherWallpaperRuntime,
+            visible = tabOverviewVisible,
+            bottomBarTopPx = bottomBarTopPx,
+            onClose = closeTabOverview,
+            onSelect = { tabId ->
+                selectOverviewTab(tabId, false)
+            },
+            onSelectDismissAnchor = { tabId ->
+                selectOverviewTab(tabId, true)
+            },
+            onNewTab = openNewTabAndEdit,
+            onOpenSettings = {
+                onSettingsDestinationChanged(SettingsDestination.Home)
+                onSettingsVisibleChanged(true)
+            },
+            onOpenSyncSettings = {
+                onSettingsDestinationChanged(SettingsDestination.Sync)
+                onSettingsVisibleChanged(true)
+            },
+            onEditProfileWallpaper = openProfileWallpaperEditor,
+            onConfigureCreatedProfile = { profileId, options ->
+                configureProfile(
+                    profileId,
+                    options.wallpaperTargets.toList(),
+                    options.protection,
+                )
+            },
+            destinationChromeVisible = overviewDestinationChromeVisible,
+            onEntryHeroStarted = onEntryHeroStarted,
+            onEntryHeroCompleted = onEntryHeroCompleted,
+            onExitHeroVisibilityChanged = onExitHeroVisibilityChanged,
+            candyTrailTabId = candyTrailTabId,
+            candyTrailSourceBounds = candyTrailSourceBounds,
+            candyTrailBackProgress = candyTrailBackProgress,
+            candyTrailBackEdgeSign = candyTrailBackEdgeSign,
+            candyTrailPredictiveBackCommitted = candyTrailPredictiveBackCommitted,
+            onOpenCandyTrail = onOpenCandyTrail,
+            onCloseCandyTrail = onCloseCandyTrail,
+            onToggleFavoriteTab = toggleFavoriteWithFeedback,
+            onAddSiteCapsule = { tabId ->
+                openSiteCapsuleEditor(
+                    null,
+                    controller.tabs.firstOrNull { it.id == tabId },
+                )
+            },
+            onSnoozeTab = { tabId -> onSnoozeTabIdChanged(tabId) },
+        )
+    }
+
+    SnoozeTabDialog(
+        tab = pendingLinkSnooze?.displayTab()
+            ?: snoozeTabId?.let { id -> controller.tabs.firstOrNull { it.id == id } },
+        onSnooze = onSnoozeTab,
+        onDismiss = {
+            onSnoozeTabIdChanged(null)
+            onPendingLinkSnoozeChanged(null)
+        },
+    )
+
+    MoveTabToProfileDialog(
+        tab = moveTabToProfileId?.let { tabId ->
+            controller.tabs.firstOrNull { tab -> tab.id == tabId }
+        },
+        profiles = moveTabToProfileId
+            ?.let(controller::compatibleMoveTargetProfiles)
+            .orEmpty(),
+        onMove = { profileId ->
+            val tabId = moveTabToProfileId ?: return@MoveTabToProfileDialog
+            onMoveTabToProfileIdChanged(null)
+            if (controller.moveTabToProfile(tabId, profileId)) {
+                rootView.performConfirmHaptic()
+            }
+        },
+        onDismiss = { onMoveTabToProfileIdChanged(null) },
+    )
+
+    BrowserSettingsOverlay(
+        controller = controller,
+        visible = settingsVisible,
+        destination = settingsDestination,
+        predictiveBackCommitted = settingsPredictiveBackCommitted,
+        predictiveBackProgress = settingsBackProgress,
+        predictiveBackEdgeSign = settingsBackEdgeSign,
+        selectedTab = selectedTab,
+        visibleProfileIds = visibleProfileIds,
+        onDestinationChanged = onSettingsDestinationChanged,
+        onOpenPrivacyXRay = {
+            onPrivacyXRayTabIdChanged(selectedTab.id)
+            rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        },
+        onOpenPermissionRadar = {
+            onPermissionRadarTabIdChanged(selectedTab.id)
+            onPermissionRadarOriginChanged(null)
+            rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        },
+        onEditCapsule = { capsule ->
+            openSiteCapsuleEditor(capsule, null)
+        },
+        onDeleteCapsule = onPendingCapsuleDeleteChanged,
+        onImportUserScript = onImportUserScript,
+        onImportFavoriteBookmarks = onImportFavoriteBookmarks,
+        onOpenFilterStudio = {
+            onFilterStudioSelectedRuleIdChanged(null)
+            onFilterStudioVisibleChanged(true)
+        },
+        onExportAppData = onExportAppData,
+        onExportAppLogs = onExportAppLogs,
+        onClearAppLogs = onClearAppLogs,
+        onExportGeckoLogs = onExportGeckoLogs,
+        onClearGeckoLogs = onClearGeckoLogs,
+        onImportAppData = onImportAppData,
+        onShowGestureOnboarding = {
+            onSettingsVisibleChanged(false)
+            onShowGestureOnboarding()
+        },
+        onShowReleaseNotes = {
+            onSettingsVisibleChanged(false)
+            onShowReleaseNotes()
+        },
+        onClearData = { onClearDialogVisibleChanged(true) },
+        onOpenLegalUrl = { url ->
+            onSettingsVisibleChanged(false)
+            controller.openUrl(url, inNewTab = true)
+        },
+        onOpenFirefoxExtensions = onManageFirefoxExtensions,
+        onDismiss = { onSettingsVisibleChanged(false) },
+    )
+
+    BrowserModalSurfaces(
+        controller = controller,
+        privacyXRayTabId = privacyXRayTabId,
+        permissionRadarTabId = permissionRadarTabId,
+        permissionRadarOrigin = permissionRadarOrigin,
+        filterStudioVisible = filterStudioVisible,
+        filterStudioSelectedRuleId = filterStudioSelectedRuleId,
+        browserContentBlurTarget = browserContentBlurTarget,
+        visibleProfiles = visibleProfiles,
+        favoriteFeedbackEvent = favoriteFeedbackEvent,
+        feedbackSnackbarHostState = feedbackSnackbarHostState,
+        snoozedTabsVisible = snoozedTabsVisible,
+        visibleSnoozedTabs = visibleSnoozedTabs,
+        onOpenFilterStudio = { ruleId: String? ->
+            onFilterStudioSelectedRuleIdChanged(ruleId)
+            onPrivacyXRayTabIdChanged(null)
+            onFilterStudioVisibleChanged(true)
+        },
+        onClearSiteData = { target: dev.sk2andy.materialbrowser.browser.SiteDataTarget ->
+            onPrivacyXRayTabIdChanged(null)
+            AndroidCommandCatalog(rootView.context).localize(
+                commands = listOf(BrowserCommandRegistry.siteDataCommand(target)),
+                cookieScope = controller.commandCookieScope,
+            ).firstOrNull()?.let(selectCommand)
+        },
+        onPrivacyXRayDismiss = { onPrivacyXRayTabIdChanged(null) },
+        onPermissionOriginSelected = onPermissionRadarOriginChanged,
+        onPermissionRadarDismiss = {
+            onPermissionRadarTabIdChanged(null)
+            onPermissionRadarOriginChanged(null)
+        },
+        onFilterStudioDismiss = {
+            onFilterStudioVisibleChanged(false)
+            onFilterStudioSelectedRuleIdChanged(null)
+        },
+        onFavoriteFeedbackFinished = onFavoriteFeedbackEventFinished,
+        onSnoozedTabsDismiss = { onSnoozedTabsVisibleChanged(false) },
+    )
 
     BrowserTransientOverlays(
         controller = controller,
         clearDialogVisible = clearDialogVisible,
-        onClearDialogDismiss = { clearDialogVisible = false },
+        onClearDialogDismiss = { onClearDialogVisibleChanged(false) },
         pendingCommand = pendingCommand,
-        onPendingCommandDismiss = {
-            pendingCommand = null
-            addressFocusNonce++
-        },
-        onPendingCommandConfirmed = { command ->
-            pendingCommand = null
-            runCommand(command)
-        },
+        onPendingCommandDismiss = onPendingCommandDismiss,
+        onPendingCommandConfirmed = onPendingCommandConfirmed,
         addressNewTabButtonBounds = addressNewTabButtonBounds,
         pendingCapsuleDelete = pendingCapsuleDelete,
-        onPendingCapsuleDeleteDismiss = { pendingCapsuleDelete = null },
+        onPendingCapsuleDeleteDismiss = { onPendingCapsuleDeleteChanged(null) },
         onFavoriteLink = { url, title ->
             controller.toggleContextLinkFavorite(url, title)?.let(showFavoriteMutation)
         },
         onSnoozeLink = { url, title, sourceTabId ->
-            pendingLinkSnooze = PendingLinkSnooze(url, title, sourceTabId)
+            onPendingLinkSnoozeChanged(PendingLinkSnooze(url, title, sourceTabId))
         },
     )
+
     FirefoxExtensionChrome(controller)
 }
 
@@ -2350,3 +2204,139 @@ private fun ReaderExtractionResult.readerActionMessageRes(): Int = when (this) {
         ReaderExtractionFailure.InvalidResponse -> R.string.reader_extraction_invalid
     }
 }
+
+@Composable
+private fun BoxScope.BrowserMediaStreamLaunchBadge(
+    selectedTab: BrowserTab,
+    isVideoDetectionRedirectEnabled: Boolean = true,
+    hideBrowserChrome: Boolean,
+    tabOverviewVisible: Boolean,
+    addressEditorVisible: Boolean,
+    settingsVisible: Boolean,
+    readerStudioSession: Any?,
+    controller: BrowserController? = null,
+    onOpenMpvRx: ((String, String?) -> Unit)?,
+) {
+    val currentContext = LocalContext.current
+    LaunchedEffect(selectedTab.url) {
+        YouTubeStreamPreloader.onUrlChanged(currentContext, selectedTab.url)
+    }
+    val preloadedYtStream by YouTubeStreamPreloader.preloadedStream.collectAsState()
+    val activeDirectStream by MediaStreamDetectorBridge.activeStreamPayload.collectAsState()
+    val isYtPreloading by YouTubeStreamPreloader.isLoading.collectAsState()
+    val isPrefetchedAndReady by YouTubeStreamPreloader.isPrefetchedAndReady.collectAsState()
+    val isKnownCandidate = YouTubeStreamPreloader.isCandidateVideoPage(selectedTab.url)
+    val hasDirectMedia = activeDirectStream != null || preloadedYtStream != null
+    val isCandidate = isKnownCandidate || hasDirectMedia
+    val currentMediaKey = YouTubeStreamPreloader.extractMediaKey(selectedTab.url)
+
+    val validPreloaded = (preloadedYtStream ?: activeDirectStream?.let { payload ->
+        PreloadedYouTubeStream(
+            videoId = payload.url,
+            pageUrl = selectedTab.url,
+            videoUrl = payload.url,
+            title = payload.title ?: selectedTab.title,
+            resolution = "Direct Stream",
+            headers = payload.headers,
+            isDirectMedia = true,
+            isPreloaded = true,
+        )
+    })?.takeIf { stream ->
+        !YouTubeStreamPreloader.isAdOrAuxiliaryMedia(stream.videoUrl)
+    }
+    val hasValidReadyStream = validPreloaded != null
+    val isPrefetching = isCandidate && !hasValidReadyStream && isYtPreloading
+
+    val shouldShowButton = hasValidReadyStream || isPrefetching
+
+    if (
+        !isVideoDetectionRedirectEnabled ||
+        !shouldShowButton ||
+        hideBrowserChrome ||
+        tabOverviewVisible ||
+        addressEditorVisible ||
+        settingsVisible ||
+        readerStudioSession != null ||
+        onOpenMpvRx == null
+    ) {
+        return
+    }
+
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val baseTopDp = if (isLandscape) {
+        16.dp
+    } else {
+        (configuration.screenWidthDp.dp * 9f / 16f) + 56.dp
+    }
+    val minTopPx = with(density) { 16.dp.toPx() }
+    val maxTopPx = with(density) { (configuration.screenHeightDp.dp - 120.dp).toPx() }
+    val baseTopPx = with(density) { baseTopDp.toPx() }
+
+    var dragOffsetY by remember(selectedTab.url) { mutableFloatStateOf(0f) }
+    val draggableState = rememberDraggableState { delta ->
+        dragOffsetY += delta
+    }
+    val clampedY = (baseTopPx + dragOffsetY).coerceIn(minTopPx, maxTopPx)
+
+    Surface(
+        onClick = {
+            if (!hasValidReadyStream) {
+                if (isPrefetching) {
+                    Toast.makeText(currentContext, "Prefetching video (5-10%), please wait...", Toast.LENGTH_SHORT).show()
+                }
+                return@Surface
+            }
+            if (validPreloaded != null) {
+                val launched = YouTubeStreamPreloader.launchPreloadedStream(currentContext, validPreloaded) {
+                    controller?.stopWebVideoPlaybackForExternalPlayer()
+                    controller?.pauseActiveMedia()
+                    controller?.exitSelectedWebContentFullscreen()
+                }
+                if (launched) {
+                    Toast.makeText(currentContext, "Playing in MPV RX...", Toast.LENGTH_SHORT).show()
+                    return@Surface
+                }
+            }
+            onOpenMpvRx.invoke(
+                selectedTab.url,
+                validPreloaded?.title ?: selectedTab.title,
+            )
+        },
+        shape = CircleShape,
+        color = if (hasValidReadyStream) Color(0xFFCC0000) else Color(0xDD1E1E1E),
+        shadowElevation = 6.dp,
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset { IntOffset(x = 0, y = clampedY.roundToInt()) }
+            .padding(end = 12.dp)
+            .draggable(
+                state = draggableState,
+                orientation = Orientation.Vertical,
+            )
+            .size(46.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            if (isPrefetching) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = Color.White,
+                    strokeWidth = 2.5.dp,
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.ic_mpvrx_logo),
+                    contentDescription = "Play in mpvRx",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+        }
+    }
+}
+
+

@@ -10,7 +10,6 @@ import android.net.Uri
 import androidx.annotation.VisibleForTesting
 import dev.sk2andy.materialbrowser.data.BrowserDownloadRequest
 import dev.sk2andy.materialbrowser.data.BrowserDownloadSettings
-import dev.sk2andy.materialbrowser.data.ExistingDownload
 import java.util.Locale
 
 enum class ExternalDownloadProtocol(val stableId: String) {
@@ -34,8 +33,6 @@ data class PendingDownloadChoice(
     val releaseResponse: (() -> Unit)? = null,
     val isSourceCurrent: (() -> Boolean)? = null,
     val sourceTabId: String? = null,
-    val existingDownload: ExistingDownload? = null,
-    val downloadAgain: (() -> DownloadActionResult?)? = null,
 )
 
 sealed interface ExternalDownloadLaunchResult {
@@ -47,12 +44,14 @@ class ExternalDownloadManager(private val context: Context) {
     private val packageManager = context.packageManager
 
     fun discover(request: BrowserDownloadRequest? = null): List<ExternalDownloadManagerApp> {
-        val knownApps = ONE_DM_PACKAGES.mapNotNull { packageName ->
+        val knownApps = listOfNotNull(
+            knownApp(context.packageName, KETCH_ACTIVITY, isOneDm = false),
+            knownApp(KETCH_PACKAGE, KETCH_ACTIVITY, isOneDm = false),
+            knownApp(GOPEED_PACKAGE, GOPEED_ACTIVITY, isOneDm = false),
+            knownApp(ARIA2_APP_PACKAGE, ARIA2_APP_ACTIVITY, isOneDm = false),
+        ) + ONE_DM_PACKAGES.mapNotNull { packageName ->
             knownApp(packageName, ONE_DM_ACTIVITY, isOneDm = true)
-        } + listOfNotNull(
-            knownApp(GOPEED_PACKAGE, GOPEED_ACTIVITY),
-            knownApp(ARIA2_APP_PACKAGE, ARIA2_APP_ACTIVITY),
-        )
+        }
         val knownPackages = knownApps.mapTo(hashSetOf(), ExternalDownloadManagerApp::packageName)
         val mimeTypes = request?.mimeType?.let(::listOf) ?: PROBE_MIME_TYPES
         val genericApps = mimeTypes.asSequence()
@@ -100,14 +99,24 @@ class ExternalDownloadManager(private val context: Context) {
         app: ExternalDownloadManagerApp,
         settings: BrowserDownloadSettings,
         allowSessionData: Boolean,
-    ): Intent = if (app.isOneDm) {
+    ): Intent = when {
+        app.packageName == KETCH_PACKAGE || app.packageName == context.packageName -> {
+            Intent(Intent.ACTION_SEND).apply {
+                component = ComponentName(app.packageName, app.activityName)
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, request.url)
+            }
+        }
+        app.isOneDm -> {
             oneDmIntent(request, app, settings, allowSessionData)
-        } else {
+        }
+        else -> {
             Intent(Intent.ACTION_VIEW).apply {
                 component = ComponentName(app.packageName, app.activityName)
                 setDataAndType(Uri.parse(request.url), request.mimeType)
             }
         }
+    }
 
     private fun oneDmIntent(
         request: BrowserDownloadRequest,
@@ -206,6 +215,8 @@ class ExternalDownloadManager(private val context: Context) {
         const val ONE_DM_ACTIVITY = "idm.internet.download.manager.Downloader"
         const val GOPEED_PACKAGE = "com.gopeed.gopeed"
         const val GOPEED_ACTIVITY = "com.gopeed.gopeed.MainActivity"
+        const val KETCH_PACKAGE = "com.linroid.ketch.app"
+        const val KETCH_ACTIVITY = "com.linroid.ketch.app.android.QuickAddActivity"
         const val ARIA2_APP_PACKAGE = "com.gianlu.aria2app"
         const val ARIA2_APP_ACTIVITY = "com.gianlu.aria2app.LoadingActivity"
         const val EXTRA_FILENAME = "extra_filename"

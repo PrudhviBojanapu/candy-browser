@@ -3,14 +3,10 @@
     <cloud-backup disableIfNoEncryptionCapabilities="true">
         <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="app_logging_capture.xml" />
-        <exclude domain="sharedpref" path="device_search.xml" />
-        <exclude domain="sharedpref" path="reader_speech_preparation.xml" />
         <include domain="file" path="candy_filter_rules.json" />
         <include domain="file" path="candy_filter_rules.json.bak" />
         <include domain="file" path="user_scripts.json" />
         <include domain="file" path="user_scripts.json.bak" />
-        <include domain="file" path="custom_workflows_v1.json" />
-        <include domain="file" path="custom_workflows_v1.json.bak" />
         <include domain="file" path="site_capsules_v1.json" />
         <include domain="file" path="site_capsules_v1.json.bak" />
         <include domain="file" path="site_capsule_icons" />
@@ -19,8 +15,6 @@
         <!-- no_backup is intentionally outside this allowlist; Recall stays device-local. -->
         <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="app_logging_capture.xml" />
-        <exclude domain="sharedpref" path="device_search.xml" />
-        <exclude domain="sharedpref" path="reader_speech_preparation.xml" />
         <include domain="file" path="." />
         <include domain="database" path="." />
     </device-transfer>

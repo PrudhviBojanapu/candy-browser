@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.view.View
 import dev.sk2andy.materialbrowser.browser.BrowserEngineAndroidPermissionRequest
 import dev.sk2andy.materialbrowser.browser.BrowserEngineAuthPromptRequest
-import dev.sk2andy.materialbrowser.browser.BrowserEngineBooleanResponse
 import dev.sk2andy.materialbrowser.browser.BrowserEngineContentPermissionRequest
 import dev.sk2andy.materialbrowser.browser.BrowserEngineDownloadResponse
 import dev.sk2andy.materialbrowser.browser.BrowserEngineFilePromptRequest
@@ -70,14 +69,11 @@ internal data class GeckoMainFrameNavigationRequest(
     val hasUserGesture: Boolean,
     val isDirectNavigation: Boolean,
     val target: BrowserEngineNavigationTarget = BrowserEngineNavigationTarget.Current,
-    /** Lets Gecko retain the original popup request while external app lookup completes. */
-    val nativePopupResponse: BrowserEngineBooleanResponse? = null,
 )
 
 internal enum class GeckoNavigationRequestDecision {
     Allow,
     Deny,
-    Pending,
 }
 
 internal fun interface GeckoNavigationRequestListener {
@@ -236,12 +232,7 @@ internal enum class GeckoMediaCommand {
  * for Compose hosting, so callers cannot reach or replace the process GeckoRuntime.
  */
 internal interface GeckoBrowserSession {
-    val supportsSiteDataDeletion: Boolean get() = false
-
-    fun clearSiteData(url: String, onComplete: (Boolean) -> Unit) = onComplete(false)
-
     fun createOffscreenSurface(widthPx: Int, heightPx: Int): BrowserEngineOffscreenSurface? = null
-
     val profileId: String
     val isPrivate: Boolean
 
@@ -330,6 +321,8 @@ internal interface GeckoBrowserSession {
 
     fun seekMedia(positionMillis: Long)
 
+    fun stopWebVideoPlayback() = Unit
+
     /** Keeps Gecko's compositor surface in sync with Android picture-in-picture mode. */
     fun notifyPictureInPictureModeChanged(inPictureInPicture: Boolean)
 
@@ -410,7 +403,6 @@ internal interface GeckoBrowserSession {
 
     fun clearFindInPage()
 
-    /** Extracts bounded article JSON through Candy's internal Gecko content-script bridge. */
     fun setSelectedTextActionListener(
         listener: ((WebTextSelectionAction, String) -> Unit)?,
     ) = Unit
@@ -419,13 +411,8 @@ internal interface GeckoBrowserSession {
 
     fun setWebAnnotationClickListener(listener: ((String) -> Unit)?) = Unit
 
-    fun setFormDraftListener(listener: ((String) -> Unit)?) = Unit
-
-    fun restoreFormDraft(payload: String, onComplete: (Boolean) -> Unit) = onComplete(false)
-
+    /** Extracts bounded article JSON through Candy's internal Gecko content-script bridge. */
     fun extractPageForReader(onComplete: (String?) -> Unit)
-
-    fun extractPageText(onComplete: (String?) -> Unit) = onComplete(null)
 
     /** Checks one committed document for a text editor hidden by browser chrome. */
     fun probeTextInputOcclusion(
@@ -476,6 +463,12 @@ internal interface GeckoBrowserSession {
     fun reload()
 
     fun stop()
+
+    val supportsSiteDataDeletion: Boolean get() = false
+
+    fun clearSiteData(url: String, onComplete: (Boolean) -> Unit) {
+        onComplete(false)
+    }
 
     /** Permanently releases this session. Private session state must never be persisted. */
     fun close()

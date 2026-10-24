@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -200,8 +199,6 @@ fun TabOverviewHeroPager(
     titleContent: @Composable (BrowserTab, Boolean, Modifier) -> Unit,
     cardModifier: (BrowserTab) -> Modifier = { Modifier },
     modifier: Modifier = Modifier,
-    titleAbovePreview: Boolean = false,
-    titleOverlayTopOffset: Dp = 0.dp,
 ) {
     val pagerFlingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
@@ -465,23 +462,10 @@ fun TabOverviewHeroPager(
                             }
                         },
                     )
-                    .padding(
-                        horizontal = 4.dp,
-                        vertical = if (titleAbovePreview) 0.dp else 28.dp,
-                    ),
+                    .padding(horizontal = 4.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (titleAbovePreview) {
-                    titleContent(
-                        tab,
-                        isInitialCard,
-                        Modifier
-                            .width(tabCardWidth)
-                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                    )
-                } else {
-                    Spacer(Modifier.height(8.dp))
-                }
+                Spacer(Modifier.height(8.dp))
                 Box(modifier = Modifier.width(tabCardWidth)) {
                     TabCard(
                         cardWidth = tabCardWidth,
@@ -506,16 +490,13 @@ fun TabOverviewHeroPager(
                     ) {
                         previewContent(tab)
                     }
-                    if (!titleAbovePreview) {
-                        titleContent(
-                            tab,
-                            isInitialCard,
-                            Modifier
-                                .align(Alignment.TopStart)
-                                .offset(y = titleOverlayTopOffset)
-                                .padding(start = 12.dp, top = 4.dp, end = 12.dp),
-                        )
-                    }
+                    titleContent(
+                        tab,
+                        isInitialCard,
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 12.dp, top = 4.dp, end = 12.dp),
+                    )
                 }
             }
         }
@@ -703,8 +684,7 @@ fun TabListHeroContent(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            tab.snoozePurpose.takeUnless { tab.isIncognito || it.isBlank() }
-                                ?: visuals.subtitle,
+                            visuals.subtitle,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodySmall,
@@ -775,25 +755,15 @@ fun TabTitleRow(
                 }
             }
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f, fill = false)) {
-                Text(
-                    visuals.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = contentColor,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (tab.snoozePurpose.isNotBlank() && !tab.isIncognito) {
-                    Text(
-                        tab.snoozePurpose,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = contentColor,
-                    )
-                }
-            }
+            Text(
+                visuals.title,
+                modifier = Modifier.weight(1f, fill = false),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleSmall,
+                color = contentColor,
+                fontWeight = FontWeight.SemiBold,
+            )
             if (tab.isPinned) {
                 Spacer(Modifier.width(8.dp))
                 visuals.pinnedIcon(Modifier.size(18.dp), contentColor)

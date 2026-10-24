@@ -152,7 +152,6 @@ internal class BrowserCustomWorkflowRuntime(
                             initialUrl = input.url,
                             openerTabId = input.tabId,
                             isIncognito = input.isPrivate,
-                            showContentActionFeedback = false,
                         ) else input.tabId
                         val success = targetId != null && (
                             controller.tabs.any { it.id == targetId && it.isPinned } ||

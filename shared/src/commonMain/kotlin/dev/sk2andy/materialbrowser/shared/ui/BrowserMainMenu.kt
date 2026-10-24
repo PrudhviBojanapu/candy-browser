@@ -30,7 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
@@ -59,7 +58,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
@@ -190,12 +188,6 @@ interface BrowserMainMenuResources {
     fun accessibilityLabel(item: BrowserFeatureMenuItem): String? = null
 
     @Composable
-    fun unreadCountLabel(count: Int): String = count.toString()
-
-    @Composable
-    fun sectionExpansionLabel(expanded: Boolean): String = if (expanded) "Expanded" else "Collapsed"
-
-    @Composable
     fun supportingText(item: BrowserFeatureMenuItem, snoozedTabCount: Int): String?
 
     @Composable
@@ -230,20 +222,15 @@ interface BrowserMainMenuEffects {
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun actionTooltip(
         label: String,
         modifier: Modifier,
         content: @Composable () -> Unit,
     ) {
-        TooltipBox(
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-            tooltip = { PlainTooltip { Text(label) } },
-            state = rememberTooltipState(),
-            modifier = modifier,
-            content = content,
-        )
+        Box(modifier = modifier) {
+            content()
+        }
     }
 
     @Composable
@@ -265,9 +252,6 @@ interface BrowserMainMenuEffects {
 
     @Composable
     fun selectedToolbarContentColor(): Color = MaterialTheme.colorScheme.onPrimary
-
-    @Composable
-    fun selectedToggleContentColor(): Color = MaterialTheme.colorScheme.onSecondary
 
     @Composable
     fun spatialAnimationSpec(expanding: Boolean): FiniteAnimationSpec<Float> = tween(
@@ -333,9 +317,6 @@ fun BrowserMainMenu(
     morphAnchorSize: DpSize? = null,
     morphProgress: Float? = null,
     extensionContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit = {},
-    customContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit = {},
-    customShortcutSlots: Map<Int, BrowserCustomAction?> = emptyMap(),
-    onCustomAction: (String) -> Unit = {},
 ) {
     val style = effects.style
     val menuShape = RoundedCornerShape(style.menuCornerRadius)
@@ -569,9 +550,6 @@ fun BrowserMainMenu(
                     onCommand = ::dismissThen,
                     onToggle = onAction,
                     extensionContent = extensionContent,
-                    customContent = customContent,
-                    customShortcutSlots = customShortcutSlots,
-                    onCustomAction = { id -> commit { onCustomAction(id) } },
                     onExtensionCommit = ::commit,
                     modifier = Modifier
                         .graphicsLayer {
@@ -600,9 +578,6 @@ private fun BrowserMainMenuContent(
     onCommand: (BrowserFeatureMenuItem) -> Unit,
     onToggle: (BrowserFeatureMenuItem) -> Unit,
     extensionContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit,
-    customContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit,
-    customShortcutSlots: Map<Int, BrowserCustomAction?>,
-    onCustomAction: (String) -> Unit,
     onExtensionCommit: (() -> Unit) -> Unit,
     modifier: Modifier,
 ) {
@@ -642,11 +617,9 @@ private fun BrowserMainMenuContent(
                 )
                 Spacer(Modifier.height(10.dp))
             }
-            if (libraryItems.isNotEmpty() || customShortcutSlots.isNotEmpty()) {
+            if (libraryItems.isNotEmpty()) {
                 BrowserMainMenuLibraries(
                     items = libraryItems,
-                    customSlots = customShortcutSlots,
-                    onCustomAction = onCustomAction,
                     compact = compactToolbar,
                     resources = resources,
                     effects = effects,
@@ -670,6 +643,27 @@ private fun BrowserMainMenuContent(
                     onCommand = onCommand,
                     onToggle = onToggle,
                     modifier = Modifier.testTag(BrowserMainMenuTestTags.PageGroup),
+                )
+            }
+
+            val toppingItems = groupedItems[BrowserFeatureMenuSection.Toppings].orEmpty()
+            if (toppingItems.isNotEmpty()) {
+                BrowserMainMenuSectionTitle(
+                    title = resources.sectionTitle(BrowserFeatureMenuSection.Toppings),
+                    topPadding = 8,
+                    effects = effects,
+                )
+                BrowserMainMenuItemGroup(
+                    items = toppingItems,
+                    resources = resources,
+                    effects = effects,
+                    snoozedTabCount = snapshot.snoozedTabCount,
+                    firstItemShape = firstItemShape,
+                    innerCorners = innerCorners,
+                    lastItemShape = lastItemShape,
+                    onCommand = onCommand,
+                    onToggle = onToggle,
+                    modifier = Modifier.testTag(BrowserMainMenuTestTags.ToppingsGroup),
                 )
             }
 
@@ -713,35 +707,6 @@ private fun BrowserMainMenuContent(
                     modifier = Modifier.testTag(BrowserMainMenuTestTags.BrowserGroup),
                 )
             }
-            val readingItems = groupedItems[BrowserFeatureMenuSection.Reading].orEmpty()
-            if (readingItems.isNotEmpty()) {
-                BrowserMainMenuSectionTitle(
-                    title = resources.sectionTitle(BrowserFeatureMenuSection.Reading),
-                    topPadding = 12,
-                    effects = effects,
-                )
-                BrowserMainMenuItemGroup(
-                    items = readingItems,
-                    resources = resources,
-                    effects = effects,
-                    snoozedTabCount = snapshot.snoozedTabCount,
-                    firstItemShape = firstItemShape,
-                    innerCorners = innerCorners,
-                    lastItemShape = lastItemShape,
-                    onCommand = onCommand,
-                    onToggle = onToggle,
-                    modifier = Modifier.testTag(BrowserMainMenuTestTags.ReadingGroup),
-                )
-            }
-            customContent(onExtensionCommit)
-            BrowserMainMenuWorkflows(
-                items = groupedItems[BrowserFeatureMenuSection.Toppings].orEmpty(),
-                resources = resources,
-                effects = effects,
-                snoozedTabCount = snapshot.snoozedTabCount,
-                onCommand = onCommand,
-                onToggle = onToggle,
-            )
         }
         if (toolbarItems.isNotEmpty()) {
             Surface(
@@ -778,8 +743,6 @@ private val LIBRARY_ACTIONS = listOf(
 @Composable
 private fun BrowserMainMenuLibraries(
     items: List<BrowserFeatureMenuItem>,
-    customSlots: Map<Int, BrowserCustomAction?>,
-    onCustomAction: (String) -> Unit,
     compact: Boolean,
     resources: BrowserMainMenuResources,
     effects: BrowserMainMenuEffects,
@@ -793,34 +756,19 @@ private fun BrowserMainMenuLibraries(
         color = effects.containerColor(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column {
-            val slotCount = maxOf(items.size, (customSlots.keys.maxOrNull() ?: -1) + 1)
-                .coerceAtMost(LIBRARY_ACTIONS.size)
-            val slots = (0 until slotCount).toList()
-            val rows = if (compact) slots.chunked(3) else listOf(slots)
+            val rows = if (compact) items.chunked(3) else listOf(items)
             rows.forEach { row ->
                 Row(modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                    row.forEach { index ->
-                        val modifier = Modifier.weight(1f).fillMaxHeight()
-                        val item = items.getOrNull(index)
-                        if (customSlots.containsKey(index)) {
-                            Box(modifier = modifier, contentAlignment = Alignment.Center) {
-                                BrowserCustomActionButton(
-                                    action = customSlots[index],
-                                    onAction = onCustomAction,
-                                    modifier = Modifier.testTag("custom_workflow_shortcut:$index"),
-                                )
-                            }
-                        } else if (item != null) {
-                            BrowserMainMenuLibraryAction(
-                                item = item,
-                                resources = resources,
-                                effects = effects,
-                                onClick = { onClick(item) },
-                                modifier = modifier,
-                            )
-                        } else {
-                            Spacer(modifier)
-                        }
+                    row.forEach { item ->
+                        BrowserMainMenuLibraryAction(
+                            item = item,
+                            resources = resources,
+                            effects = effects,
+                            onClick = { onClick(item) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
                     }
                 }
             }
@@ -1058,7 +1006,7 @@ internal fun BrowserMainMenuItemGroup(
                             frostedAlpha = 1f,
                             role = BrowserMainMenuContainerRole.Selected,
                         ),
-                        checkedContentColor = effects.selectedToggleContentColor(),
+                        checkedContentColor = MaterialTheme.colorScheme.onSecondary,
                     )
                 }
                 item.action == BrowserFeatureMenuAction.ToggleDomainMute -> {
@@ -1115,28 +1063,8 @@ internal fun BrowserMainMenuItemGroup(
                         ),
                         contentColor = contentColor,
                         supportingText = resources.supportingText(item, snoozedTabCount),
-                        trailingContent = if (item.hasTrailingIcon() || item.unreadCount > 0) {
-                            {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    if (item.unreadCount > 0) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = MaterialTheme.colorScheme.secondaryContainer,
-                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        ) {
-                                            Text(
-                                                text = resources.unreadCountLabel(item.unreadCount),
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                style = MaterialTheme.typography.labelMedium,
-                                            )
-                                        }
-                                    }
-                                    if (item.hasTrailingIcon()) resources.trailingIcon(Modifier.size(20.dp))
-                                }
-                            }
+                        trailingContent = if (item.hasTrailingIcon()) {
+                            { resources.trailingIcon(Modifier.size(20.dp)) }
                         } else {
                             null
                         },
@@ -1152,56 +1080,7 @@ internal fun BrowserMainMenuItemGroup(
     }
 }
 
-/** Optional user commands stay out of the main page-action flow. */
-@Composable
-internal fun BrowserMainMenuWorkflows(
-    items: List<BrowserFeatureMenuItem>,
-    resources: BrowserMainMenuResources,
-    effects: BrowserMainMenuEffects,
-    snoozedTabCount: Int,
-    onCommand: (BrowserFeatureMenuItem) -> Unit,
-    onToggle: (BrowserFeatureMenuItem) -> Unit,
-) {
-    if (items.isEmpty()) return
-    var expanded by remember { mutableStateOf(false) }
-    val expansionLabel = resources.sectionExpansionLabel(expanded)
-    val outer = effects.style.groupCornerRadius
-    val inner = effects.style.groupInnerCornerRadius
-    Spacer(Modifier.height(12.dp))
-    TextButton(
-        onClick = { expanded = !expanded },
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(BrowserMainMenuTestTags.WorkflowsToggle)
-            .semantics { stateDescription = expansionLabel },
-    ) {
-        Text(
-            resources.sectionTitle(BrowserFeatureMenuSection.Toppings),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.labelLarge,
-        )
-        resources.trailingIcon(Modifier.size(20.dp).graphicsLayer { rotationZ = if (expanded) 90f else 0f })
-    }
-    if (expanded) {
-        BrowserMainMenuItemGroup(
-            items = items,
-            resources = resources,
-            effects = effects,
-            snoozedTabCount = snoozedTabCount,
-            firstItemShape = RoundedCornerShape(outer, outer, inner, inner),
-            innerCorners = RoundedCornerShape(inner),
-            lastItemShape = RoundedCornerShape(inner, inner, outer, outer),
-            onCommand = onCommand,
-            onToggle = onToggle,
-            modifier = Modifier.fillMaxWidth().testTag(BrowserMainMenuTestTags.ToppingsGroup),
-        )
-    }
-}
-
 private fun BrowserFeatureMenuItem.hasTrailingIcon(): Boolean = action in setOf(
-    BrowserFeatureMenuAction.OpenFeeds,
-    BrowserFeatureMenuAction.OpenLibrary,
-    BrowserFeatureMenuAction.DiscoverFeeds,
     BrowserFeatureMenuAction.OpenSnoozedTabs,
     BrowserFeatureMenuAction.OpenFavorites,
     BrowserFeatureMenuAction.OpenDownloads,
@@ -1211,9 +1090,6 @@ private fun BrowserFeatureMenuItem.hasTrailingIcon(): Boolean = action in setOf(
 )
 
 internal fun BrowserFeatureMenuItem.testTagModifier(): Modifier = when (action) {
-    BrowserFeatureMenuAction.OpenFeeds -> Modifier.testTag(BrowserMainMenuTestTags.Feeds)
-    BrowserFeatureMenuAction.OpenLibrary -> Modifier.testTag(BrowserMainMenuTestTags.Library)
-    BrowserFeatureMenuAction.DiscoverFeeds -> Modifier.testTag(BrowserMainMenuTestTags.DiscoverFeeds)
     BrowserFeatureMenuAction.ToggleFavorite -> Modifier.testTag(BrowserMainMenuTestTags.Favorite)
     BrowserFeatureMenuAction.TogglePinned -> Modifier.testTag(BrowserMainMenuTestTags.Pin)
     BrowserFeatureMenuAction.TranslatePage -> Modifier.testTag(BrowserMainMenuTestTags.Translate)
@@ -1246,11 +1122,6 @@ internal fun BrowserFeatureMenuItem.testTagModifier(): Modifier = when (action) 
 }
 
 object BrowserMainMenuTestTags {
-    const val Feeds = "browser_main_menu_feeds"
-    const val Library = "browser_main_menu_library"
-    const val DiscoverFeeds = "browser_main_menu_discover_feeds"
-    const val ReadingGroup = "browser_main_menu_reading_group"
-    const val WorkflowsToggle = "browser_main_menu_workflows_toggle"
     const val Menu = "browser_main_menu"
     const val Toolbar = "browser_main_menu_toolbar"
     const val Footer = "browser_main_menu_footer"

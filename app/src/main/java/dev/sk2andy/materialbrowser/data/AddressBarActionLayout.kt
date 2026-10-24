@@ -45,11 +45,14 @@ data class AddressBarActionLayout(
 internal object AddressBarActionLayoutRules {
     const val MAX_CONFIGURABLE_ACTIONS = 3
 
+    val DebloatedActions = setOf(AddressBarAction.Reader, AddressBarAction.Print)
+
     fun normalize(layout: AddressBarActionLayout): AddressBarActionLayout {
         val accepted = mutableSetOf<AddressBarAction>()
 
         fun normalized(actions: List<AddressBarAction>): List<AddressBarAction> = buildList {
             for (action in actions) {
+                if (action in DebloatedActions) continue
                 if (accepted.size == MAX_CONFIGURABLE_ACTIONS) break
                 if (accepted.add(action)) add(action)
             }
@@ -74,7 +77,7 @@ internal object AddressBarActionLayoutRules {
     fun available(layout: AddressBarActionLayout): List<AddressBarAction> {
         val normalized = normalize(layout)
         val placed = normalized.beforeAddress.toSet() + normalized.afterAddress
-        return AddressBarAction.entries.filterNot(placed::contains)
+        return AddressBarAction.entries.filterNot { it in placed || it in DebloatedActions }
     }
 
     fun reserveDynamicSlots(

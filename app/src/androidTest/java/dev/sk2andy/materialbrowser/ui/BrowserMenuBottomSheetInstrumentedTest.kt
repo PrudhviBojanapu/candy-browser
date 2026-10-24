@@ -53,10 +53,8 @@ import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.data.AddressBarActionLayout
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuBottomSheetContentLayout
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuBottomSheetToolbarRules
-import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuConfigurationSection
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuEntry
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuLayout
-import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuLocation
 import dev.sk2andy.materialbrowser.ui.theme.MaterialBrowserTheme
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
@@ -69,117 +67,6 @@ import org.junit.runner.RunWith
 class BrowserMenuBottomSheetInstrumentedTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
-
-    @Test
-    fun emptyPageActionsAndControlsShowSettingsHintAndButtonNavigates() {
-        val settingsOpens = AtomicInteger()
-        showMenu(
-            contentLayout = BrowserMenuBottomSheetContentLayout.SwipePages,
-            menuLayout = emptySectionLayout(emptyPageActions = true).copy(
-                bottomSheetContentLayout = BrowserMenuBottomSheetContentLayout.SwipePages,
-            ),
-            onOpenMenuSettings = { settingsOpens.incrementAndGet() },
-        )
-        openMenu()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_page_actions))
-            .performClick()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_message))
-            .assertIsDisplayed()
-        captureScreenshot("empty-page-actions-hint")
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_action))
-            .performClick()
-        assertEquals(1, settingsOpens.get())
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings_menu_actions_title))
-            .assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(composeRule.activity.getString(R.string.action_back)).performClick()
-        composeRule.onNodeWithContentDescription("Open bottom sheet menu").assertIsDisplayed()
-    }
-
-    @Test
-    fun emptyPageControlsShowSettingsHintAndButtonNavigates() {
-        val settingsOpens = AtomicInteger()
-        showMenu(
-            contentLayout = BrowserMenuBottomSheetContentLayout.SwipePages,
-            menuLayout = emptySectionLayout(emptyPageControls = true).copy(
-                bottomSheetContentLayout = BrowserMenuBottomSheetContentLayout.SwipePages,
-            ),
-            onOpenMenuSettings = { settingsOpens.incrementAndGet() },
-        )
-        openMenu()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_page_controls))
-            .performClick()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_message))
-            .assertIsDisplayed()
-        captureScreenshot("empty-page-controls-hint")
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_action))
-            .performClick()
-        assertEquals(1, settingsOpens.get())
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings_menu_actions_title))
-            .assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(composeRule.activity.getString(R.string.action_back)).performClick()
-        composeRule.onNodeWithContentDescription("Open bottom sheet menu").assertIsDisplayed()
-    }
-
-    @Test
-    fun bothEmptySectionsRenderOneSettingsHint() {
-        val settingsOpens = AtomicInteger()
-        showMenu(
-            menuLayout = emptySectionLayout(emptyPageActions = true, emptyPageControls = true),
-            onOpenMenuSettings = { settingsOpens.incrementAndGet() },
-        )
-        openMenu()
-        composeRule.onAllNodesWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_message))
-            .assertCountEquals(1)
-        composeRule.onAllNodesWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_action))
-            .assertCountEquals(1)
-        captureScreenshot("both-empty-sections-hint")
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_action))
-            .performClick()
-        assertEquals(1, settingsOpens.get())
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings_menu_actions_title))
-            .assertIsDisplayed()
-    }
-
-    @Test
-    fun nonEmptyMenuSectionsRemainUnchanged() {
-        showMenu()
-        openMenu()
-        composeRule.onAllNodesWithText(composeRule.activity.getString(R.string.browser_menu_empty_section_message))
-            .assertCountEquals(0)
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_page_actions))
-            .assertIsDisplayed()
-    }
-
-    private fun emptySectionLayout(
-        emptyPageActions: Boolean = false,
-        emptyPageControls: Boolean = false,
-    ): BrowserMenuLayout {
-        val toggleEntries = setOf(
-            BrowserMenuEntry.CookieBannerRemoval,
-            BrowserMenuEntry.ForceVerticalScrolling,
-            BrowserMenuEntry.ForcePageZooming,
-            BrowserMenuEntry.ForceSafeArea,
-            BrowserMenuEntry.AlwaysBlockPopups,
-            BrowserMenuEntry.DesktopView,
-            BrowserMenuEntry.DomainMute,
-        )
-        val shortcutEntries = setOf(
-            BrowserMenuEntry.OpenDownloads,
-            BrowserMenuEntry.Reader,
-            BrowserMenuEntry.OpenFavorites,
-            BrowserMenuEntry.OpenHistory,
-            BrowserMenuEntry.OpenSettings,
-        )
-        return BrowserMenuLayout(
-            locations = BrowserMenuEntry.entries.associateWith { entry ->
-                if (
-                    (emptyPageActions && entry.section != BrowserMenuConfigurationSection.Toolbar &&
-                        entry !in toggleEntries && entry !in shortcutEntries) ||
-                    (emptyPageControls && entry in toggleEntries)
-                ) BrowserMenuLocation.Nowhere else entry.defaultLocation
-            },
-        )
-    }
 
     @Test
     fun scrollKeepsAddressShortcutsAndPageActionsFixed() {
@@ -441,33 +328,6 @@ class BrowserMenuBottomSheetInstrumentedTest {
     }
 
     @Test
-    fun feedsUnreadChipTracksCountAndOpensDestination() {
-        val opens = AtomicInteger()
-        val count = mutableStateOf(3)
-        showMenu(
-            unreadFeedCount = { count.value },
-            onOpenFeeds = { opens.incrementAndGet() },
-            onOpenLibrary = {},
-        )
-        openMenu()
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.Feeds).performScrollTo()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_feed_unread_count, 3))
-            .assertIsDisplayed()
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.Library).assertExists()
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.Feeds).performClick()
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.Menu).assertDoesNotExist()
-        assertEquals(1, opens.get())
-
-        composeRule.runOnIdle { count.value = 0 }
-        openMenu()
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.Feeds).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_feed_unread_count, 0))
-            .assertDoesNotExist()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.browser_menu_feed_unread_count, 3))
-            .assertDoesNotExist()
-    }
-
-    @Test
     fun downloadsShortcutClosesSheetAndRunsAction() {
         val downloads = AtomicInteger()
         showMenu(onDownloads = { downloads.incrementAndGet() })
@@ -567,29 +427,6 @@ class BrowserMenuBottomSheetInstrumentedTest {
 
         assertEquals("short drag returns to expanded address position", before.top, addressBounds().top, 1f)
         composeRule.onNodeWithTag(BrowserMainMenuTestTags.Menu).assertIsDisplayed()
-    }
-
-    @Test
-    fun footerDragDismissesSheetWithoutTouchingHandle() {
-        showMenu(anchoredAddressBar = true)
-        openMenu()
-        val before = addressBounds()
-        val travel = collapsedAddressBounds().top - before.top
-        val footer = composeRule.onNodeWithTag(BrowserMenuBottomSheetTestTags.Footer)
-        footer.performTouchInput {
-            down(center)
-            moveBy(Offset(0f, travel * 0.8f), delayMillis = 600L)
-        }
-        composeRule.waitForIdle()
-
-        assertTrue("footer drag moves sheet", addressBounds().top - before.top > travel * 0.7f)
-        footer.performTouchInput {
-            advanceEventTime(200L)
-            up()
-        }
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.Menu).assertDoesNotExist()
     }
 
     @Test
@@ -787,23 +624,17 @@ class BrowserMenuBottomSheetInstrumentedTest {
         onDesktopChanged: () -> Unit = {},
         onDuplicate: () -> Unit = {},
         onDownloads: () -> Unit = {},
-        onOpenFeeds: (() -> Unit)? = null,
-        onOpenLibrary: (() -> Unit)? = null,
-        unreadFeedCount: () -> Int = { 0 },
         onShare: () -> Unit = {},
         onFindInPage: () -> Unit = {},
         onTabs: () -> Unit = {},
         onNewTab: () -> Unit = {},
         onCloseTab: () -> Unit = {},
         onAddressClick: () -> Unit = {},
-        menuLayout: BrowserMenuLayout? = null,
-        onOpenMenuSettings: () -> Unit = {},
     ) {
         composeRule.setContent {
             MaterialBrowserTheme {
                 var expanded by remember { mutableStateOf(false) }
                 var desktopView by remember { mutableStateOf(false) }
-                var menuSettingsVisible by remember { mutableStateOf(false) }
                 var anchorBounds by remember { mutableStateOf<Rect?>(null) }
                 Box(Modifier.fillMaxSize().background(Color(0xFF1565C0))) {
                     if (anchoredAddressBar) {
@@ -814,16 +645,7 @@ class BrowserMenuBottomSheetInstrumentedTest {
                                 .testTag("Collapsed bottom sheet address anchor"),
                         )
                     }
-                    if (menuSettingsVisible) {
-                        BrowserMenuSettingsPage(
-                            layout = menuLayout ?: BrowserMenuLayout(
-                                bottomSheetContentLayout = contentLayout,
-                                bottomSheetToolbarEntries = toolbarEntries,
-                            ),
-                            onLocationChanged = { _, _ -> },
-                            onBack = { menuSettingsVisible = false },
-                        )
-                    } else Box(Modifier.align(Alignment.BottomEnd).size(48.dp)) {
+                    Box(Modifier.align(Alignment.BottomEnd).size(48.dp)) {
                         IconButton(onClick = { expanded = true }) {
                             Icon(Icons.Default.MoreVert, "Open bottom sheet menu")
                         }
@@ -871,9 +693,6 @@ class BrowserMenuBottomSheetInstrumentedTest {
                             onOpenExternal = {},
                             onPrint = {},
                             onOpenReader = {},
-                            onOpenFeeds = onOpenFeeds,
-                            onOpenLibrary = onOpenLibrary,
-                            unreadFeedCount = unreadFeedCount(),
                             onTranslate = {},
                             onDomainMutedChange = {},
                             onAlwaysBlockPopupsChange = {},
@@ -894,7 +713,7 @@ class BrowserMenuBottomSheetInstrumentedTest {
                             onDockAddressBar = {},
                             onDownloads = onDownloads,
                             onHistory = {},
-                            menuLayout = menuLayout ?: BrowserMenuLayout(
+                            menuLayout = BrowserMenuLayout(
                                 bottomSheetContentLayout = contentLayout,
                                 bottomSheetToolbarEntries = toolbarEntries,
                             ),
@@ -947,10 +766,6 @@ class BrowserMenuBottomSheetInstrumentedTest {
                             },
                             bottomSheetAnchorBounds = anchorBounds,
                             onSettings = {},
-                            onOpenMenuSettings = {
-                                menuSettingsVisible = true
-                                onOpenMenuSettings()
-                            },
                         )
                     }
                 }

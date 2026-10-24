@@ -11,10 +11,6 @@ recorded in [Settings option map](settings-option-map.md).
 | Settings subpages | Only the current page shrinks; its parent settings page fills the background throughout the gesture. Cancellation restores the page, commit returns to its parent. | `SettingsBackRouter`, shared `SettingsRouter`, `NativeScreenBackHandler`, `SettingsBackRules` |
 | Nested settings | Theme details return to Theme & interface; browser details return to Browser behavior; Link routing returns to Web pages; action editors return to Gestures; Topping catalog returns to Toppings. An active search result returns directly to the preserved Settings search. | shared `SettingsNavigationRules`, `SettingsBackRules`, `SettingsScreen` |
 | Snoozed tabs | Default shrink, followed by the existing dismissal fade; rescheduling dialogs retain Back priority | `SnoozedTabsScreen`, `NativeScreenBackHandler` |
-| History and Favorites activity roots | Idle root Back delegates to Android's cross-activity preview. A pending write alone temporarily blocks activity dismissal. History publishes committed mutation results before dismissal; selection clearing stays local. | `HistoryActivity`, `FavoritesActivity`, `HistoryScreen`, `FavoritesScreen` |
-| Favorites folders | The current folder follows gesture progress; cancel keeps it, commit returns one folder level without finishing the activity. | `FavoritesScreen`, `NativeScreenBackHandler` |
-| Legacy RSS source detail | Retains the source list beneath the detail, animates entry/exit, and reveals the list during predictive Back. Root Back remains Android-owned. | `RssFeedsScreen`, `NativeScreenBackHandler` |
-| Feed catalog and release notes | Catalog retains its parent collection under the gesture; release notes reveal the existing browser. Both cancel without navigation and commit once. | `FeedsScreen`, `FeedCatalogScreen`, `ReleaseNotesScreen` |
 
 The shared motion keeps the existing 0.9 minimum scale, edge-directed translation and rounded
 corners. A canceled gesture restores the surface without navigation. Button/three-button Back
@@ -22,10 +18,6 @@ continues to navigate without waiting for a gesture animation.
 
 `SettingsBackRouterInstrumentedTest` checks the visible parent preview, opaque foreground,
 gesture cancellation and single-step commits through nested settings destinations.
-`CollectionBackNavigationInstrumentedTest` covers activity-root delegation, selection/folder
-priority, legacy RSS detail cancellation/commit, and release-note gesture progress.
-`FeedCatalogNavigationInstrumentedTest` covers catalog entry motion and returning to the retained
-collection after a committed or cancelled gesture.
 
 ## Ownership
 
@@ -469,20 +461,19 @@ The **Theme & interface**, **Tabs**, **Player**, **Search**, **Downloads**, **Ge
 are recorded in [`../design/external-app-links-artwork.md`](../design/external-app-links-artwork.md). Profiles and Translations
 now begin their own focused pages with full headers; they are no longer compact inline section art.
 Android and shared Core Search use the same approved Search illustration and built-in engine choices.
-**Long-press link action** uses a matching generated hand/link/action-card motif instead of the
-older geometric preview. Its original, exact prompt and rendering contract are recorded in
-[`../design/link-long-press-artwork.md`](../design/link-long-press-artwork.md).
 `SettingsHeaderIllustration` owns shared Compose rendering. The images are decorative, have no
 accessibility announcement or interaction, and use a centered, aspect-preserving runtime window in a
 200 dp header capped at 360 dp wide. Narrow layouts retain the complete shape. Artwork scrolls with
 the page. The External link preview page uses only its approved v8 decorative header; its redundant
 older graphic is removed without removing controls.
 
-The original eleven PNGs in `shared/src/commonMain/composeResources/drawable` remain byte-identical
-downloads. RSS uses the matching flat v2 illustration, with its prompt recorded in
-[`../design-concepts/rss/polish-artwork.md`](../design-concepts/rss/polish-artwork.md).
-Its page uses the same scrolling `SettingsPage` container and background as the other settings;
-all interval choices remain reachable at large text sizes. No original asset changed. The
+The **Gestures & controls** overview retains its swipe-arrow header. Its **Gestures** child uses a
+hand dragging a floating address pill, while **Address-bar buttons** uses floating shortcut tiles
+and placement slots. These three pages have independent artwork; the new originals and exact
+prompts are recorded in [Gesture and address-bar artwork](../design/gesture-controls-artwork.md).
+
+The eleven PNGs in `shared/src/commonMain/composeResources/drawable` are byte-identical original
+downloads. No pixels were cropped, recolored, redrawn or regenerated in the source files. The
 Appearance and Tabs windows reference the first sheet; the rejected rounded Player on that sheet
 is outside both windows. Player references only the separately approved waveform image.
 
@@ -499,7 +490,6 @@ is outside both windows. Player references only the separately approved waveform
 | `settings_approved_tab_lifecycle.png` | 1536 × 1024 | Tab lifecycle `(340, 115, 1210, 910)` | `0178005781cbd91cec822e02480b276de186d1dc172d2e1d39bff7f57d49ebf5` |
 | `settings_approved_personal_link_rules.png` | 1536 × 1024 | Personal link rules `(140, 225, 1400, 795)` | `63e9bd5762063cce660ad691b6afdb153f5b3e9378e5601ceb71792e0b08fad0` |
 | `settings_external_app_links.png` | 1536 × 1024 | Open links in apps `(160, 205, 1385, 815)` | `288d106373b03999124b7aaeaa0342197d108aea3b8b4aace783c660e8fba6fe` |
-| `settings_approved_rss_v2.png` | 1536 × 1024 | RSS `(100, 250, 1435, 760)` | `cf421de93977b7a3f02ed829675a7d64fe297fdbd38e75aba1508bdd5c927448` |
 
 The original Library IDs are `libfile_46c900dcd0448191a03ae81118385873` and
 `libfile_48290d7ff1088191aacd6d776d5db0db`, respectively. These are user-approved imagegen
@@ -546,9 +536,8 @@ evidence only for their earlier layout. Real-app navigation, Back behavior and p
 separately in `PlayerSettingsNavigationInstrumentedTest` and the affected settings/search suites;
 they are not established by artwork captures alone. One private-search recreation case skipped
 because notification permission was not already granted.
-The existing Colors and Surfaces/shapes previews continue to use their functional illustrations;
-Gestures does not receive the Tabs header. Address bar uses the generated motif documented in
-[Address-bar artwork](../design/address-bar-artwork.md). Candy Player mode
+The existing Colors, Surfaces/shapes and Address bar explanatory previews continue to
+use their functional illustrations; Gestures does not receive the Tabs header. Candy Player mode
 uses five generated flat Material Expressive images, one per selection, in the former 400 dp ×
 240 dp preview slot. They share the approved headers' live theme coloring and retain the complete
 original images. Sources, prompts and checks are in [Player mode artwork](../design/player-mode-artwork.md).

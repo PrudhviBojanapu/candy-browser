@@ -6,27 +6,47 @@
 
 package dev.sk2andy.materialbrowser.ui
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.width
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -67,38 +87,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -122,7 +141,6 @@ import dev.sk2andy.materialbrowser.data.TabDeletionRules
 import dev.sk2andy.materialbrowser.reader.ReaderStudioSessionRules
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuLayout
 import dev.sk2andy.materialbrowser.shared.ui.AddressBarFieldContent
-import dev.sk2andy.materialbrowser.shared.ui.BrowserCustomActionButton
 import dev.sk2andy.materialbrowser.ui.theme.BrowserChromeSurfaceRole
 import dev.sk2andy.materialbrowser.ui.theme.LocalCandyMotionScheme
 import dev.sk2andy.materialbrowser.ui.theme.browserChromeSurfaceTokens
@@ -183,6 +201,8 @@ internal fun ExpandedBottomBarContent(
     onActivateAddressSuggestion: () -> Unit,
     onDismissEditor: () -> Unit,
     onSubmitAddress: (String) -> Unit,
+    onToggleMultilineEditor: () -> Unit = {},
+    isMultilineExpanded: Boolean = false,
     showAiModeToggle: Boolean,
     aiModeSelected: Boolean,
     onAiModeSelectedChange: (Boolean) -> Unit,
@@ -209,15 +229,14 @@ internal fun ExpandedBottomBarContent(
     canToggleDomainMute: Boolean,
     isDomainMuted: Boolean,
     onDomainMutedChange: (Boolean) -> Unit,
-    canToggleStatusBarScroll: Boolean = false,
-    isStatusBarScrollEnabled: Boolean = false,
-    onStatusBarScrollEnabledChange: (Boolean) -> Unit = {},
     canToggleAlwaysBlockPopups: Boolean,
     isAlwaysBlockPopupsEnabled: Boolean,
     onAlwaysBlockPopupsChange: (Boolean) -> Unit,
     canToggleDesktopView: Boolean,
     isDesktopView: Boolean,
     onDesktopViewChange: (Boolean) -> Unit,
+    isVideoDetectionRedirectEnabled: Boolean = true,
+    onVideoDetectionRedirectEnabledChange: (Boolean) -> Unit = {},
     canToggleCookieBannerRemoval: Boolean,
     isCookieBannerRemovalEnabled: Boolean,
     canToggleForceVerticalScrolling: Boolean,
@@ -226,25 +245,23 @@ internal fun ExpandedBottomBarContent(
     isForcePageZoomingEnabled: Boolean,
     canToggleForceSafeArea: Boolean,
     isForceSafeAreaEnabled: Boolean,
+    canToggleAllAdBlockers: Boolean = true,
+    isAllAdBlockersEnabled: Boolean = true,
+    onAllAdBlockersChange: (Boolean) -> Unit = {},
     onCookieBannerRemovalEnabledChange: (Boolean) -> Unit,
     onForceVerticalScrollingChange: (Boolean) -> Unit,
     onForcePageZoomingChange: (Boolean) -> Unit,
     onForceSafeAreaChange: (Boolean) -> Unit,
     snoozedTabCount: Int,
     onSnoozedTabs: () -> Unit,
-    onOpenFeeds: (() -> Unit)? = null,
-    onOpenLibrary: (() -> Unit)? = null,
-    onDiscoverFeeds: (() -> Unit)? = null,
-    unreadFeedCount: Int = 0,
-    canDiscoverFeeds: Boolean = false,
     onFavorites: () -> Unit,
     onDownloads: () -> Unit,
     onHistory: () -> Unit,
     firefoxExtensionActions: List<GeckoExtensionActionState>,
     menuLayout: BrowserMenuLayout,
     onFirefoxExtensionAction: (GeckoExtensionActionKey) -> Unit,
+    onManageFirefoxExtensions: () -> Unit = {},
     onSettings: () -> Unit,
-    onOpenMenuSettings: () -> Unit = onSettings,
     onPrivacyXRay: () -> Unit,
     permissionActivityVisible: Boolean,
     onOpenExternal: () -> Unit,
@@ -256,16 +273,8 @@ internal fun ExpandedBottomBarContent(
     onOpenCandyTrail: () -> Unit,
     canOpenWebAnnotations: Boolean = false,
     onWebAnnotations: (() -> Unit)? = null,
-    canOpenConstellations: Boolean = false,
-    onOpenConstellations: (() -> Unit)? = null,
-    onOpenRssFeeds: (() -> Unit)? = null,
-    workflowActions: CustomWorkflowSurfaceActions = CustomWorkflowSurfaceActions.Empty,
-    onWorkflow: (String) -> Unit = {},
-    onManageWorkflows: (() -> Unit)? = null,
     onSnooze: () -> Unit,
     onAddSiteCapsule: () -> Unit,
-    canCreateSiteWidget: Boolean = false,
-    onCreateSiteWidget: () -> Unit = {},
     supportsPageContentActions: Boolean,
     canDock: Boolean,
     onDock: () -> Unit,
@@ -320,11 +329,6 @@ internal fun ExpandedBottomBarContent(
     val visibleActionLayout = AddressBarActionLayoutRules.reserveDynamicSlots(
         layout = actionLayout,
         dynamicSlotCount = dynamicSlotCount,
-    )
-    val workflowAddressSlots = CustomWorkflowAddressSlotRules.slots(
-        layout = visibleActionLayout,
-        boundSlots = workflowActions.addressSlots.keys,
-        reservedSlots = dynamicSlotCount,
     )
     val overflowAddressBarActions = if (showCastButton) {
         AddressBarActionLayoutRules.temporarilyHiddenActions(
@@ -435,7 +439,7 @@ internal fun ExpandedBottomBarContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnimatedVisibility(
-                visible = workflowAddressSlots.beforeAddress.isNotEmpty() &&
+                visible = visibleActionLayout.beforeAddress.isNotEmpty() &&
                     !editorUsesFullWidth &&
                     !segmentedEditorActive,
                 enter = fadeIn(tween(motionScheme.addressBarActionFadeInMillis)) +
@@ -444,14 +448,12 @@ internal fun ExpandedBottomBarContent(
                     shrinkHorizontally(tween(motionScheme.addressBarActionExpandMillis)),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    workflowAddressSlots.beforeAddress.forEach { slot ->
-                        if (slot.overridden) {
-                            BrowserCustomActionButton(workflowActions.addressSlots[slot.index], onWorkflow)
-                        } else if (slot.builtinAction != null) {
-                            AddressBarActionButton(slot.builtinAction, actionState, actionCallbacks)
-                        } else {
-                            Box(Modifier.size(48.dp))
-                        }
+                    visibleActionLayout.beforeAddress.forEach { action ->
+                        AddressBarActionButton(
+                            action = action,
+                            state = actionState,
+                            callbacks = actionCallbacks,
+                        )
                     }
                 }
             }
@@ -483,6 +485,220 @@ internal fun ExpandedBottomBarContent(
                 color = fieldSurfaceColor,
                 contentColor = addressChromeTokens.fieldContentColor,
             ) {
+                if (editing) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        // Quick actions chip row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Surface(
+                                onClick = {
+                                    val textToCopy = editValue.text.ifBlank { tab.url }
+                                    if (textToCopy.isNotBlank()) {
+                                        clipboardManager.setText(AnnotatedString(textToCopy))
+                                        Toast.makeText(context, R.string.toast_link_copied, Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = CircleShape,
+                                color = addressChromeTokens.fieldContainerColor.copy(alpha = 0.85f),
+                                contentColor = addressChromeTokens.fieldContentColor,
+                                tonalElevation = 2.dp,
+                                modifier = Modifier.height(32.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Text("Copy", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                            Surface(
+                                onClick = {
+                                    val clipText = clipboardManager.getText()?.text
+                                    if (!clipText.isNullOrBlank()) {
+                                        onEditValueChange(TextFieldValue(clipText, TextRange(clipText.length)))
+                                    }
+                                },
+                                shape = CircleShape,
+                                color = addressChromeTokens.fieldContainerColor.copy(alpha = 0.85f),
+                                contentColor = addressChromeTokens.fieldContentColor,
+                                tonalElevation = 2.dp,
+                                modifier = Modifier.height(32.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Text("Paste", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                            Surface(
+                                onClick = {
+                                    val textToShare = editValue.text.ifBlank { tab.url }
+                                    if (textToShare.isNotBlank()) {
+                                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                            putExtra(Intent.EXTRA_TEXT, textToShare)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, null))
+                                    }
+                                },
+                                shape = CircleShape,
+                                color = addressChromeTokens.fieldContainerColor.copy(alpha = 0.85f),
+                                contentColor = addressChromeTokens.fieldContentColor,
+                                tonalElevation = 2.dp,
+                                modifier = Modifier.height(32.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Text("Share", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+
+                        // Modern single-line URL input pill
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = CircleShape,
+                            color = addressChromeTokens.fieldContainerColor,
+                            tonalElevation = 3.dp,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .padding(start = 6.dp, end = 8.dp)
+                                        .size(20.dp),
+                                    tint = addressChromeTokens.accentColor,
+                                )
+                                BasicTextField(
+                                    value = editValue,
+                                    onValueChange = onEditValueChange,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .focusRequester(focusRequester)
+                                        .onFocusChanged { addressFieldFocused = it.isFocused },
+                                    singleLine = true,
+                                    maxLines = 1,
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                        color = addressChromeTokens.fieldContentColor,
+                                        fontSize = 15.sp,
+                                    ),
+                                    cursorBrush = SolidColor(addressChromeTokens.accentColor),
+                                    keyboardOptions = KeyboardOptions(
+                                        capitalization = KeyboardCapitalization.None,
+                                        autoCorrectEnabled = false,
+                                        keyboardType = KeyboardType.Uri,
+                                        imeAction = ImeAction.Go,
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onGo = {
+                                            onSubmitAddress(editValue.text)
+                                            onDismissEditor()
+                                        },
+                                    ),
+                                    decorationBox = { innerTextField ->
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            contentAlignment = Alignment.CenterStart,
+                                        ) {
+                                            if (editValue.text.isEmpty()) {
+                                                Text(
+                                                    text = stringResource(R.string.search_or_enter_url),
+                                                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+                                                    color = addressChromeTokens.fieldSecondaryContentColor,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    },
+                                )
+                                if (editValue.text.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { onEditValueChange(TextFieldValue("", TextRange.Zero)) },
+                                        modifier = Modifier.size(32.dp),
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = addressChromeTokens.fieldSecondaryContentColor.copy(alpha = 0.2f),
+                                            modifier = Modifier.size(22.dp),
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Clear,
+                                                    contentDescription = "Clear",
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = addressChromeTokens.fieldContentColor,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.width(4.dp))
+                                }
+                                IconButton(
+                                    onClick = {
+                                        onSubmitAddress(editValue.text)
+                                        onDismissEditor()
+                                    },
+                                    modifier = Modifier.size(34.dp),
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = addressChromeTokens.accentColor,
+                                        modifier = Modifier.size(30.dp),
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                                contentDescription = "Go",
+                                                modifier = Modifier.size(16.dp),
+                                                tint = Color.White,
+                                            )
+                                        }
+                                    }
+                                }
+                                IconButton(
+                                    onClick = onDismissEditor,
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.cd_close_address_input),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = addressChromeTokens.fieldSecondaryContentColor,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
                 AnimatedContent(
                     targetState = wideTabStripVisible,
                     modifier = Modifier
@@ -669,6 +885,7 @@ internal fun ExpandedBottomBarContent(
                     }
                 }
             }
+            }
             AnimatedVisibility(
                 visible = !editorUsesFullWidth && !segmentedEditorActive,
                 enter = fadeIn(tween(motionScheme.addressBarActionFadeInMillis)) +
@@ -680,14 +897,12 @@ internal fun ExpandedBottomBarContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (!editing || tab.url != BLANK_URL) {
-                        workflowAddressSlots.afterAddress.forEach { slot ->
-                            if (slot.overridden) {
-                                BrowserCustomActionButton(workflowActions.addressSlots[slot.index], onWorkflow)
-                            } else if (slot.builtinAction != null) {
-                                AddressBarActionButton(slot.builtinAction, actionState, actionCallbacks)
-                            } else {
-                                Box(Modifier.size(48.dp))
-                            }
+                        visibleActionLayout.afterAddress.forEach { action ->
+                            AddressBarActionButton(
+                                action = action,
+                                state = actionState,
+                                callbacks = actionCallbacks,
+                            )
                         }
                         if (showCastButton) CastRouteButton()
                     }
@@ -746,6 +961,7 @@ internal fun ExpandedBottomBarContent(
                                 canUsePageActions = tab.url != BLANK_URL,
                                 canUseDocumentActions = tab.url != BLANK_URL,
                                 canOpenReader = ReaderStudioSessionRules.isSupportedSource(tab.url),
+                                canOpenWebAnnotations = canOpenWebAnnotations,
                                 canTranslatePage = PageTranslationRules.canTranslate(
                                     provider = pageTranslationProvider,
                                     sourceUrl = tab.url,
@@ -768,6 +984,9 @@ internal fun ExpandedBottomBarContent(
                                 isForcePageZoomingEnabled = isForcePageZoomingEnabled,
                                 canToggleForceSafeArea = canToggleForceSafeArea,
                                 isForceSafeAreaEnabled = isForceSafeAreaEnabled,
+                                canToggleAllAdBlockers = canToggleAllAdBlockers,
+                                isAllAdBlockersEnabled = isAllAdBlockersEnabled,
+                                onAllAdBlockersChange = onAllAdBlockersChange,
                                 canAddSiteCapsule = tab.url != BLANK_URL &&
                                     !tab.isIncognito &&
                                     (
@@ -775,7 +994,6 @@ internal fun ExpandedBottomBarContent(
                                             tab.url.startsWith("http://")
                                         ),
                                 canSnooze = !tab.isIncognito,
-                                canCreateSiteWidget = canCreateSiteWidget,
                                 snoozedTabCount = snoozedTabCount,
                                 overflowAddressBarActions = overflowAddressBarActions,
                                 canCloseTab = actionState.canCloseTab,
@@ -797,11 +1015,11 @@ internal fun ExpandedBottomBarContent(
                                 onTranslate = onTranslate,
                                 onFindInPage = onFindInPage,
                                 onDomainMutedChange = onDomainMutedChange,
-                                canToggleStatusBarScroll = canToggleStatusBarScroll,
-                                isStatusBarScrollEnabled = isStatusBarScrollEnabled,
-                                onStatusBarScrollEnabledChange = onStatusBarScrollEnabledChange,
                                 onAlwaysBlockPopupsChange = onAlwaysBlockPopupsChange,
                                 onDesktopViewChange = onDesktopViewChange,
+                                canToggleVideoDetectionRedirect = true,
+                                isVideoDetectionRedirectEnabled = isVideoDetectionRedirectEnabled,
+                                onVideoDetectionRedirectEnabledChange = onVideoDetectionRedirectEnabledChange,
                                 onCookieBannerRemovalEnabledChange =
                                     onCookieBannerRemovalEnabledChange,
                                 onForceVerticalScrollingChange =
@@ -809,35 +1027,22 @@ internal fun ExpandedBottomBarContent(
                                 onForcePageZoomingChange = onForcePageZoomingChange,
                                 onForceSafeAreaChange = onForceSafeAreaChange,
                                 onOpenCandyTrail = onOpenCandyTrail,
-                                canOpenWebAnnotations = canOpenWebAnnotations,
                                 onWebAnnotations = onWebAnnotations,
-                                canOpenConstellations = canOpenConstellations,
-                                onOpenConstellations = onOpenConstellations,
-                                onOpenRssFeeds = onOpenRssFeeds,
-                                workflowActions = workflowActions,
-                                onWorkflow = onWorkflow,
-                                onManageWorkflows = onManageWorkflows,
                                 onAddSiteCapsule = onAddSiteCapsule,
-                                onCreateSiteWidget = onCreateSiteWidget,
                                 onSummarize = onSummarizeWithAssistant,
                                 onSnooze = onSnooze,
                                 onSnoozedTabs = onSnoozedTabs,
                                 canDockAddressBar = canDock,
                                 onDockAddressBar = onDock,
                                 onParkAddressBarRight = onParkRight,
-                                onOpenFeeds = onOpenFeeds,
-                                onOpenLibrary = onOpenLibrary,
-                                onDiscoverFeeds = onDiscoverFeeds,
-                                unreadFeedCount = unreadFeedCount,
-                                canDiscoverFeeds = canDiscoverFeeds,
                                 onFavorites = onFavorites,
                                 onDownloads = onDownloads,
                                 onHistory = onHistory,
                                 firefoxExtensionActions = firefoxExtensionActions,
                                 menuLayout = menuLayout,
                                 onFirefoxExtensionAction = onFirefoxExtensionAction,
+                                onManageFirefoxExtensions = onManageFirefoxExtensions,
                                 onSettings = onSettings,
-                                onOpenMenuSettings = onOpenMenuSettings,
                                 bottomSheetAnchorBounds = addressBarBounds,
                                 onBottomSheetVisibleChange = onMenuSheetVisibleChange,
                                 bottomSheetAddressBar = { commit ->
@@ -847,9 +1052,6 @@ internal fun ExpandedBottomBarContent(
                                         actionLayout = snapshot.actionLayout,
                                         actionState = snapshot.actionState,
                                         actionCallbacks = actionCallbacks,
-                                        customSlots = workflowActions.addressSlots,
-                                        reservedSlots = dynamicSlotCount,
-                                        onCustomAction = onWorkflow,
                                         commit = commit,
                                         onAddress = onAddress,
                                         onDismissRequest = { onMenuExpandedChange(false) },

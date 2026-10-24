@@ -69,12 +69,11 @@ class ReaderLibraryRepository private constructor(context: Context) : ReaderLibr
         document: ReaderDocument,
         progress: Float,
         isPrivate: Boolean,
-        sourceProfileId: String? = null,
         onSaved: (ReaderSnapshot?) -> Unit,
     ) {
         enqueue {
             val snapshot = try {
-                store.saveSnapshot(document, progress, isPrivate, sourceProfileId = sourceProfileId)
+                store.saveSnapshot(document, progress, isPrivate)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {
@@ -84,28 +83,6 @@ class ReaderLibraryRepository private constructor(context: Context) : ReaderLibr
             onMain { onSaved(snapshot) }
         }
     }
-
-    fun forProfile(profileId: String?): ReaderLibraryDataSource =
-        object : ReaderLibraryDataSource by this@ReaderLibraryRepository {
-            override fun saveSnapshot(
-                document: ReaderDocument,
-                progress: Float,
-                isPrivate: Boolean,
-                onUpdated: (ReaderLibraryState) -> Unit,
-            ) {
-                enqueue {
-                    store.saveSnapshot(
-                        document,
-                        progress,
-                        isPrivate,
-                        sourceProfileId = profileId,
-                        preserveExistingProvenance = true,
-                    )
-                    val state = store.load(isPrivate)
-                    onMain { onUpdated(state) }
-                }
-            }
-        }
 
     internal fun saveWorkflowSnapshot(
         document: ReaderDocument,
@@ -121,8 +98,6 @@ class ReaderLibraryRepository private constructor(context: Context) : ReaderLibr
                     document = document,
                     progress = 0f,
                     isPrivate = isPrivate,
-                    sourceProfileId = sourceProfileId,
-                    allowEviction = false,
                 )
             } catch (cancellation: CancellationException) {
                 throw cancellation

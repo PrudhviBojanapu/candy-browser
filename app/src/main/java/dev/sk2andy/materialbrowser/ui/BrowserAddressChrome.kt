@@ -17,12 +17,53 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -61,7 +102,6 @@ import dev.sk2andy.materialbrowser.reader.ReaderStudioSessionRules
 import dev.sk2andy.materialbrowser.shared.browser.AddressBarLongPressAction
 import dev.sk2andy.materialbrowser.shared.browser.AddressBarLongPressActionRules
 import dev.sk2andy.materialbrowser.shared.browser.AddressBarLongPressContext
-import dev.sk2andy.materialbrowser.shared.ui.AddressBarFieldCompletionRules
 import eightbitlab.com.blurview.BlurTarget
 import kotlin.math.absoluteValue
 
@@ -120,26 +160,18 @@ internal fun BoxScope.BrowserAddressChrome(
     toggleFavoriteWithFeedback: (String) -> Unit,
     onBlankTabModeRevealOriginChanged: (Offset) -> Unit,
     onSnoozedTabs: () -> Unit,
-    onOpenFeeds: (() -> Unit)? = null,
-    onOpenLibrary: (() -> Unit)? = null,
-    onDiscoverFeeds: (() -> Unit)? = null,
-    unreadFeedCount: Int = 0,
     onOpenFavorites: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenHistory: () -> Unit,
-    onOpenRssFeeds: (() -> Unit)? = null,
-    onManageWorkflows: (() -> Unit)? = null,
     onSettings: () -> Unit,
-    onOpenMenuSettings: () -> Unit = onSettings,
     onPrivacyXRay: () -> Unit,
     onNewTabButtonBoundsChanged: (Rect?) -> Unit,
     onReaderStudio: () -> Unit,
     onOpenCandyTrail: () -> Unit,
     onSnooze: () -> Unit,
     onAddSiteCapsule: () -> Unit,
-    canCreateSiteWidget: Boolean = false,
-    onCreateSiteWidget: () -> Unit = {},
     onAddressBarLongPressAction: (AddressBarLongPressAction) -> Unit,
+    onManageFirefoxExtensions: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -177,6 +209,7 @@ internal fun BoxScope.BrowserAddressChrome(
     val qrScanFailureMessage = stringResource(R.string.toast_qr_scan_failed)
     val qrScanner = rememberQrCodeScanner()
     var qrScanInProgress by remember { mutableStateOf(false) }
+    var isMultilineEditorExpanded by remember(selectedTab.id, addressEditorVisible) { mutableStateOf(false) }
     val selectedSiteState = controller.siteProtectionState(selectedTab.id)
     val selectedSiteHasHost = controller.supportsPageContentActions &&
         selectedSiteState.host != null
@@ -184,12 +217,11 @@ internal fun BoxScope.BrowserAddressChrome(
         controller.blockerSettings.hideCookieConsent &&
         !selectedSiteState.isPaused
     val permissionActivityVisible = controller.hasPermissionActivity(selectedTab.id)
-    val imeBottomPx = WindowInsets.ime.getBottom(density)
-    val fullWindowHeightPx = context
-        .getSystemService(WindowManager::class.java)
-        .currentWindowMetrics
-        .bounds
-        .height()
+    val imeBottomPx = 0
+    val windowManager = remember(context) { context.getSystemService(WindowManager::class.java) }
+    val fullWindowHeightPx = remember(context.resources.configuration) {
+        windowManager?.currentWindowMetrics?.bounds?.height() ?: 0
+    }
     val visibleViewportHeightPx = AddressBarInsetRules.visibleViewportHeightPx(
         rootHeightPx = browserHeightPx.toInt(),
         fullWindowHeightPx = fullWindowHeightPx,
@@ -286,7 +318,6 @@ internal fun BoxScope.BrowserAddressChrome(
         onDispose(controller::clearAddressBarBoundsInViewport)
     }
     BrowserBottomBar(
-        onOpenMenuSettings = onOpenMenuSettings,
         menuDismissRequestId = menuDismissRequestId,
         tab = selectedTab,
         pageTranslationProvider = controller.pageTranslationProvider,
@@ -302,8 +333,7 @@ internal fun BoxScope.BrowserAddressChrome(
         addressBarStyle = controller.appearanceSettings.addressBarStyle,
         addressLoadStyle = controller.appearanceSettings.addressLoadStyle,
         actionLayout = controller.addressBarActionLayout,
-        showCastButton = !BuildConfig.FOSS_DISTRIBUTION &&
-            (controller.castMediaCandidate != null || castUiState.isConnected),
+        showCastButton = false,
         showQrScanner = !BuildConfig.FOSS_DISTRIBUTION,
         tabCount = controller.activeTabs.size,
         wideTabs = wideTabs,
@@ -330,10 +360,10 @@ internal fun BoxScope.BrowserAddressChrome(
         onAddressBarLongPress = {
             onAddressBarLongPressAction(addressBarLongPressAction)
         },
-        searchShortcutKeyword = SearchShortcutRules.match(addressValue.text, controller.searchShortcuts)
-            ?.shortcut?.keyword,
         editValue = addressValue,
         onEditValueChange = onAddressValueChanged,
+        searchShortcutKeyword = SearchShortcutRules.match(addressValue.text, controller.searchShortcuts)
+            ?.shortcut?.keyword,
         ghostCompletion = domainCompletion,
         onAcceptGhostCompletion = {
             domainCompletion?.let { completion ->
@@ -351,15 +381,15 @@ internal fun BoxScope.BrowserAddressChrome(
         onActivateAddressSuggestion = {
             val highlighted = suggestionItems.getOrNull(highlightedSuggestionIndex)
             if (highlighted == null) {
-                submitAddressOrCommand(
-                    AddressBarFieldCompletionRules.submissionText(addressValue, domainCompletion),
-                )
+                submitAddressOrCommand(addressValue.text)
             } else {
                 selectSuggestion(highlighted)
             }
         },
         onDismissEditor = { onAddressEditorDismiss() },
         onSubmitAddress = submitAddressOrCommand,
+        onToggleMultilineEditor = { isMultilineEditorExpanded = !isMultilineEditorExpanded },
+        isMultilineExpanded = isMultilineEditorExpanded,
         showAiModeToggle = showAiModeToggle,
         aiModeSelected = aiModeSelectedState.value,
         onAiModeSelectedChange = { selected ->
@@ -379,7 +409,7 @@ internal fun BoxScope.BrowserAddressChrome(
                                 Toast.LENGTH_SHORT,
                             ).show()
                         } else {
-                            controller.submitAddressFromAddressBar(scannedValue)
+                            controller.submitAddress(scannedValue)
                             onAddressEditorDismiss()
                         }
                     },
@@ -513,15 +543,14 @@ internal fun BoxScope.BrowserAddressChrome(
         canToggleDomainMute = controller.canToggleSelectedDomainMute,
         isDomainMuted = controller.isSelectedDomainMuted,
         onDomainMutedChange = controller::setSelectedDomainMuted,
-        canToggleStatusBarScroll = controller.canToggleSelectedStatusBarScroll,
-        isStatusBarScrollEnabled = controller.isSelectedStatusBarScrollEnabled,
-        onStatusBarScrollEnabledChange = controller::setSelectedStatusBarScrollEnabled,
         canToggleAlwaysBlockPopups = controller.canToggleSelectedAlwaysBlockPopups,
         isAlwaysBlockPopupsEnabled = controller.isSelectedAlwaysBlockPopups,
         onAlwaysBlockPopupsChange = controller::setSelectedAlwaysBlockPopups,
         canToggleDesktopView = controller.canToggleSelectedDesktopView,
         isDesktopView = controller.isSelectedDesktopView,
         onDesktopViewChange = controller::setSelectedDesktopView,
+        isVideoDetectionRedirectEnabled = controller.isVideoDetectionRedirectEnabled,
+        onVideoDetectionRedirectEnabledChange = controller::updateActiveProfileVideoDetectionRedirect,
         canToggleCookieBannerRemoval = canToggleSelectedCookieBannerRemoval,
         isCookieBannerRemovalEnabled = canToggleSelectedCookieBannerRemoval &&
             !selectedSiteState.cookieBannerRemovalDisabled,
@@ -531,6 +560,12 @@ internal fun BoxScope.BrowserAddressChrome(
         isForcePageZoomingEnabled = selectedSiteState.forcePageZooming,
         canToggleForceSafeArea = selectedSiteHasHost,
         isForceSafeAreaEnabled = selectedSiteState.forceSafeArea,
+        canToggleAllAdBlockers = true,
+        isAllAdBlockersEnabled = controller.blockerSettings.blockAdsAndTrackers,
+        onAllAdBlockersChange = { enabled ->
+            controller.toggleAllAdBlockers(enabled)
+            rootView.performConfirmHaptic()
+        },
         onCookieBannerRemovalEnabledChange = { enabled ->
             if (controller.setCookieBannerRemovalDisabled(selectedTab.id, !enabled)) {
                 rootView.performConfirmHaptic()
@@ -556,11 +591,6 @@ internal fun BoxScope.BrowserAddressChrome(
             onAddressEditorDismiss()
             onSnoozedTabs()
         },
-        onOpenFeeds = onOpenFeeds,
-        onOpenLibrary = onOpenLibrary,
-        onDiscoverFeeds = onDiscoverFeeds,
-        unreadFeedCount = unreadFeedCount,
-        canDiscoverFeeds = !selectedTab.isIncognito,
         onFavorites = {
             onAddressEditorDismiss()
             onOpenFavorites()
@@ -573,20 +603,15 @@ internal fun BoxScope.BrowserAddressChrome(
             onAddressEditorDismiss()
             onOpenHistory()
         },
-        workflowActions = controller.customWorkflowConfiguration.surfaceActions(),
-        onWorkflow = { id -> controller.runCustomWorkflow(id) },
-        onManageWorkflows = onManageWorkflows,
-        onOpenRssFeeds = onOpenRssFeeds?.let { openFeeds ->
-            {
-                onAddressEditorDismiss()
-                openFeeds()
-            }
-        },
         firefoxExtensionActions = controller.firefoxExtensionActions,
         menuLayout = controller.browserMenuLayout,
         onFirefoxExtensionAction = { actionKey ->
             onAddressEditorDismiss()
             controller.clickFirefoxExtensionAction(actionKey)
+        },
+        onManageFirefoxExtensions = {
+            onAddressEditorDismiss()
+            onManageFirefoxExtensions()
         },
         onSettings = {
             onAddressEditorDismiss()
@@ -612,15 +637,8 @@ internal fun BoxScope.BrowserAddressChrome(
             onAddressEditorDismiss()
             controller.showPageAnnotations()
         },
-        canOpenConstellations = controller.canOpenConstellations,
-        onOpenConstellations = {
-            onAddressEditorDismiss()
-            controller.openConstellations()
-        },
         onSnooze = onSnooze,
         onAddSiteCapsule = onAddSiteCapsule,
-        canCreateSiteWidget = canCreateSiteWidget,
-        onCreateSiteWidget = onCreateSiteWidget,
         onBarPositioned = { boundsInRoot, _ ->
             addressBarBoundsInRoot = boundsInRoot
             if (
@@ -643,7 +661,7 @@ internal fun BoxScope.BrowserAddressChrome(
                 when {
                     commandFeedback != null && !tabOverviewVisible -> 30f
                     addressBarMorphInFront -> 20f
-                    else -> 1f
+                    else -> 0f
                 },
             ),
     )
@@ -670,4 +688,8 @@ internal fun BoxScope.BrowserAddressChrome(
         )
     }
 
+    androidx.activity.compose.BackHandler(enabled = addressEditorVisible) {
+        onAddressEditorDismiss()
+    }
 }
+

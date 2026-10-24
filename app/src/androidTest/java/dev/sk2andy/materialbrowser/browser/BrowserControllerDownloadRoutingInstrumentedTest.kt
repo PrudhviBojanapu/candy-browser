@@ -57,10 +57,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun engineResponseOffersOneDmChoiceAndBuiltInKeepsOriginalResponse() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -83,10 +80,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
             val browser = BrowserController(
                 activity = activity,
                 requestDownloadNotificationPermission = { notificationPermissionRequests++ },
-            ).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            ).also { controller = it }
             browser.onStart()
             browser.updateDownloadSettings(
                 BrowserDownloadSettings(managerMode = DownloadManagerMode.BuiltIn),
@@ -102,10 +96,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun dismissingChoiceReleasesOriginalResponseWithoutDownloading() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -122,10 +113,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun unavailableExternalManagerFallsBackToOriginalResponse() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { emptyList() }
             browser.updateDownloadSettings(BrowserDownloadSettings(
@@ -150,10 +138,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
         )
         try {
             activityRule.scenario.onActivity { activity ->
-                val browser = BrowserController(activity).also { browser ->
-                    controller = browser
-                    browser.downloadDuplicateLookupForTesting = { null }
-                }
+                val browser = BrowserController(activity).also { controller = it }
                 browser.onStart()
                 browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
                 browser.updateDownloadSettings(BrowserDownloadSettings(
@@ -176,10 +161,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun blobResponseStaysInsideEngineEvenWhenExternalManagerSelected() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -195,10 +177,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun closedSourceTabReleasesQueuedResponseInsteadOfStartingStaleTransfer() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -216,10 +195,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun closedSourceReleasesItsPendingAndQueuedResponsesButPreservesOtherSource() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -246,10 +222,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun closingQueuedSourcePreservesUnrelatedPendingResponse() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -272,10 +245,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun staleChooserCallbacksCannotConfirmOrDismissPromotedResponse() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -310,10 +280,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
         )
         try {
             activityRule.scenario.onActivity { activity ->
-                val browser = BrowserController(activity).also { browser ->
-                    controller = browser
-                    browser.downloadDuplicateLookupForTesting = { null }
-                }
+                val browser = BrowserController(activity).also { controller = it }
                 browser.onStart()
                 browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
                 browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -335,10 +302,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun closedContextSourceRejectsBuiltInChoiceWithoutUsingClosedSession() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -360,10 +324,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun navigatedContextSourceRejectsDeferredChoice() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -384,10 +345,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun dismissedExternalPreviewReleasesDeferredResponse() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -413,10 +371,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
         )
         try {
             activityRule.scenario.onActivity { activity ->
-                val browser = BrowserController(activity).also { browser ->
-                    controller = browser
-                    browser.downloadDuplicateLookupForTesting = { null }
-                }
+                val browser = BrowserController(activity).also { controller = it }
                 browser.onStart()
                 browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
                 browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -444,10 +399,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun dismissingPreviewChoicePreservesNextIndependentResponse() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))
@@ -471,10 +423,7 @@ class BrowserControllerDownloadRoutingInstrumentedTest {
     @Test
     fun previewNavigationRoundTripRejectsOldDeferredResponse() {
         activityRule.scenario.onActivity { activity ->
-            val browser = BrowserController(activity).also { browser ->
-                controller = browser
-                browser.downloadDuplicateLookupForTesting = { null }
-            }
+            val browser = BrowserController(activity).also { controller = it }
             browser.onStart()
             browser.externalDownloadDiscoveryForTesting = { listOf(oneDm) }
             browser.updateDownloadSettings(BrowserDownloadSettings(managerMode = DownloadManagerMode.AskEveryTime))

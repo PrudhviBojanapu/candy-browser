@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,6 +47,8 @@ import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -157,9 +160,17 @@ internal fun AddressSuggestions(
         tonalElevation = 12.dp,
         shadowElevation = 12.dp,
     )
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    var isImeMoving by remember { mutableStateOf(false) }
+    LaunchedEffect(imeBottom) {
+        isImeMoving = true
+        kotlinx.coroutines.delay(100)
+        isImeMoving = false
+    }
     CandyChromeSurface(
         backdropSource = backdropSource,
         tokens = chromeTokens,
+        autoUpdateBlur = !isImeMoving,
         modifier = modifier
             .padding(horizontal = 12.dp)
             .padding(bottom = bottomPadding)

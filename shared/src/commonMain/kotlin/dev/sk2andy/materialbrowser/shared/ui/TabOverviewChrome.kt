@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,7 +33,6 @@ object TabOverviewChromeTestTags {
     const val More = "tab_overview_more"
     const val PinnedTabsJump = "tab_overview_pinned_tabs_jump"
     const val Settings = "tab_overview_settings"
-    const val ReaderStudio = "tab_overview_reader_studio"
 }
 
 @Composable
@@ -61,7 +61,7 @@ fun TabOverviewBottomChrome(
     ) {
         leadingAction()
         trailingAction()
-        LocalCandyBrowserChromeEffects.current.floatingSurface(
+        Surface(
             modifier = Modifier
                 .width(112.dp)
                 .height(56.dp)

@@ -77,6 +77,8 @@ internal interface GeckoRuntimeHandle {
     fun clearAllData(onComplete: (Boolean) -> Unit = {}) {
         clearBrowsingData(GeckoBrowsingData.All, onComplete)
     }
+
+    fun onTrimMemory(level: Int) = Unit
 }
 
 /** Creates GeckoRuntime through an application-context-owned integration edge. */
@@ -116,6 +118,10 @@ internal object GeckoRuntimeOwner {
     @UiThread
     fun unbindWebAuthnActivityDelegate(delegate: GeckoRuntime.ActivityDelegate) {
         runtime?.unbindWebAuthnActivityDelegate(delegate)
+    }
+
+    fun onTrimMemory(level: Int) {
+        runtime?.onTrimMemory(level)
     }
 
     @VisibleForTesting

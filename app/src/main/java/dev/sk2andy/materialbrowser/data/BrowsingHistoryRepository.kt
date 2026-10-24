@@ -35,7 +35,6 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val store = BrowserSessionStore(appContext)
     private val recallRepository = RecallRepository.get(appContext)
-    private val constellationRepository = ConstellationRepository.get(appContext)
 
     @Synchronized
     fun snapshot(): List<HistoryEntry> = store.loadHistory()
@@ -50,8 +49,7 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
         if (updated == current) return HistoryRecordResult(history = current, recorded = false)
         val retainedKeys = updated.mapNotNullTo(hashSetOf(), ::documentKey)
         val evicted = current.filter { existing -> documentKey(existing) !in retainedKeys }
-        if (evicted.isNotEmpty() && (!recallRepository.deleteEntries(evicted) ||
-                !constellationRepository.deleteEntries(evicted))) {
+        if (evicted.isNotEmpty() && !recallRepository.deleteEntries(evicted)) {
             return HistoryRecordResult(history = current, recorded = false)
         }
         val committed = store.commitHistory(updated)
@@ -64,7 +62,7 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
     @Synchronized
     fun remove(entries: Collection<HistoryEntry>): HistoryMutationResult {
         val current = store.loadHistory()
-        if (!recallRepository.deleteEntries(entries) || !constellationRepository.deleteEntries(entries)) {
+        if (!recallRepository.deleteEntries(entries)) {
             return HistoryMutationResult(history = current, committed = false)
         }
         return mutateResult(current) { history ->
@@ -78,8 +76,7 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
         trailTabIds: Set<String> = emptySet(),
         recallAlreadyDeleted: Boolean = false,
     ): HistoryMutationResult {
-        if ((!recallAlreadyDeleted && !recallRepository.deleteProfiles(profileIds)) ||
-            !constellationRepository.deleteProfiles(profileIds)) {
+        if (!recallAlreadyDeleted && !recallRepository.deleteProfiles(profileIds)) {
             return HistoryMutationResult(history = store.loadHistory(), committed = false)
         }
         return mutateWithTrailRedaction(trailTabIds) { current ->
@@ -92,7 +89,7 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
         request: HistoryClearRequest,
         trailTabIds: Set<String> = emptySet(),
     ): HistoryMutationResult {
-        if (!recallRepository.deleteRange(request) || !constellationRepository.deleteRange(request)) {
+        if (!recallRepository.deleteRange(request)) {
             return HistoryMutationResult(history = store.loadHistory(), committed = false)
         }
         return mutateWithTrailRedaction(
@@ -107,7 +104,7 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
     @Synchronized
     fun clear(): HistoryMutationResult {
         val current = store.loadHistory()
-        if (!recallRepository.clear() || !constellationRepository.clear()) {
+        if (!recallRepository.clear()) {
             return HistoryMutationResult(history = current, committed = false)
         }
         return mutateResult(current) { emptyList() }
@@ -164,18 +161,7 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
                 ),
             )
         }
-        val constellationsCleared = if (untilExclusiveMillis == Long.MAX_VALUE) {
-            constellationRepository.clear()
-        } else {
-            constellationRepository.deleteRange(
-                HistoryClearRequest(
-                    profileIds = regularProfileIds(),
-                    sinceInclusiveMillis = Long.MIN_VALUE,
-                    untilExclusiveMillis = untilExclusiveMillis,
-                ),
-            )
-        }
-        if (!recallCleared || !constellationsCleared) return false
+        if (!recallCleared) return false
         return synchronized(this) {
             val sessionStillCurrent = isSessionCurrent()
             val retainedHistory = if (sessionStillCurrent) {
@@ -240,7 +226,7 @@ internal class BrowsingHistoryRepository private constructor(context: Context) {
         retainedHistory: List<HistoryEntry> = emptyList(),
         untilExclusiveMillis: Long = Long.MAX_VALUE,
     ): Boolean {
-        if (clearRecall && (!recallRepository.clear() || !constellationRepository.clear())) return false
+        if (clearRecall && !recallRepository.clear()) return false
         val redaction = trailRedaction(
             tabIds = persistentRegularTabIds(),
             sinceInclusiveMillis = Long.MIN_VALUE,

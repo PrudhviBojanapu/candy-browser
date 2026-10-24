@@ -57,10 +57,10 @@ internal fun SettingsHomePage(
         onOpenFirefoxExtensions = onOpenFirefoxExtensions,
         developerOptionsUnlocked = developerOptionsUnlocked,
         onUnlockDeveloperOptions = onUnlockDeveloperOptions,
-        separateTabControls = true,
-        hasAppIconSetting = true,
-        separateHistoryData = true,
-        separateExtensionsGroup = true,
+        separateTabControls = false,
+        hasAppIconSetting = false,
+        separateHistoryData = false,
+        separateExtensionsGroup = false,
         showHomeItems = searchQuery.isBlank(),
         searchContent = {
             SettingsSearchField(
@@ -80,11 +80,8 @@ private object AndroidSettingsHomeResources : SettingsHomeResources {
             SettingsHomeLabel.Title -> R.string.settings_title
             SettingsHomeLabel.Back -> R.string.action_back
             SettingsHomeLabel.BrowsingGroup -> R.string.settings_home_group_browsing
-            SettingsHomeLabel.TabsGroup -> R.string.settings_home_group_tabs
-            SettingsHomeLabel.ControlsGroup -> R.string.settings_home_group_controls
             SettingsHomeLabel.PersonalizationGroup ->
                 R.string.settings_home_group_personalization
-            SettingsHomeLabel.ExtensionsGroup -> R.string.settings_home_group_extensions
             SettingsHomeLabel.PrivacyDataGroup -> R.string.settings_home_group_privacy_data
             SettingsHomeLabel.AboutGroup -> R.string.settings_home_group_about
             SettingsHomeLabel.SearchTitle -> R.string.settings_section_search
@@ -94,21 +91,13 @@ private object AndroidSettingsHomeResources : SettingsHomeResources {
             SettingsHomeLabel.TabsAndGesturesTitle -> R.string.settings_tabs_gestures_title
             SettingsHomeLabel.TabsAndGesturesSummary ->
                 R.string.settings_home_tabs_gestures_summary
-            SettingsHomeLabel.TabsTitle -> R.string.settings_home_tabs_title
-            SettingsHomeLabel.TabsSummary -> R.string.settings_home_tabs_summary
-            SettingsHomeLabel.GesturesTitle -> R.string.settings_home_gestures_title
-            SettingsHomeLabel.GesturesSummary -> R.string.settings_home_gestures_summary
             SettingsHomeLabel.AppearanceTitle -> R.string.settings_appearance_title
             SettingsHomeLabel.AppearanceSummary -> R.string.settings_home_appearance_summary
-            SettingsHomeLabel.AppIconTitle -> R.string.settings_app_icon
-            SettingsHomeLabel.AppIconSummary -> R.string.settings_home_app_icon_summary
             SettingsHomeLabel.BrowserTitle -> R.string.settings_section_browser
             SettingsHomeLabel.BrowserSummary -> R.string.settings_home_browser_summary
             SettingsHomeLabel.PlayerTitle -> R.string.settings_player_title
             SettingsHomeLabel.PlayerSummary -> R.string.settings_home_player_summary
             SettingsHomeLabel.DownloadsTitle -> R.string.settings_downloads_title
-            SettingsHomeLabel.RssFeedsTitle -> R.string.rss_settings_title
-            SettingsHomeLabel.RssFeedsSummary -> R.string.rss_settings_summary
             SettingsHomeLabel.UserscriptsTitle -> R.string.userscript_title
             SettingsHomeLabel.UserscriptsSummary -> R.string.settings_home_userscripts_summary
             SettingsHomeLabel.FirefoxExtensionsTitle -> R.string.gecko_extensions_title
@@ -119,14 +108,13 @@ private object AndroidSettingsHomeResources : SettingsHomeResources {
                 R.string.settings_protection_data_title
             SettingsHomeLabel.ProtectionAndDataSummary ->
                 R.string.settings_home_protection_summary
-            SettingsHomeLabel.HistoryAndDataTitle -> R.string.settings_home_history_title
-            SettingsHomeLabel.HistoryAndDataSummary -> R.string.settings_home_history_summary
             SettingsHomeLabel.DeveloperOptionsTitle -> R.string.developer_options_title
             SettingsHomeLabel.DeveloperOptionsSummary -> R.string.developer_options_summary
             SettingsHomeLabel.UnlockDeveloperOptions ->
                 R.string.developer_options_unlock_action
             SettingsHomeLabel.AboutLegalTitle -> R.string.settings_section_about_legal
             SettingsHomeLabel.AboutLegalSummary -> R.string.settings_home_about_summary
+            else -> R.string.settings_title
         },
     )
 }
@@ -148,7 +136,6 @@ private fun AndroidSettingsHomeIcon(
         SettingsHomeIcon.Browser -> Icons.Default.Settings
         SettingsHomeIcon.Player -> Icons.Default.PlayArrow
         SettingsHomeIcon.Downloads -> ImageVector.vectorResource(R.drawable.ic_reader_download)
-        SettingsHomeIcon.RssFeeds -> ImageVector.vectorResource(R.drawable.ic_rss)
         SettingsHomeIcon.Userscripts -> ImageVector.vectorResource(R.drawable.ic_symbol_auto_awesome)
         SettingsHomeIcon.FirefoxExtensions -> ImageVector.vectorResource(R.drawable.ic_symbol_extension)
         SettingsHomeIcon.SiteCapsules -> Icons.Default.Favorite
@@ -156,6 +143,7 @@ private fun AndroidSettingsHomeIcon(
         SettingsHomeIcon.HistoryAndData -> ImageVector.vectorResource(R.drawable.ic_history)
         SettingsHomeIcon.DeveloperOptions -> Icons.Default.Build
         SettingsHomeIcon.AboutLegal -> Icons.Default.Info
+        else -> Icons.Default.Info
     }
     Icon(
         imageVector = vector,

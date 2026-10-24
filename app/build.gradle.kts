@@ -64,7 +64,7 @@ abstract class GenerateGeckoContentTopInsetScript : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val source = sourceFile.get().asFile.readText(Charsets.UTF_8)
+        val source = sourceFile.get().asFile.readText(Charsets.UTF_8).replace("\r\n", "\n")
         val template = source
             .substringAfter("        \"\"\"\n", missingDelimiterValue = "")
             .substringBefore("\n        \"\"\".trimIndent()", missingDelimiterValue = "")
@@ -92,7 +92,7 @@ abstract class GenerateSystemWebViewThirdPartyNotices : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val source = sourceFile.get().asFile.readText(Charsets.UTF_8)
+        val source = sourceFile.get().asFile.readText(Charsets.UTF_8).replace("\r\n", "\n")
         val geckoSectionStart = "\nGecko default extensions\n------------------------\n"
         val apacheLicenseStart = "\n\n                                 Apache License"
         val startIndex = source.indexOf(geckoSectionStart)
@@ -116,12 +116,12 @@ abstract class GenerateSystemWebViewThirdPartyNotices : DefaultTask() {
 }
 
 plugins {
-    id("com.android.application")
+    id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val releaseKeystorePropertiesFile = rootProject.file("keystore.properties")
+val releaseKeystorePropertiesFile = file("$projectDir/../keystore.properties")
 val releaseKeystoreProperties = Properties().apply {
     if (releaseKeystorePropertiesFile.isFile) {
         releaseKeystorePropertiesFile.inputStream().use(::load)
@@ -174,14 +174,11 @@ val missingPlayUploadSigningValues = playUploadSigningValues.filterValues { it =
 val hasPlayUploadSigning = missingPlayUploadSigningValues.isEmpty()
 val candyVersionCode = providers.gradleProperty("candy.versionCode").orElse("1")
 val candyVersionName = providers.gradleProperty("candy.versionName").orElse("0.1")
-val playNightly = providers.gradleProperty("candy.playNightly")
-    .map(String::toBooleanStrict)
-    .orElse(false)
 val candyReleaseNotesFile = providers.gradleProperty("candy.releaseNotesFile")
     .orElse(candyVersionName.map { version -> "release-notes/$version.md" })
 val releaseNotesImageSyntax = Regex("""!\[([^]]+)]\(([^)]+)\)""")
 val releaseNotesImageFiles = providers.provider {
-    val notes = rootProject.file(candyReleaseNotesFile.get())
+    val notes = file("$projectDir/../${candyReleaseNotesFile.get()}")
     if (!notes.isFile) {
         emptyList()
     } else {
@@ -192,7 +189,7 @@ val releaseNotesImageFiles = providers.provider {
                 match.groupValues[2]
                     .takeIf { target -> target.startsWith(prefix) }
                     ?.removePrefix(prefix)
-                    ?.let { fileName -> rootProject.file("docs/screenshots/$fileName") }
+                    ?.let { fileName -> file("$projectDir/../docs/screenshots/$fileName") }
             }
             .toList()
     }
@@ -216,27 +213,24 @@ val releaseAbi = providers.gradleProperty("candy.releaseAbi").map { value ->
 }
 val compressNativeLibs = providers.gradleProperty("candy.compressNativeLibs")
     .map(String::toBooleanStrict)
-    .orElse(false)
+    .orElse(true)
 val performanceDiagnostics = providers.gradleProperty("candy.performanceDiagnostics")
     .map(String::toBooleanStrict)
     .orElse(false)
 
 android {
     namespace = "dev.sk2andy.materialbrowser"
-    ndkVersion = "27.2.12479018"
     compileSdk = 37
     compileSdkMinor = 1
 
     defaultConfig {
-        applicationId = "dev.sk2andy.materialbrowser"
         minSdk = 33
-        targetSdk = 36
-        versionCode = candyVersionCode.get().toInt()
-        versionName = candyVersionName.get()
         manifestPlaceholders["appLabel"] = "@string/app_name"
         manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config"
+        buildConfigField("String", "VERSION_NAME", "\"${candyVersionName.get()}\"")
+        buildConfigField("int", "VERSION_CODE", candyVersionCode.get().toString())
+        buildConfigField("String", "APPLICATION_ID", "\"app.myaioapp\"")
         buildConfigField("boolean", "ENABLE_GITHUB_UPDATES", "false")
-        buildConfigField("boolean", "NIGHTLY_BUILD", "false")
         buildConfigField("boolean", "FOSS_DISTRIBUTION", "false")
         buildConfigField("boolean", "SYSTEM_WEBVIEW_ONLY", "false")
         buildConfigField("boolean", "TRUST_USER_CERTIFICATES", "false")
@@ -251,10 +245,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        releaseAbi.orNull?.let { abi ->
-            ndk {
-                abiFilters += abi
-            }
+        ndk {
+            abiFilters.clear()
+            abiFilters += "arm64-v8a"
         }
     }
 
@@ -266,7 +259,6 @@ android {
 
         create("foss") {
             dimension = "distribution"
-            applicationIdSuffix = ".foss"
             manifestPlaceholders["appLabel"] = "Candy FOSS"
             buildConfigField("boolean", "FOSS_DISTRIBUTION", "true")
             proguardFile("proguard-foss-rules.pro")
@@ -274,45 +266,19 @@ android {
 
         create("systemwebview") {
             dimension = "distribution"
-            applicationIdSuffix = ".systemwebview"
             manifestPlaceholders["appLabel"] = "Candy System WebView"
             manifestPlaceholders["performanceDiagnosticsEnabled"] = "false"
             buildConfigField("boolean", "SYSTEM_WEBVIEW_ONLY", "true")
         }
     }
 
-    signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
-                storeFile = rootProject.file(requireNotNull(releaseSigningValues["storeFile"]))
-                storePassword = requireNotNull(releaseSigningValues["storePassword"])
-                keyAlias = requireNotNull(releaseSigningValues["keyAlias"])
-                keyPassword = requireNotNull(releaseSigningValues["keyPassword"])
-            }
-        }
-        if (hasPlayUploadSigning) {
-            create("playUpload") {
-                storeFile = rootProject.file(requireNotNull(playUploadSigningValues["storeFile"]))
-                storePassword = requireNotNull(playUploadSigningValues["storePassword"])
-                keyAlias = requireNotNull(playUploadSigningValues["keyAlias"])
-                keyPassword = requireNotNull(playUploadSigningValues["keyPassword"])
-            }
-        }
-    }
-
     buildTypes {
         debug {
-            applicationIdSuffix = debugApplicationIdSuffix.get()
-            versionNameSuffix = "-debug"
             manifestPlaceholders["appLabel"] = debugAppLabel.get()
         }
 
         release {
-            isMinifyEnabled = true
             buildConfigField("boolean", "ENABLE_GITHUB_UPDATES", "true")
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
-            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -321,8 +287,6 @@ android {
 
         create("localRelease") {
             initWith(getByName("release"))
-            applicationIdSuffix = localReleaseApplicationIdSuffix.get()
-            versionNameSuffix = "-local"
             manifestPlaceholders["appLabel"] = localReleaseAppLabel.get()
             buildConfigField("boolean", "ENABLE_GITHUB_UPDATES", "false")
             matchingFallbacks += listOf("release")
@@ -331,14 +295,11 @@ android {
         create("playRelease") {
             initWith(getByName("release"))
             buildConfigField("boolean", "ENABLE_GITHUB_UPDATES", "false")
-            buildConfigField("boolean", "NIGHTLY_BUILD", playNightly.get().toString())
-            signingConfig = signingConfigs.findByName("playUpload")
             matchingFallbacks += listOf("release")
         }
 
         create("userCaDebug") {
             initWith(getByName("debug"))
-            applicationIdSuffix = ".ca.debug"
             manifestPlaceholders["appLabel"] = "Candy CA Debug"
             manifestPlaceholders["networkSecurityConfig"] =
                 "@xml/network_security_config_user_ca"
@@ -348,34 +309,15 @@ android {
 
         create("userCaRelease") {
             initWith(getByName("release"))
-            applicationIdSuffix = ".ca"
             manifestPlaceholders["appLabel"] = "Candy CA"
             manifestPlaceholders["networkSecurityConfig"] =
                 "@xml/network_security_config_user_ca"
             buildConfigField("boolean", "TRUST_USER_CERTIFICATES", "true")
             matchingFallbacks += listOf("release")
         }
-
-        create("nightly") {
-            initWith(getByName("release"))
-            applicationIdSuffix = ".nightly"
-            buildConfigField("boolean", "NIGHTLY_BUILD", "true")
-            matchingFallbacks += listOf("release")
-        }
-
-        create("userCaNightly") {
-            initWith(getByName("userCaRelease"))
-            applicationIdSuffix = ".ca.nightly"
-            manifestPlaceholders["appLabel"] = "Candy CA Nightly"
-            buildConfigField("boolean", "NIGHTLY_BUILD", "true")
-            matchingFallbacks += listOf("release")
-        }
     }
 
     sourceSets {
-        getByName("main").assets.srcDir(
-            layout.buildDirectory.dir("generated/candySyncIcons/assets").get().asFile,
-        )
         getByName("main").assets.srcDir(
             layout.buildDirectory.dir("generated/releaseNotes/assets").get().asFile,
         )
@@ -393,7 +335,6 @@ android {
         )
         getByName("userCaDebug").res.srcDir("src/userCa/res")
         getByName("userCaRelease").res.srcDir("src/userCa/res")
-        getByName("userCaNightly").res.srcDir("src/userCa/res")
     }
 
     compileOptions {
@@ -418,40 +359,8 @@ android {
     }
 }
 
-androidComponents {
-    beforeVariants(selector().withBuildType("playRelease")) { variant ->
-        variant.enable = variant.productFlavors.toMap()["distribution"] == "full"
-    }
-
-    beforeVariants(selector().withBuildType("userCaNightly")) { variant ->
-        variant.enable = variant.productFlavors.toMap()["distribution"] == "full"
-    }
-
-    onVariants { variant ->
-        if (variant.buildType == "nightly") {
-            val appLabel = when (variant.productFlavors.toMap()["distribution"]) {
-                "full" -> "Candy Browser Nightly"
-                "foss" -> "Candy FOSS Nightly"
-                "systemwebview" -> "Candy System WebView Nightly"
-                else -> error("Unknown nightly distribution: ${variant.name}")
-            }
-            variant.manifestPlaceholders.put("appLabel", appLabel)
-        }
-        val capitalizedVariantName = variant.name.replaceFirstChar(Char::uppercaseChar)
-        val generateLauncherShortcuts = tasks.register<GenerateLauncherShortcutResources>(
-            "generate${capitalizedVariantName}LauncherShortcutResources",
-        ) {
-            applicationId.set(variant.applicationId)
-        }
-        variant.sources.res?.addGeneratedSourceDirectory(
-            generateLauncherShortcuts,
-            GenerateLauncherShortcutResources::outputDirectory,
-        )
-    }
-}
-
 val generateCandySyncDeviceIconAsset by tasks.registering(Copy::class) {
-    val catalog = rootProject.file("sync/protocol/device-icons-v1.json")
+    val catalog = file("$projectDir/../sync/protocol/device-icons-v1.json")
     inputs.file(catalog)
     from(catalog)
     into(layout.buildDirectory.dir("generated/candySyncIcons/assets"))
@@ -474,12 +383,6 @@ tasks.matching { task ->
     task.name.endsWith("Build") && task.name.startsWith("preSystemwebview")
 }.configureEach {
     dependsOn(generateSystemWebViewThirdPartyNotices)
-}
-
-val generateGeckoFormDraftAsset by tasks.registering(Copy::class) {
-    from(layout.projectDirectory.file("src/main/assets/web_text_operations.js"))
-    from(layout.projectDirectory.file("src/main/assets/form_drafts.js"))
-    into(layout.buildDirectory.dir("generated/geckoPrivacy/assets/candy_privacy"))
 }
 
 val generateGeckoPrivacyRuleAssets by tasks.registering(Sync::class) {
@@ -507,10 +410,10 @@ val generateGeckoContentTopInsetScript by tasks.registering(
 val verifyGeckoDefaultExtensionAssets by tasks.registering(Exec::class) {
     group = "verification"
     description = "Verifies pinned Gecko default-extension identities and XPI integrity."
-    workingDir(rootProject.projectDir)
+    workingDir(file("$projectDir/.."))
     commandLine(
         "python3",
-        rootProject.file("scripts/generate_gecko_default_extensions.py"),
+        file("$projectDir/../scripts/generate_gecko_default_extensions.py"),
         "verify",
     )
     inputs.file(
@@ -527,16 +430,14 @@ tasks.matching { task ->
     task.name.endsWith("Build") &&
         (task.name.startsWith("preFull") || task.name.startsWith("preFoss"))
 }.configureEach {
-    dependsOn(generateGeckoFormDraftAsset)
     dependsOn(generateGeckoPrivacyRuleAssets)
     dependsOn(generateGeckoContentTopInsetScript)
-    dependsOn(verifyGeckoDefaultExtensionAssets)
 }
 
 val validateReleaseNotes by tasks.registering {
     group = "verification"
     description = "Validates the Markdown release notes packaged into the app."
-    val releaseNotes = candyReleaseNotesFile.map(rootProject::file)
+    val releaseNotes = candyReleaseNotesFile.map { file("$projectDir/../$it") }
     inputs.property("releaseNotesVersion", candyVersionName)
     inputs.property("releaseNotesPath", candyReleaseNotesFile)
     inputs.file(releaseNotes)
@@ -597,7 +498,7 @@ val validateReleaseNotes by tasks.registering {
             check(fileName.matches(Regex("""[A-Za-z0-9][A-Za-z0-9._-]*\.(png|jpe?g|webp)"""))) {
                 "Unsupported release-note screenshot path: $fileName."
             }
-            rootProject.file("docs/screenshots/$fileName").also { image ->
+            file("$projectDir/../docs/screenshots/$fileName").also { image ->
                 check(image.isFile) { "Release-note screenshot does not exist: ${image.absolutePath}" }
                 check(image.length() in 1..2_097_152) {
                     "Release-note screenshot must contain 1..2097152 bytes: ${image.absolutePath}."
@@ -612,19 +513,14 @@ val validateReleaseNotes by tasks.registering {
 
 val generateReleaseNotesAsset by tasks.registering(Sync::class) {
     dependsOn(validateReleaseNotes)
-    inputs.files(releaseNotesImageFiles)
-    from(candyReleaseNotesFile.map(rootProject::file)) {
+    from(candyReleaseNotesFile.map { file("$projectDir/../$it") }) {
         rename { "candy_release_notes.md" }
-    }
-    from(releaseNotesImageFiles) {
-        into("release-notes-images")
     }
     into(layout.buildDirectory.dir("generated/releaseNotes/assets"))
     duplicatesStrategy = DuplicatesStrategy.FAIL
 }
 
 tasks.named("preBuild").configure {
-    dependsOn(generateCandySyncDeviceIconAsset)
     dependsOn(generateReleaseNotesAsset)
 }
 
@@ -638,7 +534,7 @@ val validateReleaseSigning by tasks.registering {
                 "Configure keystore.properties or the CANDY_RELEASE_* environment variables."
         }
 
-        val keystoreFile = rootProject.file(requireNotNull(releaseSigningValues["storeFile"]))
+        val keystoreFile = file("$projectDir/../${requireNotNull(releaseSigningValues["storeFile"])}")
         check(keystoreFile.isFile) {
             "Release keystore does not exist: ${keystoreFile.absolutePath}"
         }
@@ -649,89 +545,76 @@ tasks.matching {
     it.name == "preFullReleaseBuild" ||
         it.name == "preFullLocalReleaseBuild" ||
         it.name == "preFullUserCaReleaseBuild" ||
-        it.name == "preSystemwebviewReleaseBuild" ||
-        it.name == "preFullNightlyBuild" ||
-        it.name == "preFossNightlyBuild" ||
-        it.name == "preSystemwebviewNightlyBuild" ||
-        it.name == "preFullUserCaNightlyBuild"
+        it.name == "preSystemwebviewReleaseBuild"
 }.configureEach {
     dependsOn(validateReleaseSigning)
 }
 
-listOf("release", "nightly").forEach { buildType ->
-    val capitalizedBuildType = buildType.replaceFirstChar(Char::uppercaseChar)
-    val verifySystemWebViewDependencies = tasks.register("verifySystemWebView${capitalizedBuildType}Dependencies") {
-        group = "verification"
-        description = "Rejects GeckoView from the System WebView-only release runtime."
+val verifySystemWebViewReleaseDependencies by tasks.registering {
+    group = "verification"
+    description = "Rejects GeckoView from the System WebView-only release runtime."
 
-        doLast {
-            val violations = configurations.getByName("systemwebview${capitalizedBuildType}RuntimeClasspath")
-                .incoming
-                .resolutionResult
-                .allComponents
-                .mapNotNull { it.moduleVersion }
-                .filter { module -> module.group == "org.mozilla.geckoview" }
-                .map { it.toString() }
-                .sorted()
+    doLast {
+        val violations = configurations.getByName("systemwebviewReleaseRuntimeClasspath")
+            .incoming
+            .resolutionResult
+            .allComponents
+            .mapNotNull { it.moduleVersion }
+            .filter { module -> module.group == "org.mozilla.geckoview" }
+            .map { it.toString() }
+            .sorted()
 
-            check(violations.isEmpty()) {
-                "System WebView release contains GeckoView runtime dependencies: " +
-                    violations.joinToString()
-            }
+        check(violations.isEmpty()) {
+            "System WebView release contains GeckoView runtime dependencies: " +
+                violations.joinToString()
         }
     }
+}
 
-    tasks.matching { it.name == "preSystemwebview${capitalizedBuildType}Build" }.configureEach {
-        dependsOn(verifySystemWebViewDependencies)
-    }
+tasks.matching { it.name == "preSystemwebviewReleaseBuild" }.configureEach {
+    dependsOn(verifySystemWebViewReleaseDependencies)
+}
 
-    val verifyFossDependencies = tasks.register("verifyFoss${capitalizedBuildType}Dependencies") {
-        group = "verification"
-        description = "Rejects proprietary Google runtime dependencies from the FOSS release."
+val verifyFossReleaseDependencies by tasks.registering {
+    group = "verification"
+    description = "Rejects proprietary Google runtime dependencies from the FOSS release."
 
-        doLast {
-            val forbiddenGroups = listOf(
-                "com.google.android.datatransport",
-                "com.google.android.gms",
-                "com.google.android.odml",
-                "com.google.firebase",
-                "com.google.mlkit",
-            )
-            val violations = configurations.getByName("foss${capitalizedBuildType}RuntimeClasspath")
-                .incoming
-                .resolutionResult
-                .allComponents
-                .mapNotNull { it.moduleVersion }
-                .filter { module ->
-                    forbiddenGroups.any { group ->
-                        module.group == group || module.group.startsWith("$group.")
-                    }
+    doLast {
+        val forbiddenGroups = listOf(
+            "com.google.android.datatransport",
+            "com.google.android.gms",
+            "com.google.android.odml",
+            "com.google.firebase",
+            "com.google.mlkit",
+        )
+        val violations = configurations.getByName("fossReleaseRuntimeClasspath")
+            .incoming
+            .resolutionResult
+            .allComponents
+            .mapNotNull { it.moduleVersion }
+            .filter { module ->
+                forbiddenGroups.any { group ->
+                    module.group == group || module.group.startsWith("$group.")
                 }
-                .map { it.toString() }
-                .sorted()
-
-            check(violations.isEmpty()) {
-                "FOSS release contains forbidden Google runtime dependencies: " +
-                    violations.joinToString()
             }
+            .map { it.toString() }
+            .sorted()
+
+        check(violations.isEmpty()) {
+            "FOSS release contains forbidden Google runtime dependencies: " +
+                violations.joinToString()
         }
     }
+}
 
-    tasks.matching { it.name == "preFoss${capitalizedBuildType}Build" }.configureEach {
-        dependsOn(verifyFossDependencies)
-    }
+tasks.matching { it.name == "preFossReleaseBuild" }.configureEach {
+    dependsOn(verifyFossReleaseDependencies)
 }
 
 val geckoViewDependency = "org.mozilla.geckoview:geckoview:157.0.20260924084938"
 
 dependencies {
-    implementation(project(":shared"))
-    implementation(project(":pocket-runtime"))
-    implementation("com.optimaize.languagedetector:language-detector:0.6") {
-        exclude(group = "com.intellij", module = "annotations")
-    }
-    // Optimaize requires an SLF4J 1.x binding in minified builds. Keep detector logging silent.
-    runtimeOnly("org.slf4j:slf4j-nop:1.7.36")
+    implementation(project(if (rootProject.name == "MyAioApp") ":browser-shared" else ":shared"))
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.biometric:biometric:1.1.0")
@@ -750,8 +633,6 @@ dependencies {
     implementation("com.google.guava:guava:33.2.1-android")
     implementation("com.github.Dimezis:BlurView:version-3.2.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.jsoup:jsoup:1.23.2")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.24.3")
     implementation("com.lambdapioneer.argon2kt:argon2kt:1.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     "fullImplementation"(geckoViewDependency)
@@ -762,21 +643,12 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.05.01"))
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3:1.4.0-alpha08")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     "fullImplementation"("com.google.android.gms:play-services-code-scanner:16.1.0")
-    "fullImplementation"("com.google.mlkit:genai-prompt:1.0.0-beta4")
-    "fullImplementation"("androidx.credentials:credentials-play-services-auth:1.5.0")
-    "fullImplementation"("com.google.android.gms:play-services-cast-framework:21.4.0") {
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-    }
     "systemwebviewImplementation"("com.google.android.gms:play-services-code-scanner:16.1.0")
-    "systemwebviewImplementation"("com.google.mlkit:genai-prompt:1.0.0-beta4")
-    "systemwebviewImplementation"("androidx.credentials:credentials-play-services-auth:1.5.0")
-    "systemwebviewImplementation"("com.google.android.gms:play-services-cast-framework:21.4.0") {
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-    }
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

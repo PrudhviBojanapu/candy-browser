@@ -17,10 +17,12 @@ import dev.sk2andy.materialbrowser.data.InactiveTabLifetime
 import dev.sk2andy.materialbrowser.data.TabOverviewMode
 
 internal data class SettingsSearchAvailability(
-    val searchSuggestionProvider: SearchSuggestionProvider = SearchSuggestionProvider.DuckDuckGo,
+    val searchSuggestionProvider: SearchSuggestionProvider = SearchSuggestionProvider.Google,
     val hasAppLanguages: Boolean = false,
-    val isLinkPeekEnabled: Boolean = true,
     val hasBrowserEngineSelection: Boolean = false,
+    val supportsAiSearch: Boolean = false,
+    val hasSearxngInstance: Boolean = false,
+    val hasSearxngSuggestionFallback: Boolean = false,
     val isDnsOverHttpsSupported: Boolean = false,
     val isHttpsOnlySupported: Boolean = false,
     val isVideoAutoplayBlockingSupported: Boolean = false,
@@ -30,6 +32,10 @@ internal data class SettingsSearchAvailability(
     val isHttpPasswordAutofillSupported: Boolean = false,
     val isGeckoLoggingSupported: Boolean = false,
     val hasFirefoxExtensions: Boolean = false,
+    val isBuiltInDownloadManager: Boolean = false,
+    val hasOneDmSessionSharing: Boolean = false,
+    val isFrostedSurface: Boolean = false,
+    val hasUserScriptSupport: Boolean = false,
     val isGeckoEngine: Boolean = false,
 )
 
@@ -96,7 +102,7 @@ private fun SettingsSearchDefinition.localizedDescription(): String = when (id) 
 
 internal fun settingsSearchDefinitions(
     availability: SettingsSearchAvailability,
-): List<SettingsSearchDefinition> = buildList<SettingsSearchDefinition> {
+): List<SettingsSearchDefinition> = buildList {
     settingsPage(
         destination = SettingsDestination.Search,
         id = "settings_section_search",
@@ -113,16 +119,20 @@ internal fun settingsSearchDefinitions(
             titleRes = R.string.settings_search_shortcuts_title,
             descriptionRes = R.string.settings_search_shortcuts_summary,
         )
-        setting(
+        if (availability.supportsAiSearch) {
+            setting(
                 id = "settings_ai_mode_toggle_title",
                 titleRes = R.string.settings_ai_mode_toggle_title,
                 descriptionRes = R.string.settings_ai_mode_toggle_subtitle,
             )
-        setting(
+        }
+        if (availability.hasSearxngInstance) {
+            setting(
                 id = "settings_searxng_instance_url",
                 titleRes = R.string.settings_searxng_instance_url,
                 descriptionRes = R.string.settings_searxng_instance_url_summary,
             )
+        }
         setting(
             id = "settings_history_suggestions_title",
             titleRes = R.string.settings_history_suggestions_title,
@@ -137,24 +147,25 @@ internal fun settingsSearchDefinitions(
                 else -> R.string.settings_search_suggestions_summary
             },
         )
-        setting(
+        if (availability.hasSearxngSuggestionFallback) {
+            setting(
                 id = "settings_searxng_suggestion_fallback",
                 titleRes = R.string.settings_searxng_suggestion_fallback,
                 descriptionRes = R.string.settings_searxng_suggestion_fallback_summary,
             )
+        }
     }
 
     settingsPage(
-        destination = SettingsDestination.Tabs,
-        id = "settings_home_tabs_title",
-        titleRes = R.string.settings_home_tabs_title,
-        descriptionRes = R.string.settings_home_tabs_summary,
+        destination = SettingsDestination.TabsAndGestures,
+        id = "settings_tabs_gestures_title",
+        titleRes = R.string.settings_tabs_gestures_title,
+        descriptionRes = R.string.settings_home_tabs_gestures_summary,
     ) {
         setting(
             id = "settings_tab_overview_mode",
             titleRes = R.string.settings_tab_overview_mode,
             descriptionRes = R.string.settings_home_tabs_gestures_summary,
-            destination = SettingsDestination.TabOverview,
         )
         setting(
             id = "settings_tab_list_starts_at_bottom_title",
@@ -192,19 +203,6 @@ internal fun settingsSearchDefinitions(
             descriptionRes = R.string.settings_profiles_subtitle,
         )
         setting(
-            id = "guest_bubble_title",
-            titleRes = R.string.guest_bubble_title,
-            descriptionRes = R.string.guest_bubble_settings_summary,
-        )
-    }
-
-    settingsPage(
-        destination = SettingsDestination.Gestures,
-        id = "settings_home_gestures_title",
-        titleRes = R.string.settings_home_gestures_title,
-        descriptionRes = R.string.settings_home_gestures_summary,
-    ) {
-        setting(
             id = "settings_address_bar_long_press_title",
             titleRes = R.string.settings_address_bar_long_press_title,
             descriptionRes = R.string.settings_address_bar_long_press_summary,
@@ -215,13 +213,6 @@ internal fun settingsSearchDefinitions(
             titleRes = R.string.settings_link_long_press_action,
             descriptionRes = R.string.settings_home_tabs_gestures_summary,
         )
-        if (availability.isLinkPeekEnabled) {
-            setting(
-                id = "settings_link_peek_swipe_action",
-                titleRes = R.string.settings_link_peek_swipe_action,
-                descriptionRes = R.string.settings_link_peek_swipe_action_summary,
-            )
-        }
         setting(
             id = "settings_link_peek_actions_title",
             titleRes = R.string.settings_link_peek_actions_title,
@@ -235,12 +226,6 @@ internal fun settingsSearchDefinitions(
             destination = SettingsDestination.AddressBarActions,
         )
         setting(
-            id = "custom_workflows",
-            titleRes = R.string.workflow_title,
-            descriptionRes = R.string.workflow_assignments_summary,
-            destination = SettingsDestination.CustomWorkflows,
-        )
-        setting(
             id = "settings_menu_actions_title",
             titleRes = R.string.settings_menu_actions_title,
             descriptionRes = R.string.settings_menu_actions_summary,
@@ -250,13 +235,13 @@ internal fun settingsSearchDefinitions(
             id = "settings_menu_presentation_title",
             titleRes = R.string.settings_menu_presentation_title,
             descriptionRes = R.string.settings_menu_presentation_summary,
-            destination = SettingsDestination.MenuStyle,
+            destination = SettingsDestination.MenuActions,
         )
         setting(
             id = "settings_menu_bottom_sheet_layout_title",
             titleRes = R.string.settings_menu_bottom_sheet_layout_title,
             descriptionRes = R.string.settings_menu_presentation_summary,
-            destination = SettingsDestination.MenuContentLayout,
+            destination = SettingsDestination.MenuActions,
         )
         setting(
             id = "settings_menu_bottom_sheet_toolbar_title",
@@ -273,16 +258,6 @@ internal fun settingsSearchDefinitions(
             id = "settings_address_bar_swipe_mode_title",
             titleRes = R.string.settings_address_bar_swipe_mode_title,
             descriptionRes = R.string.settings_address_bar_swipe_mode_summary,
-        )
-        setting(
-            id = "settings_status_bar_scroll_title",
-            titleRes = R.string.settings_status_bar_scroll_title,
-            descriptionRes = R.string.settings_status_bar_scroll_summary,
-        )
-        setting(
-            id = "settings_status_bar_scroll_width_title",
-            titleRes = R.string.settings_status_bar_scroll_width_title,
-            descriptionRes = R.string.settings_status_bar_scroll_summary,
         )
         setting(
             id = "settings_tab_dismiss_resistance",
@@ -371,111 +346,10 @@ internal fun settingsSearchDefinitions(
             descriptionRes = R.string.settings_external_app_links_summary,
         )
         setting(
-            id = "device_search_title",
-            titleRes = R.string.device_search_title,
-            descriptionRes = R.string.device_search_settings_summary,
-        )
-        setting(
             id = "settings_external_link_preview_title",
             titleRes = R.string.settings_external_link_preview_title,
             descriptionRes = R.string.settings_external_link_preview_subtitle,
         )
-    }
-
-    settingsPage(
-        destination = SettingsDestination.ReadAloud,
-        id = "reader_voice_settings_title",
-        titleRes = R.string.reader_voice_settings_title,
-        descriptionRes = R.string.reader_voice_settings_summary,
-    ) {
-        setting(
-            id = "reader_voice_enabled_title",
-            titleRes = R.string.reader_voice_enabled_title,
-            descriptionRes = R.string.reader_voice_enabled_summary,
-        )
-        setting(
-            id = "reader_voice_download",
-            titleRes = R.string.reader_voice_download,
-            descriptionRes = R.string.reader_voice_model_details,
-        )
-        setting(
-            id = "reader_voice_delete",
-            titleRes = R.string.reader_voice_delete,
-            descriptionRes = R.string.reader_voice_model_details,
-        )
-    }
-
-    settingsPage(
-        destination = SettingsDestination.ExternalAppLinks,
-        id = "settings_external_app_sites_title",
-        titleRes = R.string.settings_external_app_sites_title,
-        descriptionRes = R.string.settings_external_app_sites_summary,
-    ) {}
-
-    settingsPage(
-        destination = SettingsDestination.LinkRouting,
-        id = "link_routing_title",
-        titleRes = R.string.link_routing_title,
-        descriptionRes = R.string.link_routing_summary,
-    ) {}
-
-    settingsPage(
-        destination = SettingsDestination.Player,
-        id = "settings_player_title",
-        titleRes = R.string.settings_player_title,
-        descriptionRes = R.string.settings_home_player_summary,
-    ) {
-        setting(
-                id = "settings_video_autoplay_title",
-                titleRes = R.string.settings_video_autoplay_title,
-                descriptionRes = if (availability.isVideoAutoplayBlockingSupported) {
-                    R.string.settings_video_autoplay_subtitle
-                } else {
-                    R.string.settings_video_autoplay_unsupported
-                },
-            )
-        setting(
-                id = "settings_inline_media_player_title",
-                titleRes = R.string.settings_inline_media_player_title,
-                descriptionRes = if (availability.isInlineMediaPlayerSupported) {
-                    R.string.settings_inline_media_player_subtitle
-                } else {
-                    R.string.settings_inline_media_player_unsupported
-                },
-            )
-        setting(
-                id = "settings_inline_media_player_seek_backward",
-                titleRes = R.string.settings_inline_media_player_seek_backward,
-                descriptionRes = R.string.settings_inline_media_player_seek_subtitle,
-            )
-        setting(
-                id = "settings_inline_media_player_seek_forward",
-                titleRes = R.string.settings_inline_media_player_seek_forward,
-                descriptionRes = R.string.settings_inline_media_player_seek_subtitle,
-            )
-    }
-
-    settingsPage(
-        destination = SettingsDestination.Downloads,
-        id = "settings_downloads_title",
-        titleRes = R.string.settings_downloads_title,
-        descriptionRes = R.string.settings_download_manager_ask,
-    ) {
-        setting(
-            id = "settings_download_manager_title",
-            titleRes = R.string.settings_download_manager_title,
-            descriptionRes = R.string.settings_download_manager_ask,
-        )
-        setting(
-                id = "settings_download_folder_title",
-                titleRes = R.string.settings_download_folder_title,
-                descriptionRes = R.string.settings_download_folder_summary,
-            )
-        setting(
-                id = "settings_download_one_dm_session_title",
-                titleRes = R.string.settings_download_one_dm_session_title,
-                descriptionRes = R.string.settings_download_one_dm_session_summary,
-            )
     }
 
     settingsPage(
@@ -493,22 +367,19 @@ internal fun settingsSearchDefinitions(
             id = "settings_app_icon",
             titleRes = R.string.settings_app_icon,
             descriptionRes = R.string.settings_home_appearance_summary,
-            destination = SettingsDestination.AppIcon,
         )
         setting(
             id = "settings_animations",
             titleRes = R.string.settings_animations,
             descriptionRes = R.string.settings_animations_summary,
         )
-        setting(
+        if (availability.isForceDarkWebsitesSupported) {
+            setting(
                 id = "settings_force_dark_websites",
                 titleRes = R.string.settings_force_dark_websites,
-                descriptionRes = if (availability.isForceDarkWebsitesSupported) {
-                    R.string.settings_force_dark_websites_summary
-                } else {
-                    R.string.settings_force_dark_websites_system_webview_only
-                },
+                descriptionRes = R.string.settings_force_dark_websites_summary,
             )
+        }
         setting(
             id = "settings_web_content_font_size",
             titleRes = R.string.settings_web_content_font_size,
@@ -529,25 +400,27 @@ internal fun settingsSearchDefinitions(
             titleRes = R.string.settings_surface_style,
             descriptionRes = R.string.settings_surface_style_summary,
         )
-        setting(
-            id = "settings_frosted_transparency",
-            titleRes = R.string.settings_frosted_transparency,
-            descriptionRes = R.string.settings_surface_style_summary,
-        )
-        setting(
-            id = "settings_frosted_address_bar_transparency",
-            titleRes = R.string.settings_frosted_address_bar_transparency,
-            descriptionRes = R.string.settings_surface_style_summary,
-        )
-        setting(
-            id = "settings_frosted_blur",
-            titleRes = R.string.settings_frosted_blur,
-            descriptionRes = if (availability.isGeckoEngine) {
-                R.string.settings_frosted_blur_summary_gecko
-            } else {
-                R.string.settings_frosted_blur_summary_system_webview
-            },
-        )
+        if (availability.isFrostedSurface) {
+            setting(
+                id = "settings_frosted_transparency",
+                titleRes = R.string.settings_frosted_transparency,
+                descriptionRes = R.string.settings_surface_style_summary,
+            )
+            setting(
+                id = "settings_frosted_address_bar_transparency",
+                titleRes = R.string.settings_frosted_address_bar_transparency,
+                descriptionRes = R.string.settings_surface_style_summary,
+            )
+            setting(
+                id = "settings_frosted_blur",
+                titleRes = R.string.settings_frosted_blur,
+                descriptionRes = if (availability.isGeckoEngine) {
+                    R.string.settings_frosted_blur_summary_gecko
+                } else {
+                    R.string.settings_frosted_blur_summary_system_webview
+                },
+            )
+        }
         setting(
             id = "settings_shape_style",
             titleRes = R.string.settings_shape_style,
@@ -563,38 +436,6 @@ internal fun settingsSearchDefinitions(
             titleRes = R.string.settings_address_bar_style,
             descriptionRes = R.string.settings_home_appearance_summary,
         )
-    }
-
-    settingsPage(
-        destination = SettingsDestination.SiteCapsules,
-        id = "capsule_settings_title",
-        titleRes = R.string.capsule_settings_title,
-        descriptionRes = R.string.settings_home_capsules_summary,
-    ) {
-    }
-
-    settingsPage(
-        destination = SettingsDestination.Userscripts,
-        id = "userscript_title",
-        titleRes = R.string.userscript_title,
-        descriptionRes = R.string.settings_home_userscripts_summary,
-    ) {
-        setting(
-                id = "topping_discover",
-                titleRes = R.string.topping_discover,
-                descriptionRes = R.string.settings_home_userscripts_summary,
-                destination = SettingsDestination.ToppingCatalog,
-            )
-        setting(
-                id = "userscript_add",
-                titleRes = R.string.userscript_add,
-                descriptionRes = R.string.userscript_editor_help,
-            )
-        setting(
-                id = "userscript_import",
-                titleRes = R.string.userscript_import,
-                descriptionRes = R.string.userscript_editor_help,
-            )
     }
 
     if (availability.hasFirefoxExtensions) {
@@ -658,37 +499,25 @@ internal fun settingsSearchDefinitions(
             titleRes = R.string.settings_auto_de_amp_title,
             descriptionRes = R.string.settings_auto_de_amp_summary,
         )
-        setting(
+        if (availability.isHttpsOnlySupported) {
+            setting(
                 id = "settings_https_only_title",
                 titleRes = R.string.settings_https_only_title,
-                descriptionRes = if (availability.isHttpsOnlySupported) {
-                    R.string.settings_https_only_all_summary
-                } else {
-                    R.string.settings_https_only_system_webview_summary
-                },
+                descriptionRes = R.string.settings_https_only_all_summary,
             )
-        setting(
+        }
+        if (availability.isDnsOverHttpsSupported) {
+            setting(
                 id = "settings_dns_over_https_title",
                 titleRes = R.string.settings_dns_over_https_title,
-                descriptionRes = if (availability.isDnsOverHttpsSupported) {
-                    R.string.settings_dns_over_https_gecko_summary
-                } else {
-                    R.string.settings_dns_over_https_system_webview_summary
-                },
+                descriptionRes = R.string.settings_dns_over_https_gecko_summary,
             )
+        }
         setting(
             id = "settings_webrtc_protection_title",
             titleRes = R.string.settings_webrtc_protection_title,
             descriptionRes = R.string.settings_webrtc_standard_summary,
         )
-    }
-
-    settingsPage(
-        destination = SettingsDestination.HistoryAndData,
-        id = "settings_home_history_title",
-        titleRes = R.string.settings_home_history_title,
-        descriptionRes = R.string.settings_home_history_summary,
-    ) {
         setting(
             id = "history_save_title",
             titleRes = R.string.history_save_title,
@@ -698,11 +527,6 @@ internal fun settingsSearchDefinitions(
             id = "history_clear_on_exit_title",
             titleRes = R.string.history_clear_on_exit_title,
             descriptionRes = R.string.history_clear_on_exit_summary,
-        )
-        setting(
-            id = "form_drafts_settings_title",
-            titleRes = R.string.form_drafts_settings_title,
-            descriptionRes = R.string.form_drafts_settings_summary,
         )
         setting(
             id = "recall_settings_title",
@@ -723,84 +547,6 @@ internal fun settingsSearchDefinitions(
             id = "action_clear_browsing_data",
             titleRes = R.string.action_clear_browsing_data,
             descriptionRes = R.string.settings_home_protection_summary,
-        )
-    }
-
-    settingsPage(
-        destination = SettingsDestination.Sync,
-        id = "sync_settings_title",
-        titleRes = R.string.sync_settings_title,
-        descriptionRes = R.string.settings_home_sync_summary,
-    ) {
-        setting(
-            id = "sync_setup_guide_title",
-            titleRes = R.string.sync_setup_guide_title,
-            descriptionRes = R.string.sync_setup_guide_summary,
-        )
-        setting(
-            id = "sync_setup_server_title",
-            titleRes = R.string.sync_setup_server_title,
-            descriptionRes = R.string.sync_setup_server_summary,
-        )
-        setting(
-            id = "sync_setup_extension_title",
-            titleRes = R.string.sync_setup_extension_title,
-            descriptionRes = R.string.sync_setup_extension_summary,
-        )
-        setting(
-            id = "sync_setup_workspace_title",
-            titleRes = R.string.sync_setup_workspace_title,
-            descriptionRes = R.string.sync_setup_workspace_summary,
-        )
-        setting(
-            id = "sync_setup_android_title",
-            titleRes = R.string.sync_setup_android_title,
-            descriptionRes = R.string.sync_setup_android_summary,
-        )
-        setting(
-            id = "sync_endpoint_label",
-            titleRes = R.string.sync_endpoint_label,
-            descriptionRes = R.string.sync_setup_android_summary,
-        )
-        setting(
-            id = "sync_username_label",
-            titleRes = R.string.sync_username_label,
-            descriptionRes = R.string.sync_setup_android_summary,
-        )
-        setting(
-            id = "sync_server_password_label",
-            titleRes = R.string.sync_server_password_label,
-            descriptionRes = R.string.sync_server_password_summary,
-        )
-        setting(
-            id = "sync_local_profile_label",
-            titleRes = R.string.sync_local_profile_label,
-            descriptionRes = R.string.settings_home_sync_summary,
-        )
-        setting(
-            id = "sync_device_name_label",
-            titleRes = R.string.sync_device_name_label,
-            descriptionRes = R.string.settings_home_sync_summary,
-        )
-        setting(
-            id = "sync_device_icon_label",
-            titleRes = R.string.sync_device_icon_label,
-            descriptionRes = R.string.settings_home_sync_summary,
-        )
-        setting(
-            id = "sync_accent_color_label",
-            titleRes = R.string.sync_accent_color_label,
-            descriptionRes = R.string.settings_home_sync_summary,
-        )
-        setting(
-            id = "sync_passphrase_label",
-            titleRes = R.string.sync_passphrase_label,
-            descriptionRes = R.string.sync_passphrase_warning_message,
-        )
-        setting(
-            id = "sync_passphrase_confirm_label",
-            titleRes = R.string.sync_passphrase_confirm_label,
-            descriptionRes = R.string.sync_passphrase_warning_message,
         )
     }
 
@@ -866,23 +612,16 @@ internal fun settingsSearchDefinitions(
                 titleRes = R.string.developer_options_required_failures,
                 descriptionRes = R.string.developer_options_required_failures_summary,
             )
+            if (availability.isHttpPasswordAutofillSupported) {
                 setting(
                     id = "settings_http_password_autofill_title",
                     titleRes = R.string.settings_http_password_autofill_title,
-                    descriptionRes = if (availability.isHttpPasswordAutofillSupported) {
-                        R.string.settings_http_password_autofill_gecko_summary
-                    } else {
-                        R.string.settings_http_password_autofill_system_webview_summary
-                    },
+                    descriptionRes = R.string.settings_http_password_autofill_gecko_summary,
                 )
                 setting(
                     id = "developer_options_gecko_logging",
                     titleRes = R.string.developer_options_gecko_logging,
-                    descriptionRes = if (availability.isGeckoLoggingSupported) {
-                        R.string.developer_options_gecko_logging_summary
-                    } else {
-                        R.string.developer_options_gecko_logging_unsupported
-                    },
+                    descriptionRes = R.string.developer_options_gecko_logging_summary,
                 )
                 setting(
                     id = "developer_options_gecko_logging_modules",
@@ -954,6 +693,7 @@ internal fun settingsSearchDefinitions(
                     titleRes = R.string.developer_options_gecko_max_initial_elements,
                     descriptionRes = R.string.developer_options_gecko_max_initial_elements_summary,
                 )
+            }
         }
     }
 
@@ -963,11 +703,6 @@ internal fun settingsSearchDefinitions(
         titleRes = R.string.settings_section_about_legal,
         descriptionRes = R.string.settings_home_about_summary,
     ) {
-        setting(
-            id = "settings_privacy_policy_title",
-            titleRes = R.string.settings_privacy_policy_title,
-            descriptionRes = R.string.settings_privacy_policy_summary,
-        )
         setting(
             id = "settings_imprint_title",
             titleRes = R.string.settings_imprint_title,
@@ -984,32 +719,6 @@ internal fun settingsSearchDefinitions(
             descriptionRes = R.string.settings_uassets_source_summary,
         )
     }
-}.map { definition ->
-    val destination = when (definition.id) {
-        "settings_tab_stack_folder_mode" -> SettingsDestination.TabStackFolder
-        "settings_closed_tab_undo_title" -> SettingsDestination.ClosedTabUndo
-        "settings_resident_tab_limit", "settings_auto_close_tabs" -> SettingsDestination.TabLifecycle
-        "settings_profiles_title", "guest_bubble_title" -> SettingsDestination.ProfileOptions
-        "settings_address_bar_docking_title", "settings_address_bar_swipe_mode_title",
-        "settings_tab_dismiss_resistance", "settings_status_bar_scroll_title",
-        "settings_status_bar_scroll_width_title" -> SettingsDestination.GestureControls
-        "settings_link_long_press_action" -> SettingsDestination.LinkLongPress
-        "settings_link_peek_swipe_action" -> SettingsDestination.LinkPeekSwipe
-        "settings_inline_media_player_title" -> SettingsDestination.PlayerMode
-        "settings_external_link_preview_title" -> SettingsDestination.ExternalLinkPreview
-        "settings_appearance_mode", "settings_color_palette" -> SettingsDestination.AppearanceColors
-        "settings_shape_style" -> SettingsDestination.AppearanceSurfaces
-        "settings_surface_style", "settings_frosted_transparency", "settings_frosted_address_bar_transparency", "settings_frosted_blur" -> SettingsDestination.AppearanceSurfaces
-        "settings_address_bar_color", "settings_address_load_style", "settings_address_bar_style" -> SettingsDestination.AppearanceAddressBar
-        "settings_force_dark_websites", "settings_web_content_font_size" -> SettingsDestination.AppearanceWebsites
-        "settings_startup_animation_title", "settings_startup_address_focus_title", "settings_open_home_on_startup_title" -> SettingsDestination.BrowserStartup
-        "settings_favorite_launch_animation_title", "settings_favorite_animation_speed_title", "settings_favorite_bookmark_import_title" -> SettingsDestination.BrowserFavorites
-        "settings_full_immersive_mode_title", "settings_scroll_bar_title", "device_search_title" -> SettingsDestination.BrowserWebsites
-        "settings_translation_provider" -> SettingsDestination.Translations
-        "settings_external_app_links_title" -> SettingsDestination.ExternalAppLinks
-        else -> definition.destination
-    }
-    definition.copy(destination = destination)
 }
 
 private fun MutableList<SettingsSearchDefinition>.settingsPage(

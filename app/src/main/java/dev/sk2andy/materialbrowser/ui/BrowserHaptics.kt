@@ -17,65 +17,67 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import dev.sk2andy.materialbrowser.haptics.CandyHapticEngine
 import dev.sk2andy.materialbrowser.R
 import kotlin.math.roundToInt
 
 internal fun View.performConfirmHaptic() {
-    performHapticFeedback(
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            HapticFeedbackConstants.CONFIRM
-        } else {
-            HapticFeedbackConstants.VIRTUAL_KEY
-        },
-    )
+    val engine = CandyHapticEngine.getInstance(context)
+    if (!engine.playIfEnabled(context, CandyHapticEngine.Pattern.CLICK, 0.85f)) {
+        performHapticFeedback(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                HapticFeedbackConstants.CONFIRM
+            } else {
+                HapticFeedbackConstants.VIRTUAL_KEY
+            },
+        )
+    }
 }
 
 internal fun View.performRejectHaptic() {
-    performHapticFeedback(
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            HapticFeedbackConstants.REJECT
-        } else {
-            HapticFeedbackConstants.LONG_PRESS
-        },
-    )
+    val engine = CandyHapticEngine.getInstance(context)
+    if (!engine.playIfEnabled(context, CandyHapticEngine.Pattern.HEAVY_CLICK, 1.0f)) {
+        performHapticFeedback(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                HapticFeedbackConstants.REJECT
+            } else {
+                HapticFeedbackConstants.LONG_PRESS
+            },
+        )
+    }
 }
 
 internal fun View.performTabFocusHaptic() {
-    if (!performHapticFeedback(HapticFeedbackConstants.SEGMENT_TICK)) {
-        performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+    val hapticFlag = HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        if (!performHapticFeedback(HapticFeedbackConstants.SEGMENT_TICK, hapticFlag)) {
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK, hapticFlag)
+        }
+    } else {
+        if (!performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK, hapticFlag)) {
+            val engine = CandyHapticEngine.getInstance(context)
+            engine.playIfEnabled(context, CandyHapticEngine.Pattern.TICK, 0.45f)
+        }
     }
 }
 
 internal fun View.startRubberbandHaptic() {
-    val vibrator = rubberbandVibrator() ?: return
-    if (!vibrator.hasVibrator()) return
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val effect = if (vibrator.hasAmplitudeControl()) {
-            VibrationEffect.createWaveform(
-                longArrayOf(0L, 1_000L),
-                intArrayOf(0, 8),
-                0,
-            )
-        } else {
-            VibrationEffect.createWaveform(
-                longArrayOf(0L, 3L, 117L),
-                intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0),
-                0,
-            )
-        }
-        vibrator.vibrate(effect)
-    } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(5_000L)
-    }
+    performHapticFeedback(
+        HapticFeedbackConstants.CLOCK_TICK,
+        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING,
+    )
 }
 
 internal fun View.stopRubberbandHaptic() {
-    rubberbandVibrator()?.cancel()
+    // No continuous vibration to stop
 }
 
 internal fun View.performScaledTickHaptic(strength: Float) {
     val boundedStrength = strength.takeIf(Float::isFinite)?.coerceIn(0f, 1f) ?: 0f
+    val engine = CandyHapticEngine.getInstance(context)
+    if (engine.playIfEnabled(context, CandyHapticEngine.Pattern.TICK, boundedStrength, throttleMs = 12L)) {
+        return
+    }
     val vibrator = rubberbandVibrator()
     if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&

@@ -5,15 +5,11 @@
 | Feature | Start here | Owns |
 | --- | --- | --- |
 | Browsing and gestures | [`browsing/README.md`](browsing/README.md) | WebView runtime, address flow, commands, Candy Recall, Link Peek, browser actions |
-| Custom workflows | [`browsing/custom-workflows.md`](browsing/custom-workflows.md) | Ordered browser actions, link inputs, surface bindings and backup |
 | Platform engines | [`browsing/platform-engines.md`](browsing/platform-engines.md) | Shared Kotlin contracts, Android Gecko/WebExtensions, iOS WKWebView/Toppings and Liquid Glass |
 | Tabs and profiles | [`tabs-and-profiles/README.md`](tabs-and-profiles/README.md) | Tab lifecycle, previews, persistence, snoozing, profile isolation |
-| Candy Constellations | [`browsing/constellations.md`](browsing/constellations.md) | Profile-local semantic page map, on-device embeddings, model download and graph UI |
 | Candy Trails | [`candy-trails/README.md`](candy-trails/README.md) | Journey graph, history reconciliation, forks, persistence, graph UI |
 | Site Capsules | [`site-capsules/README.md`](site-capsules/README.md) | Capsule model, navigation boundary, profile ownership, shortcuts |
 | Reader Studio | [`reader-studio/README.md`](reader-studio/README.md) | Extraction, reader sessions, local library, speech |
-| RSS feeds | [`rss/README.md`](rss/README.md) | Feed discovery, subscriptions, refresh notifications, widget, Reader Studio handoff |
-| Feeds and library | [`feeds/README.md`](feeds/README.md) | RSS/Atom, subscriptions, inbox, shared saved articles, OPML, offline and opt-in notifications |
 | Privacy protection | [`privacy-protection/README.md`](privacy-protection/README.md) | Request/cosmetic blocking, Candy Rules, X-Ray, Permission Radar |
 | Candy Sync | [`sync/README.md`](sync/README.md) | Self-hosted server, browser extension, Android integration, and E2EE protocol |
 

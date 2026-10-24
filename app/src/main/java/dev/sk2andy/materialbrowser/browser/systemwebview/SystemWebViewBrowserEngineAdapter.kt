@@ -1,6 +1,9 @@
 package dev.sk2andy.materialbrowser.browser.systemwebview
 
 import dev.sk2andy.materialbrowser.browser.annotation.WebTextSelectionAction
+
+import dev.sk2andy.materialbrowser.browser.gecko.BrowserEngineOffscreenSurface
+
 import dev.sk2andy.materialbrowser.data.TabPreviewCaptureRules
 import dev.sk2andy.materialbrowser.data.AppLogEvent
 import dev.sk2andy.materialbrowser.data.AppLogging
@@ -48,9 +51,9 @@ import dev.sk2andy.materialbrowser.blocking.ContentBlocker
 import dev.sk2andy.materialbrowser.blocking.ConsentRequestRules
 import dev.sk2andy.materialbrowser.blocking.CandyDecisionAction
 import dev.sk2andy.materialbrowser.blocking.CandyMatcherSnapshot
-import dev.sk2andy.materialbrowser.browser.PageTextExtraction
 import dev.sk2andy.materialbrowser.browser.AndroidBrowserEngineCapabilities
 import dev.sk2andy.materialbrowser.browser.AndroidBrowserEngineKind
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
 import dev.sk2andy.materialbrowser.browser.AntiFingerprintingRules
 import dev.sk2andy.materialbrowser.browser.AntiFingerprintingScript
 import dev.sk2andy.materialbrowser.browser.BrowserEngineAuthPromptRequest
@@ -94,7 +97,6 @@ import dev.sk2andy.materialbrowser.browser.systemwebview.commands.WebViewSiteDat
 import dev.sk2andy.materialbrowser.browser.gecko.AndroidBrowserEngineSessionPort
 import dev.sk2andy.materialbrowser.browser.gecko.BrowserEngineEventSink
 import dev.sk2andy.materialbrowser.browser.gecko.BrowserEnginePreviewCapture
-import dev.sk2andy.materialbrowser.browser.gecko.BrowserEngineOffscreenSurface
 import dev.sk2andy.materialbrowser.browser.gecko.BrowserEnginePreparedSession
 import dev.sk2andy.materialbrowser.browser.gecko.GeckoCloseRequestListener
 import dev.sk2andy.materialbrowser.browser.gecko.GeckoAndroidPermissionRequestListener
@@ -140,7 +142,6 @@ import dev.sk2andy.materialbrowser.data.BrowserDownloadRequestFactory
 import dev.sk2andy.materialbrowser.data.BrowserSessionStore
 import dev.sk2andy.materialbrowser.data.DownloadDirectoryRules
 import dev.sk2andy.materialbrowser.data.UserScriptValueStore
-import dev.sk2andy.materialbrowser.recall.RecallExtractionScript
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionScript
 import dev.sk2andy.materialbrowser.shared.browser.BrowserEngineCommand
 import dev.sk2andy.materialbrowser.shared.browser.BrowserEngineCommandType
@@ -167,7 +168,6 @@ private class SystemWebViewPreparedSession(
 
 internal class SystemWebViewBrowserEngineFactory(
     private val context: Context,
-    cleanupPrivateProfiles: Boolean = true,
 ) : AndroidBrowserEngineFactory {
     override val kind = AndroidBrowserEngineKind.SystemWebView
     override val capabilities = AndroidBrowserEngineCapabilities.SystemWebView
@@ -195,7 +195,7 @@ internal class SystemWebViewBrowserEngineFactory(
     private val contentBlocker = ContentBlocker(context.applicationContext)
 
     init {
-        if (cleanupPrivateProfiles) cleanupStalePrivateProfiles()
+        cleanupStalePrivateProfiles()
         contentBlocker.prepareConsentScript()
         contentBlocker.prepareCosmeticRules()
     }
@@ -416,7 +416,6 @@ private class SystemWebViewBrowserEngineSession(
     private val profileId = profileId
     private val webView = SystemWebViewHost(context, ::onSafeAreaFallback, ::onStatusBarBackdrop)
     private val host = webView
-    private val formDrafts = SystemWebViewFormDrafts(webView)
     private val annotations = SystemWebViewAnnotations(webView) { generation, url ->
         !closed && !isPrivate && contentKind == BrowserEngineContentKind.RegularTab &&
             generation == pageLoadGeneration && url == webView.url
@@ -426,13 +425,8 @@ private class SystemWebViewBrowserEngineSession(
         appContext,
         webView,
         diagnostic = downloadDiagnostics::record,
-        sourceProfileId = profileId,
-        isPrivate = isPrivate,
     )
     private var closed = false
-    private var pageTextResult: ((String?) -> Unit)? = null
-    private var pageTextTimeout: Runnable? = null
-    private var pageTextRequest: Any? = null
     private var active = true
     private var desktopMode = false
     private var desktopViewportDomain: String? = null
@@ -743,6 +737,15 @@ private class SystemWebViewBrowserEngineSession(
         }
     }
 
+    override fun stopWebVideoPlayback() {
+        if (!closed) {
+            webView.evaluateJavascript(
+                "(()=>{try{document.querySelectorAll('video').forEach(v=>{v.pause();v.currentTime=0;v.src='';v.removeAttribute('src');v.load();});const mp=document.getElementById('movie_player')||window.player;if(mp&&typeof mp.stopVideo==='function')mp.stopVideo();}catch(e){}})()",
+                null,
+            )
+        }
+    }
+
     override fun goToHistoryIndex(index: Int) {
         val history = webView.copyBackForwardList()
         val offset = index - history.currentIndex
@@ -917,6 +920,24 @@ private class SystemWebViewBrowserEngineSession(
         )
     }
 
+    override fun extractPageForReader(onComplete: (String?) -> Unit) {
+        if (closed) onComplete(null)
+        else webView.evaluateJavascript(ReaderExtractionScript.javascript, onComplete)
+    }
+
+    override fun probeTextInputOcclusion(
+        viewportRect: BrowserViewportRect,
+        mode: TextInputOcclusionProbeMode,
+        onComplete: (TextInputOcclusionProbeResult) -> Unit,
+    ) {
+        if (closed || currentPageUrl == null) {
+            onComplete(TextInputOcclusionProbeResult.NoFocusedTextInput)
+            return
+        }
+        webView.evaluateJavascript(TextInputOcclusionScript.javascript(viewportRect, mode)) { result ->
+            onComplete(TextInputOcclusionProbeResult.fromWireValue(result.toIntOrNull() ?: 0))
+        }
+    }
 
     override fun setSelectedTextActionListener(
         listener: ((WebTextSelectionAction, String) -> Unit)?,
@@ -965,79 +986,8 @@ private class SystemWebViewBrowserEngineSession(
         if (!closed) annotations.setListener(listener.takeIf { !isPrivate && contentKind == BrowserEngineContentKind.RegularTab })
     }
 
-    override fun setFormDraftListener(listener: ((String) -> Unit)?) {
-        if (!closed) formDrafts.setListener(listener)
-    }
-
-    override fun restoreFormDraft(payload: String, onComplete: (Boolean) -> Unit) {
-        if (closed) onComplete(false) else formDrafts.restore(payload, onComplete)
-    }
-
     override fun promoteToRegularTab() {
         if (!closed) contentKind = BrowserEngineContentKind.RegularTab
-    }
-
-    override fun extractPageText(onComplete: (String?) -> Unit) {
-        if (closed || isPrivate || contentKind != BrowserEngineContentKind.RegularTab ||
-            currentPageUrl == null
-        ) {
-            onComplete(null)
-            return
-        }
-        finishPageTextExtraction(null)
-        val expectedGeneration = pageLoadGeneration
-        val expectedUrl = currentPageUrl
-        val request = Any()
-        pageTextRequest = request
-        pageTextResult = onComplete
-        pageTextTimeout = Runnable { finishPageTextExtraction(null) }.also {
-            webView.postDelayed(it, 5_000L)
-        }
-        runCatching {
-            webView.evaluateJavascript(
-                RecallExtractionScript.javascript(PageTextExtraction.MAX_TEXT_CHARS),
-            ) { result ->
-                if (pageTextRequest !== request) return@evaluateJavascript
-                val payload = if (!closed && expectedGeneration == pageLoadGeneration &&
-                    expectedUrl == currentPageUrl
-                ) PageTextExtraction.fromJavascriptResult(result) else null
-                finishPageTextExtraction(payload)
-            }
-        }.onFailure { finishPageTextExtraction(null) }
-    }
-
-    private fun finishPageTextExtraction(payload: String?) {
-        pageTextTimeout?.let(webView::removeCallbacks)
-        pageTextTimeout = null
-        pageTextRequest = null
-        val callback = pageTextResult
-        pageTextResult = null
-        callback?.invoke(payload)
-    }
-
-    override fun extractPageForReader(onComplete: (String?) -> Unit) {
-        if (closed) onComplete(null)
-        else webView.evaluateJavascript(ReaderExtractionScript.javascript) { encoded ->
-            // The engine port returns JSON text; WebView wraps JavaScript strings once more.
-            val json = encoded?.takeIf { it.length <= 4_000_000 }?.let {
-                runCatching { org.json.JSONTokener(it).nextValue() as? String }.getOrNull()
-            }
-            onComplete(json)
-        }
-    }
-
-    override fun probeTextInputOcclusion(
-        viewportRect: BrowserViewportRect,
-        mode: TextInputOcclusionProbeMode,
-        onComplete: (TextInputOcclusionProbeResult) -> Unit,
-    ) {
-        if (closed || currentPageUrl == null) {
-            onComplete(TextInputOcclusionProbeResult.NoFocusedTextInput)
-            return
-        }
-        webView.evaluateJavascript(TextInputOcclusionScript.javascript(viewportRect, mode)) { result ->
-            onComplete(TextInputOcclusionProbeResult.fromWireValue(result.toIntOrNull() ?: 0))
-        }
     }
 
     override fun updatePrivacyPolicy(
@@ -1138,7 +1088,6 @@ private class SystemWebViewBrowserEngineSession(
             null
         }
         closed = true
-        finishPageTextExtraction(null)
         closeRequestListener = null
         newSessionListener = null
         navigationRequestListener = null
@@ -1150,7 +1099,6 @@ private class SystemWebViewBrowserEngineSession(
         webRtcScriptHandler?.remove()
         safeAreaScriptHandler?.remove()
         desktopViewportScriptHandler?.remove()
-        formDrafts.close()
         annotations.close()
         removeMediaBridge()
         blobDownloadTransfer.close()
@@ -1307,6 +1255,12 @@ private class SystemWebViewBrowserEngineSession(
             view: WebView,
             request: WebResourceRequest,
         ): WebResourceResponse? {
+            MediaStreamDetectorBridge.inspectWebViewRequest(
+                request = request,
+                pageUrl = currentPageUrl,
+                userAgent = null,
+                currentTitle = runCatching { view.title }.getOrNull(),
+            )
             val requestState = requestPrivacyState
             val policy = requestState.policy
             val url = request.url.toString()
@@ -1370,7 +1324,6 @@ private class SystemWebViewBrowserEngineSession(
 
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
             host.textDocumentGeneration++
-            finishPageTextExtraction(null)
             // WebView skips shouldOverrideUrlLoading for a popup's initial POST.
             if (url != null && initialPopupNavigationPending && handleInitialPopupNavigation(url)) {
                 view.stopLoading()
@@ -2241,7 +2194,6 @@ private class SystemWebViewBrowserEngineSession(
             listener.onFailed(GeckoDownloadFailure.Storage)
             return null
         }
-        dev.sk2andy.materialbrowser.data.DownloadProvenanceStore(appContext).record(id, fileName, profileId, isPrivate)
         listener.onStarted(
             GeckoDownloadTransferStart(
                 id = id.toInt(),
@@ -2335,7 +2287,6 @@ private class SystemWebViewHost(
             if (selectedTextActionsEnabled()) selectedTextActionListener?.invoke(action, text)
         }
     }
-
     val safeAreaInstallScript = SystemWebViewSafeAreaScript.installScript(context)
     private val supportsNativeCssSafeArea = SystemWebViewSafeAreaRules.supportsCssSafeAreaInsets(
         WebView.getCurrentWebViewPackage()?.versionName,

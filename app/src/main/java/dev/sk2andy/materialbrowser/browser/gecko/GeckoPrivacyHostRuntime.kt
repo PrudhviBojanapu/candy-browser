@@ -9,6 +9,7 @@ import dev.sk2andy.materialbrowser.browser.BrowserEngineScrollMetrics
 import dev.sk2andy.materialbrowser.browser.BrowserViewportRect
 import dev.sk2andy.materialbrowser.browser.TextInputOcclusionProbeMode
 import dev.sk2andy.materialbrowser.browser.TextInputOcclusionProbeResult
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
 import dev.sk2andy.materialbrowser.browser.WebRtcProtectionMode
 import dev.sk2andy.materialbrowser.browser.WebRtcProtectionRules
 import java.util.UUID
@@ -26,13 +27,7 @@ internal interface GeckoPrivacyBinding {
 
     fun setWebAnnotationClickListener(listener: ((String) -> Unit)?) = Unit
 
-    fun setFormDraftListener(listener: ((String) -> Unit)?) = Unit
-
-    fun restoreFormDraft(payload: String, onComplete: (Boolean) -> Unit) = onComplete(false)
-
     fun extractPageForReader(onResult: (String?) -> Unit)
-
-    fun extractPageText(onResult: (String?) -> Unit) = onResult(null)
 
     fun probeTextInputOcclusion(
         viewportRect: BrowserViewportRect,
@@ -66,6 +61,8 @@ internal interface GeckoPrivacyBinding {
         onResult: (Boolean) -> Unit,
     )
 
+    fun stopWebVideoPlayback() = Unit
+
     fun close()
 }
 
@@ -92,11 +89,8 @@ internal class GeckoViewPrivacyHostRuntime(
         val domProbe: GeckoDomProbeRequest,
         val textInputOcclusionProbe: GeckoTextInputOcclusionRequest,
         val userInputRequest: GeckoUserInputRequest,
-        val textExtraction: GeckoTextExtractionRequest,
         val webTextOperation: GeckoWebTextOperationRequest,
-        val formDraftRestore: GeckoFormDraftRestoreRequest,
         var annotationClickListener: ((String) -> Unit)? = null,
-        var formDraftListener: ((String) -> Unit)? = null,
         var pictureInPicturePlaybackExpected: Boolean = false,
         var pictureInPicturePlaybackRequestGeneration: Long = 0,
         var pictureInPicturePreparationRequestId: Long? = null,
@@ -238,9 +232,7 @@ internal class GeckoViewPrivacyHostRuntime(
             domProbe = GeckoDomProbeRequest(mainHandler),
             textInputOcclusionProbe = GeckoTextInputOcclusionRequest(mainHandler),
             userInputRequest = GeckoUserInputRequest(mainHandler),
-            textExtraction = GeckoTextExtractionRequest(mainHandler),
             webTextOperation = GeckoWebTextOperationRequest(mainHandler),
-            formDraftRestore = GeckoFormDraftRestoreRequest(mainHandler),
             sink = sink,
             onScrollMetrics = onScrollMetrics,
             onMainFrameResponse = onMainFrameResponse,
@@ -279,13 +271,25 @@ internal class GeckoViewPrivacyHostRuntime(
         return object : GeckoPrivacyBinding {
             override fun update(policy: GeckoPrivacyPolicy, onReady: () -> Unit) {
                 binding.userInputRequest.cancel()
-                binding.textExtraction.cancel()
                 binding.webTextOperation.cancel()
-                binding.formDraftRestore.cancel()
                 binding.inlineVideoOpenGate.invalidatePolicy(policy, session.settings.usePrivateMode)
                 refreshInlineVideoOpenTimeout(binding)
                 binding.policy = policy
                 runWhenReady(binding) { publish(binding, policy, onReady) }
+            }
+
+            override fun extractPageForReader(onResult: (String?) -> Unit) {
+                if (bindings[token] !== binding) {
+                    onResult(null)
+                    return
+                }
+                failureDescription?.let {
+                    onResult(null)
+                    return
+                }
+                runWhenReady(binding) {
+                    requestReaderExtraction(binding, onResult)
+                }
             }
 
             override fun executeWebTextOperation(payload: String, onComplete: (Boolean) -> Unit) {
@@ -306,72 +310,6 @@ internal class GeckoViewPrivacyHostRuntime(
             override fun setWebAnnotationClickListener(listener: ((String) -> Unit)?) {
                 if (bindings[token] !== binding) return
                 binding.annotationClickListener = listener.takeUnless { session.settings.usePrivateMode }
-            }
-
-            override fun setFormDraftListener(listener: ((String) -> Unit)?) {
-                if (bindings[token] !== binding) return
-                val enabled = listener != null
-                val wasEnabled = binding.formDraftListener != null
-                binding.formDraftListener = listener.takeIf { enabled }
-                if (!enabled) binding.formDraftRestore.cancel()
-                if (enabled != wasEnabled) runWhenReady(binding) { publish(binding, binding.policy) }
-            }
-
-            override fun restoreFormDraft(payload: String, onComplete: (Boolean) -> Unit) {
-                if (bindings[token] !== binding || binding.formDraftListener == null ||
-                    payload.length > 150_000) {
-                    onComplete(false)
-                    return
-                }
-                binding.formDraftRestore.start(payload, { message ->
-                    port?.postMessage(message
-                        .put("protocolVersion", CandyPrivacyHostContract.PROTOCOL_VERSION)
-                        .put("token", token)
-                        .put("revision", binding.handshake.publishedRevision)
-                        .put("navigationGeneration", binding.policy.navigationGeneration))
-                }, onComplete)
-            }
-
-            override fun extractPageText(onResult: (String?) -> Unit) {
-                if (bindings[token] !== binding || session.settings.usePrivateMode ||
-                    failureDescription != null
-                ) {
-                    onResult(null)
-                    return
-                }
-                runWhenReady(binding) {
-                    val connectedPort = port
-                    if (bindings[token] !== binding || connectedPort == null ||
-                        !binding.handshake.isCurrentPolicyAcknowledged
-                    ) {
-                        onResult(null)
-                        return@runWhenReady
-                    }
-                    binding.textExtraction.start(
-                        revision = binding.handshake.publishedRevision,
-                        navigationGeneration = binding.policy.navigationGeneration,
-                        post = { message ->
-                            connectedPort.postMessage(message
-                                .put("protocolVersion", CandyPrivacyHostContract.PROTOCOL_VERSION)
-                                .put("token", token))
-                        },
-                        onResult = onResult,
-                    )
-                }
-            }
-
-            override fun extractPageForReader(onResult: (String?) -> Unit) {
-                if (bindings[token] !== binding) {
-                    onResult(null)
-                    return
-                }
-                failureDescription?.let {
-                    onResult(null)
-                    return
-                }
-                runWhenReady(binding) {
-                    requestReaderExtraction(binding, onResult)
-                }
             }
 
             override fun scrollMetrics(): BrowserEngineScrollMetrics? = binding.scrollMetrics
@@ -507,15 +445,25 @@ internal class GeckoViewPrivacyHostRuntime(
                 }
             }
 
+            override fun stopWebVideoPlayback() {
+                val currentPort = this@GeckoViewPrivacyHostRuntime.port
+                if (currentPort != null) {
+                    currentPort.postMessage(
+                        JSONObject()
+                            .put("type", "stop-web-video-playback")
+                            .put("protocolVersion", CandyPrivacyHostContract.PROTOCOL_VERSION)
+                            .put("token", token),
+                    )
+                }
+            }
+
             override fun close() {
                 cancelPendingInlineVideoOpen(binding)
                 bindings.remove(token)
                 binding.domProbe.cancel()
                 binding.textInputOcclusionProbe.cancel()
                 binding.userInputRequest.cancel()
-                binding.textExtraction.cancel()
                 binding.webTextOperation.cancel()
-                binding.formDraftRestore.cancel()
                 clearPictureInPicturePreparationRequest(binding)?.invoke(null)
                 clearPictureInPictureRestorationRequest(binding)?.invoke(false)
                 clearInlineVideoPresentationRequest(binding)?.invoke(false)
@@ -601,9 +549,6 @@ internal class GeckoViewPrivacyHostRuntime(
         binding.domProbe.cancel()
         binding.textInputOcclusionProbe.cancel()
         binding.userInputRequest.cancel()
-        binding.textExtraction.cancel()
-        binding.webTextOperation.cancel()
-        binding.formDraftRestore.cancel()
         val readerResult = clearReaderRequest(binding)
         val pictureInPicturePreparationResult =
             clearPictureInPicturePreparationRequest(binding)
@@ -627,7 +572,6 @@ internal class GeckoViewPrivacyHostRuntime(
         refreshTimeout(binding)
         port?.postMessage(
             policy.toMessage(binding.token, binding.handshake.publishedRevision)
-                .put("formDraftSavingEnabled", binding.formDraftListener != null)
                 .put("bindingMode", if (binding.nativeWindow) "native-tab" else "bootstrap")
                 .put("bindingChallenge", if (binding.nativeWindow) binding.challenge else JSONObject.NULL)
                 .put("domDiagnosticsEnabled", BuildConfig.ENABLE_PERFORMANCE_DIAGNOSTICS && !binding.session.settings.usePrivateMode)
@@ -704,38 +648,36 @@ internal class GeckoViewPrivacyHostRuntime(
             "inline-video-presentation-result" -> acceptInlineVideoPresentationResult(value)
             "picture-in-picture-playback-result" ->
                 acceptPictureInPicturePlaybackResult(value)
-            "form-draft-snapshot", "form-draft-restored" -> {
-                val binding = bindings[value.optString("token")] ?: return
-                if (binding.formDraftListener == null ||
-                    binding.handshake.publishedRevision != value.optLong("revision", -1) ||
-                    binding.policy.navigationGeneration != value.optInt("navigationGeneration", -1)) return
-                if (value.optString("type") == "form-draft-restored") binding.formDraftRestore.accept(value)
-                else value.optJSONObject("payload")?.toString()?.takeIf { it.length <= 150_000 }
-                    ?.let { binding.formDraftListener?.invoke(it) }
-            }
-            "web-annotation-click" -> {
-                val binding = bindings[value.optString("token")] ?: return
-                if (binding.session.settings.usePrivateMode ||
-                    binding.handshake.publishedRevision != value.optLong("revision", -1) ||
-                    binding.policy.navigationGeneration != value.optInt("navigationGeneration", -1)) return
-                value.optString("id").takeIf { it.length in 1..64 }
-                    ?.let { binding.annotationClickListener?.invoke(it) }
-            }
-            "web-text-operation-result" -> {
-                val binding = bindings[value.optString("token")] ?: return
-                if (binding.handshake.publishedRevision != value.optLong("revision", -1) ||
-                    binding.policy.navigationGeneration != value.optInt("navigationGeneration", -1)) return
-                binding.webTextOperation.accept(value)
-            }
-            "text-extraction-result" -> {
-                val binding = bindings[value.optString("token")] ?: return
-                if (binding.session.settings.usePrivateMode ||
-                    binding.handshake.publishedRevision != value.optLong("revision", -1) ||
-                    binding.policy.navigationGeneration != value.optInt("navigationGeneration", -1)
-                ) return
-                binding.textExtraction.accept(value)
-            }
             "reader-result" -> acceptReaderResult(value)
+            "media-stream-detected" -> {
+                val streamUrl = value.optString("url")
+                val pageUrl = value.optString("pageUrl").takeIf { it.isNotBlank() }
+                val title = value.optString("title").takeIf { it.isNotBlank() }
+                val userAgent = value.optString("userAgent").takeIf { it.isNotBlank() }
+                val headersJson = value.optJSONObject("headers")
+                val headersMap = mutableMapOf<String, String>()
+                if (headersJson != null) {
+                    val keys = headersJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val headerVal = headersJson.optString(key)
+                        if (headerVal.isNotBlank()) {
+                            headersMap[key] = headerVal
+                        }
+                    }
+                }
+                if (streamUrl.isNotBlank() && !streamUrl.startsWith("blob:")) {
+                    mainHandler.post {
+                        MediaStreamDetectorBridge.onStreamDetected(
+                            url = streamUrl,
+                            pageUrl = pageUrl,
+                            userAgent = userAgent,
+                            title = title,
+                            headers = headersMap,
+                        )
+                    }
+                }
+            }
             "text-input-occlusion-result" -> {
                 val binding = bindings[value.optString("token")] ?: return
                 if (
@@ -764,6 +706,20 @@ internal class GeckoViewPrivacyHostRuntime(
                     binding.policy.navigationGeneration != value.optInt("navigationGeneration", -1)
                 ) return
                 binding.userInputRequest.accept(value)
+            }
+            "web-annotation-click" -> {
+                val binding = bindings[value.optString("token")] ?: return
+                if (binding.session.settings.usePrivateMode ||
+                    binding.handshake.publishedRevision != value.optLong("revision", -1) ||
+                    binding.policy.navigationGeneration != value.optInt("navigationGeneration", -1)) return
+                value.optString("id").takeIf { it.length in 1..64 }
+                    ?.let { binding.annotationClickListener?.invoke(it) }
+            }
+            "web-text-operation-result" -> {
+                val binding = bindings[value.optString("token")] ?: return
+                if (binding.handshake.publishedRevision != value.optLong("revision", -1) ||
+                    binding.policy.navigationGeneration != value.optInt("navigationGeneration", -1)) return
+                binding.webTextOperation.accept(value)
             }
             "failed" -> fail(IllegalStateException(value.optString("reason", "Privacy host failed")))
         }
@@ -1455,9 +1411,6 @@ internal class GeckoViewPrivacyHostRuntime(
             binding.domProbe.cancel()
             binding.textInputOcclusionProbe.cancel()
             binding.userInputRequest.cancel()
-            binding.textExtraction.cancel()
-            binding.webTextOperation.cancel()
-            binding.formDraftRestore.cancel()
             cancelTimeout(binding)
             clearPictureInPicturePreparationRequest(binding)?.invoke(null)
             clearInlineVideoPresentationRequest(binding)?.invoke(false)

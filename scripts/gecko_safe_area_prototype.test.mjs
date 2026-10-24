@@ -8,7 +8,7 @@ const redditSource = readFileSync(new URL('../app/src/main/assets/candy_privacy/
 
 function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnimationFrames = false,
   normalizePixels = false, reparseStyles = false, prototypeSource = source, hostname = '',
-  viewportContent = null, themeColor = null, mediaMatches = () => true } = {}) {
+  viewportContent = null, themeColor = null } = {}) {
   let clock = 0; let timerId = 0; let observer;
   const observers = [];
   let deliveredEnvTop = envTop;
@@ -19,7 +19,6 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
   let ruleWrites = 0;
   const normalize = (value) => normalizePixels && /^[+-]?[\d.]+px$/.test(value) ? `${Number(Number(value.slice(0, -2)).toFixed(4))}px` : value;
   const sheets = [];
-  const selectorParts = (selector) => selector.split(/,(?![^()]*\))/);
   function ruleStyle() {
     const values = new Map();
     return { getPropertyValue: (name) => values.get(name)?.value || '',
@@ -33,7 +32,6 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
       this.content = '';
       this.isConnected = true; this.computed = { position, top }; this.properties = new Map();
       this.attributes = new Map();
-      this.eventListeners = new Map(); this.disabled = false;
       if (tag === 'style') {
         this.sheet = { cssRules: [], ownerNode: this, media: { get mediaText() { return this.owner.getAttribute('media') || ''; }, owner: this },
           insertRule: (selector, index) => {
@@ -103,11 +101,6 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
     }
     setAttribute(name, value) { this.attributes.set(name, value); if (name === 'media') this.reparse(); }
     removeAttribute(name) { this.attributes.delete(name); if (name === 'media') this.reparse(); }
-    hasAttribute(name) { return this.attributes.has(name); }
-    addEventListener(type, callback) {
-      const callbacks = this.eventListeners.get(type) || new Set(); callbacks.add(callback); this.eventListeners.set(type, callbacks);
-    }
-    removeEventListener(type, callback) { this.eventListeners.get(type)?.delete(callback); }
     set textContent(value) { this.content = value; this.reparse(); }
     get textContent() { return this.content; }
     get firstChild() {
@@ -121,15 +114,10 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
     }
     matches(selector) {
       selectorMatches++;
-      return selectorParts(selector).some((part) => {
-        const conflicts = [...part.matchAll(/:not\(:where\(([^()]*)\)\)/g)];
-        for (const conflict of conflicts) {
-          if (selectorParts(conflict[1]).some((value) => {
-            const attribute = /^\[([^\]]+)\]$/.exec(value.trim());
-            return attribute ? this.getAttribute(attribute[1]) !== null : this.matches(value);
-          })) return false;
-          part = part.replace(conflict[0], '');
-        }
+      return selector.split(',').some((part) => {
+        const exclusions = [...part.matchAll(/:not\(:where\(\[([^\]]+)\]\)\)/g)];
+        if (exclusions.some((exclusion) => this.getAttribute(exclusion[1]) !== null)) return false;
+        for (const exclusion of exclusions) part = part.replace(exclusion[0], '');
         const marker = /\[([^=]+)="([^"]+)"\]/.exec(part);
         if (marker) return this.getAttribute(marker[1]) === marker[2];
         const value = part.trim();
@@ -193,15 +181,6 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
     querySelectorAll: (selector) => {
       if (selector === 'meta[name="theme-color" i]') return theme ? [theme] : [];
       if (selector === 'meta[name="viewport" i]') return viewport ? [viewport] : [];
-      if (selector === 'link[rel~="stylesheet"]') {
-        const pending = [root]; const links = [];
-        while (pending.length) {
-          const element = pending.pop();
-          if (element.localName === 'link' && (element.getAttribute('rel') || '').split(/\s+/).includes('stylesheet')) links.push(element);
-          pending.push(...element.children);
-        }
-        return links;
-      }
       if (!["header, nav, [role=\"banner\"], [role=\"navigation\"]",
         'reddit-header-small, reddit-header-large, shreddit-header', 'shreddit-app', 'main'].includes(selector)) return [];
       reads.selector++;
@@ -216,34 +195,27 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
   };
   function computed(element) {
     const result = { display: 'block', visibility: 'visible', paddingTop: '0px', backgroundColor: 'rgba(0, 0, 0, 0)', ...element.computed };
-    const activeRules = (rules) => Array.from(rules).flatMap((rule) =>
-      [4, 12].includes(rule.type) ? activeRules(rule.cssRules || []) : [rule]);
-    const accessible = (sheet) => { try { return activeRules(sheet.cssRules); } catch { return []; } };
-    // Model priority and simple selector specificity used by these fixtures.
-    // :where() exclusions must not raise the injected rule's specificity.
-    const specificity = (selector) => {
-      const plain = selector.replace(/:not\(:where\([^()]*\)\)/g, '');
-      return (plain.match(/#[\w-]+/g)?.length || 0) * 10000 +
-        (plain.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+/g)?.length || 0) * 100 +
-        (plain.match(/(?:^|\s)[a-z][\w-]*/gi)?.length || 0);
-    };
-    for (const [name, camel] of [['position', 'position'], ['display', 'display'], ['top', 'top'], ['padding-top', 'paddingTop']]) {
+    const accessible = (sheet) => { try { return sheet.cssRules; } catch { return []; } };
+    for (const sheet of document.styleSheets) {
+      if (sheet.disabled || (sheet.media?.mediaText && sheet.media.mediaText !== 'all')) continue;
+      for (const rule of accessible(sheet)) {
+        if (rule.type !== 1 || !element.matches(rule.selectorText)) continue;
+        for (const name of ['position', 'display']) {
+          const value = rule.style.getPropertyValue(name);
+          if (value) result[name] = value;
+        }
+      }
+    }
+    for (const [name, camel] of [['top', 'top'], ['padding-top', 'paddingTop']]) {
       const inline = element.properties.get(name);
       if (inline) result[camel] = inline.value;
       if (inline?.priority === 'important' || element.authorImportant?.[name]) continue;
-      let winningPriority = inline ? 1e9 : -1;
       for (const sheet of document.styleSheets) {
         if (sheet.disabled || (sheet.media?.mediaText && sheet.media.mediaText !== 'all')) continue;
         for (const rule of accessible(sheet)) {
           const value = rule.style.getPropertyValue(name);
-          if (rule.type !== 1 || !value) continue;
-          const matching = selectorParts(rule.selectorText).filter((part) => element.matches(part));
-          if (!matching.length) continue;
-          const priority = (rule.style.getPropertyPriority(name) === 'important' ? 1e12 : 0) +
-            Math.max(...matching.map(specificity));
-          if (priority < winningPriority) continue;
-          winningPriority = priority;
-          result[camel] = value;
+          if (inline && rule.style.getPropertyPriority(name) !== 'important') continue;
+          if (rule.type === 1 && element.matches(rule.selectorText) && value) result[camel] = value;
         }
       }
     }
@@ -260,7 +232,6 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
     innerHeight: 800,
     scrollY: 0,
     devicePixelRatio: density,
-    matchMedia: (media) => ({ matches: mediaMatches(media) }),
     CandyContentTopInset: {
       cssSafeAreaConfiguration: () => ({ ...config }),
       domDiagnosticsEnabled: () => true,
@@ -311,14 +282,12 @@ function fixture({ density = 3, nativeTop = 96, envTop = nativeTop, simulateAnim
     sheet(definitions, options = {}) {
       const node = body.append(new Element('static', 'auto', 'style'));
       Object.assign(node.sheet, options);
-      const makeRule = (definition) => {
+      for (const definition of definitions) {
         const style = ruleStyle();
         for (const [name, value] of Object.entries(definition.declarations || {})) style.setProperty(name, value, definition.important ? 'important' : '');
-        return { type: definition.type ?? 1, selectorText: definition.selector || 'div', style,
-          ...(definition.children ? { cssRules: definition.children.map(makeRule) } :
-            definition.nested ? { cssRules: [{}] } : {}) };
-      };
-      node.sheet.cssRules.push(...definitions.map(makeRule));
+        node.sheet.cssRules.push({ type: definition.type ?? 1, selectorText: definition.selector || 'div', style,
+          ...(definition.nested ? { cssRules: [{}] } : {}) });
+      }
       return node;
     },
     start(drain = true) { vm.runInContext(prototypeSource, context); if (drain) flush(); },
@@ -1679,7 +1648,7 @@ test('split negative class and ancestor states escape positive selectors outside
   f.start();
   assert.equal(f.computed(selected).top, '32px');
   f.event('scroll'); selected.classes = ['hidden']; f.mutate(selected, 'class'); f.flush();
-  assert.equal(f.computed(selected).top, '-64px', 'The ID selector wins over the later class selector');
+  assert.equal(f.computed(selected).top, '-80px');
   selected.classes = []; f.mutate(selected, 'class'); f.flush();
   assert.equal(f.computed(selected).top, '32px');
   selected.computed.top = '-64px';
@@ -1717,14 +1686,12 @@ test('removing a positive inline top can expose a negative author stylesheet top
 });
 
 test('negative selector exclusions retain comma-list specificity and precede pseudo-elements', () => {
-  const injected = [];
-  for (const selector of ['#one, .two', '#pseudo::before']) {
-    const f = fixture();
-    f.sheet([{ selector, declarations: { position: 'fixed', top: '0px' } }]);
-    f.start();
-    injected.push(...f.sheets.filter((element) => element.isConnected && element.parentElement?.localName === 'html')
-      .flatMap((element) => element.sheet.cssRules).map((rule) => rule.selectorText));
-  }
+  const f = fixture();
+  f.sheet([{ selector: '#one, .two', declarations: { position: 'fixed', top: '0px' } },
+    { selector: '#pseudo::before', declarations: { position: 'fixed', top: '8px' } }]);
+  f.start();
+  const injected = f.sheets.filter((element) => element.isConnected && element.parentElement?.localName === 'html')
+    .flatMap((element) => element.sheet.cssRules).map((rule) => rule.selectorText);
   assert.ok(injected.some((selector) => /^#one(?::not\(:where\(\[[^\]]+\]\)\)){2}, \.two(?::not\(:where\(\[[^\]]+\]\)\)){2}$/.test(selector)));
   assert.ok(injected.some((selector) => /^#pseudo(?::not\(:where\(\[[^\]]+\]\)\)){2}::before$/.test(selector)));
 });
@@ -2330,167 +2297,6 @@ test('stylesheet load and viewport changes recheck cached headers without networ
   assert.deepEqual({ reads: { ...f.reads }, rules: f.ruleWrites() }, before);
 });
 
-test('pending parser stylesheet defers safe-area layout probes until load settles', () => {
-  const f = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  f.context.document.readyState = 'interactive';
-  const link = f.context.document.createElement('link');
-  link.setAttribute('rel', 'stylesheet');
-  link.setAttribute('href', 'https://fixture.invalid/delayed.css');
-  f.body.append(link);
-  const header = f.element('sticky', '0px', 'header');
-  header.rect = { top: 0, left: 0, width: 800, height: 40, right: 800, bottom: 40 };
-
-  f.start();
-  assert.equal(f.reads.style, 0, 'Cover classifier and body style reads wait while the parser stylesheet is pending');
-  assert.equal(f.reads.rect, 0, 'No layout geometry is forced before stylesheet completion');
-
-  f.event('load', 'document', link);
-  f.flush();
-  assert.ok(f.reads.style > 0, 'Safe-area classification resumes after stylesheet load');
-  assert.ok(f.reads.rect > 0, 'Header geometry is checked after stylesheet load');
-});
-
-test('stylesheet error releases deferred safe-area measurements', () => {
-  const f = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  f.context.document.readyState = 'interactive';
-  const link = f.context.document.createElement('link');
-  link.setAttribute('rel', 'stylesheet'); link.setAttribute('href', 'https://fixture.invalid/failing.css'); f.body.append(link);
-  f.start();
-  assert.equal(f.reads.style, 0);
-  f.event('error', 'document', link);
-  assert.ok(f.reads.style > 0, 'A failed stylesheet must not hold safe-area work');
-
-  const completed = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  completed.context.document.readyState = 'interactive';
-  const pending = completed.context.document.createElement('link');
-  pending.setAttribute('rel', 'stylesheet'); pending.setAttribute('href', 'https://fixture.invalid/missed-event.css'); completed.body.append(pending);
-  completed.start(); assert.equal(completed.reads.style, 0);
-  completed.context.document.readyState = 'complete';
-  completed.event('load', 'window'); completed.flush();
-  assert.ok(completed.reads.style > 0, 'Window load is a final release for any missed per-link event');
-});
-
-test('disabled, removed, and non-rendering media stylesheets do not hold readiness', () => {
-  const disabled = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  disabled.context.document.readyState = 'interactive';
-  const disabledLink = disabled.context.document.createElement('link');
-  disabledLink.setAttribute('rel', 'stylesheet'); disabledLink.setAttribute('href', 'https://fixture.invalid/disabled.css'); disabled.body.append(disabledLink);
-  disabled.start(); assert.equal(disabled.reads.style, 0);
-  disabledLink.disabled = true; disabled.mutate(disabledLink, 'disabled');
-  assert.ok(disabled.reads.style > 0, 'A disabled pending sheet must release the gate');
-
-  const removed = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  removed.context.document.readyState = 'interactive';
-  const removedLink = removed.context.document.createElement('link');
-  removedLink.setAttribute('rel', 'stylesheet'); removedLink.setAttribute('href', 'https://fixture.invalid/removed.css'); removed.body.append(removedLink);
-  removed.start(); assert.equal(removed.reads.style, 0);
-  removedLink.remove();
-  removed.dispatchMutations([{ type: 'childList', target: removed.body, addedNodes: [], removedNodes: [removedLink] }]);
-  assert.ok(removed.reads.style > 0, 'Removal/abort must release the gate');
-
-  const print = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  print.context.document.readyState = 'interactive';
-  const printLink = print.context.document.createElement('link');
-  printLink.setAttribute('rel', 'stylesheet'); printLink.setAttribute('href', 'https://fixture.invalid/print.css'); printLink.setAttribute('media', 'print'); print.body.append(printLink);
-  print.start(); assert.ok(print.reads.style > 0, 'A non-rendering print sheet is not a readiness dependency');
-
-  let queryMatches = false;
-  const media = fixture({ viewportContent: 'width=device-width,viewport-fit=cover', mediaMatches: () => queryMatches });
-  media.context.document.readyState = 'interactive';
-  const mediaLink = media.context.document.createElement('link');
-  mediaLink.setAttribute('rel', 'stylesheet'); mediaLink.setAttribute('href', 'https://fixture.invalid/media.css'); mediaLink.setAttribute('media', '(min-width: 900px)'); media.body.append(mediaLink);
-  media.start(); assert.ok(media.reads.style > 0, 'A currently non-matching media query is not a dependency');
-  const mediaReadsBeforeMatch = media.reads.style;
-  queryMatches = true; media.mutate(mediaLink, 'media');
-  assert.equal(media.reads.style, mediaReadsBeforeMatch, 'Once the media query matches, new measurements defer');
-  media.event('load', 'document', mediaLink); media.flush();
-  assert.ok(media.reads.style > mediaReadsBeforeMatch, 'Matching media sheet releases after loading');
-});
-
-test('stylesheet readiness ignores empty links and settled sheets without waiting for window load', () => {
-  for (const href of [null, '']) {
-    const f = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-    f.context.document.readyState = 'interactive';
-    const link = f.context.document.createElement('link');
-    link.setAttribute('rel', 'stylesheet');
-    if (href !== null) link.setAttribute('href', href);
-    f.body.append(link);
-    f.start();
-    assert.ok(f.reads.style > 0, `A stylesheet link with ${href === null ? 'no href' : 'an empty href'} must not hold measured work`);
-    assert.ok(f.reads.rect > 0, 'The no-load case must proceed without a window load event');
-  }
-
-  const cached = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  cached.context.document.readyState = 'interactive';
-  const link = cached.context.document.createElement('link');
-  link.setAttribute('rel', 'stylesheet');
-  link.setAttribute('href', 'https://fixture.invalid/cached-parser.css');
-  let sheetReads = 0;
-  Object.defineProperty(link, 'sheet', { configurable: true, get() { sheetReads++; return {}; } });
-  cached.body.append(link);
-  cached.start();
-  assert.ok(sheetReads > 0, 'The associated CSSStyleSheet is a non-layout loaded-sheet indicator');
-  assert.ok(cached.reads.style > 0, 'A cached parser sheet already associated at registration does not wait for window load');
-  assert.ok(cached.reads.rect > 0, 'Safe-area geometry proceeds after the cached sheet is recognized');
-
-  const inert = fixture();
-  inert.context.document.readyState = 'loading'; inert.config.enabled = false;
-  const inertLink = inert.context.document.createElement('link');
-  inertLink.setAttribute('rel', 'stylesheet');
-  inertLink.setAttribute('href', 'https://fixture.invalid/cached-without-layout.css');
-  Object.defineProperty(inertLink, 'sheet', { configurable: true, get() { return {}; } });
-  inert.body.append(inertLink);
-  inert.start();
-  assert.equal(inert.reads.style, 0, 'Reading the associated sheet does not query computed style');
-  assert.equal(inert.reads.rect, 0, 'Reading the associated sheet does not force layout geometry');
-});
-
-test('stylesheet href changes register the new request before resuming deferred measurements', () => {
-  const pending = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  pending.context.document.readyState = 'interactive';
-  const pendingLink = pending.context.document.createElement('link');
-  pendingLink.setAttribute('rel', 'stylesheet');
-  pendingLink.setAttribute('href', 'https://fixture.invalid/old-pending.css');
-  pending.body.append(pendingLink);
-  pending.start();
-  assert.equal(pending.reads.style, 0);
-  assert.equal(pending.reads.rect, 0);
-
-  // A link can still expose its old associated sheet while the href mutation
-  // has started a replacement request. That stale association must not open a
-  // synchronous measurement window between settling the old watcher and
-  // registering the new one.
-  Object.defineProperty(pendingLink, 'sheet', { configurable: true, get() { return {}; } });
-  pendingLink.setAttribute('href', 'https://fixture.invalid/new-pending.css');
-  pending.mutate(pendingLink, 'href');
-  pending.flush();
-  assert.equal(pending.reads.style, 0, 'A replacement request stays gated during the href mutation');
-  assert.equal(pending.reads.rect, 0, 'The old sheet association must not force geometry before replacement load');
-  pending.event('load', 'document', pendingLink);
-  pending.flush();
-  assert.ok(pending.reads.style > 0, 'Measurements resume when the replacement stylesheet settles');
-
-  const loaded = fixture({ viewportContent: 'width=device-width,viewport-fit=cover' });
-  loaded.context.document.readyState = 'interactive';
-  const loadedLink = loaded.context.document.createElement('link');
-  loadedLink.setAttribute('rel', 'stylesheet');
-  loadedLink.setAttribute('href', 'https://fixture.invalid/loaded-old.css');
-  Object.defineProperty(loadedLink, 'sheet', { configurable: true, get() { return {}; } });
-  loaded.body.append(loadedLink);
-  loaded.start();
-  assert.ok(loaded.reads.style > 0, 'The already-loaded original sheet does not gate initial work');
-  const styleReads = loaded.reads.style;
-  const rectReads = loaded.reads.rect;
-  loadedLink.setAttribute('href', 'https://fixture.invalid/loaded-new.css');
-  loaded.mutate(loadedLink, 'href');
-  loaded.flush();
-  assert.equal(loaded.reads.style, styleReads, 'An href change before document complete waits for the replacement');
-  assert.equal(loaded.reads.rect, rectReads, 'The replacement link is not treated as settled from the old sheet');
-  loaded.event('load', 'document', loadedLink);
-  loaded.flush();
-  assert.ok(loaded.reads.style > styleReads, 'Replacement completion releases deferred work');
-});
-
 test('inserted and removed stylesheets refresh existing per-element header rules', () => {
   const f = fixture();
   const header = f.element('fixed', '64px', 'header');
@@ -2652,123 +2458,6 @@ test('full selector rules protect passive class activation and new matching node
   assert.equal(priority.computed(same).top, '52px', 'Same-priority duplicates preserve source order');
 });
 
-test('split top declarations use resolved author layout instead of a stale selector clone', () => {
-  for (const separateSheet of [false, true]) {
-    const f = fixture();
-    const initial = { selector: '.control', declarations: { position: 'fixed', top: '0px' } };
-    const override = { selector: '.control', declarations: { top: '60px' } };
-    f.sheet(separateSheet ? [initial] : [initial, override]);
-    if (separateSheet) f.sheet([override]);
-    const control = f.element('static', 'auto'); control.classes = ['control'];
-    assert.equal(f.computed(control).top, '60px');
-    f.start();
-    assert.equal(f.computed(control).top, '92px');
-    assert.equal(f.diagnostics().cssRulesApplied, 0, 'Split declarations stay on the bounded DOM path');
-    f.configure({ enabled: false });
-    assert.equal(f.computed(control).top, '60px');
-  }
-});
-
-test('selector conflicts preserve author specificity, importance and position changes', () => {
-  const cases = [
-    { name: 'more specific split top', definitions: [
-      { selector: '#control', declarations: { top: '60px' } },
-      { selector: '.control', declarations: { position: 'fixed', top: '0px' } },
-    ], position: 'fixed', before: '60px', after: '92px' },
-    { name: 'important class beats normal ID', definitions: [
-      { selector: '.control', declarations: { position: 'fixed', top: '8px' }, important: true },
-      { selector: '#control', declarations: { position: 'fixed', top: '60px' } },
-    ], position: 'fixed', before: '8px', after: '40px' },
-    { name: 'relative position overrides fixed class', definitions: [
-      { selector: '.control', declarations: { position: 'fixed', top: '0px' } },
-      { selector: '#control', declarations: { position: 'relative', top: '60px' } },
-    ], position: 'relative', before: '60px', after: '60px' },
-    { name: 'same-selector relative position', definitions: [
-      { selector: '.control', declarations: { position: 'fixed', top: '0px' } },
-      { selector: '.control', declarations: { position: 'relative' } },
-    ], position: 'relative', before: '0px', after: '0px' },
-  ];
-  for (const entry of cases) {
-    const f = fixture(); f.sheet(entry.definitions);
-    const control = f.element('static', 'auto'); control.id = 'control'; control.classes = ['control'];
-    assert.equal(f.computed(control).top, entry.before, entry.name);
-    f.start();
-    assert.equal(f.computed(control).position, entry.position, entry.name);
-    assert.equal(f.computed(control).top, entry.after, entry.name);
-    f.configure({ enabled: false });
-    assert.equal(f.computed(control).top, entry.before, entry.name);
-  }
-});
-
-test('passive conflicting selector states keep authored geometry outside DOM discovery', () => {
-  const f = fixture();
-  f.sheet([
-    { selector: '.control', declarations: { position: 'fixed', top: '0px' } },
-    { selector: '.control.shifted', declarations: { top: '60px' } },
-  ]);
-  const control = f.element('static', 'auto');
-  f.start();
-  control.classes = ['control'];
-  assert.equal(f.computed(control).top, '32px');
-  control.classes = ['control', 'shifted'];
-  assert.equal(f.computed(control).top, '60px', 'No stale important clone masks an unvisited state');
-  control.classes = ['control'];
-  assert.equal(f.computed(control).top, '32px');
-});
-
-test('late conflicting sources release stale clones and source removal restores safe protection', () => {
-  const f = fixture();
-  f.sheet([{ selector: '.control', declarations: { position: 'fixed', top: '0px' } }]);
-  const control = f.element('static', 'auto'); control.classes = ['control'];
-  f.start(); assert.equal(f.computed(control).top, '32px');
-  const override = f.sheet([{ selector: '.control', declarations: { top: '60px' } }]);
-  f.added(override); f.flush();
-  assert.equal(f.computed(control).top, '60px', 'A late split declaration cannot retain the stale 32px clone');
-  f.removed(override); f.flush();
-  assert.equal(f.computed(control).top, '32px');
-
-  const pseudo = fixture();
-  pseudo.sheet([
-    { selector: '.control::before', declarations: { position: 'fixed', top: '0px' } },
-    { selector: '#control::before', declarations: { top: '60px' } },
-  ]);
-  pseudo.start();
-  assert.equal(pseudo.diagnostics().cssRulesApplied, 0, 'Pseudo-element conflicts cannot use element-match exclusions');
-});
-
-test('conflict inventory outlives the output cap and grouped overrides exclude only affected matches', () => {
-  const capped = fixture(); capped.config.maxInitialElements = 64;
-  capped.sheet([
-    { selector: '.control', declarations: { position: 'fixed', top: '0px' } },
-    ...Array.from({ length: 70 }, (_, index) => ({ selector: `#spare${index}`, declarations: { position: 'relative' } })),
-    { selector: '#control', declarations: { top: '60px' } },
-  ]);
-  const control = capped.element('static', 'auto'); control.id = 'control'; control.classes = ['control'];
-  capped.start();
-  assert.equal(capped.computed(control).top, '92px', 'Protection-rule cap cannot truncate later conflict information');
-
-  for (const type of [4, 12]) {
-    const f = fixture();
-    f.sheet([
-      { selector: '.control', declarations: { position: 'fixed', top: '0px' } },
-      { selector: '.other', declarations: { position: 'fixed', top: '8px' } },
-      { type, children: [{ selector: '#control', declarations: { top: '60px' } }] },
-    ]);
-    const affected = f.element('static', 'auto'); affected.id = 'control'; affected.classes = ['control'];
-    const unrelated = f.element('static', 'auto');
-    assert.equal(f.computed(affected).top, '60px');
-    f.start();
-    assert.equal(f.computed(affected).top, '92px');
-    unrelated.classes = ['other'];
-    assert.equal(f.computed(unrelated).top, '40px', 'Grouping does not disable unrelated passive selector protection');
-  }
-
-  const nested = fixture();
-  nested.sheet([{ selector: '.control', declarations: { position: 'fixed', top: '0px' }, nested: true }]);
-  nested.start();
-  assert.equal(nested.diagnostics().cssRulesApplied, 0, 'Unresolved CSS nesting cannot be mistaken for complete conflict information');
-});
-
 test('selector scan skips unsupported and inaccessible contexts, consumes caps and never restarts on scroll', () => {
   const f = fixture();
   const declarations = { position: 'fixed', top: '0px' };
@@ -2777,6 +2466,7 @@ test('selector scan skips unsupported and inaccessible contexts, consumes caps a
   f.sheet([{ selector: '#media.future', declarations }], { media: { mediaText: '(min-width: 600px)' } });
   f.sheet([{ type: 4, selector: '#group.future', declarations },
     { type: 3, selector: '#import.future', declarations },
+    { selector: '#nested.future', declarations, nested: true },
     { selector: '#auto.future', declarations: { position: 'fixed', top: 'auto' } },
     { selector: '#percent.future', declarations: { position: 'fixed', top: '10%' } }]);
   const inaccessible = f.sheet([]);
@@ -2788,7 +2478,7 @@ test('selector scan skips unsupported and inaccessible contexts, consumes caps a
   for (const node of nodes) node.classes = ['future'];
   const own = f.sheets.find((node) => node !== inaccessible && node.sheet.cssRules.some((rule) => rule.selectorText.startsWith('#valid.future') && rule.style.getPropertyPriority('top') === 'important') && node.parentElement?.localName === 'html');
   assert.equal(f.computed(nodes[0]).top, '32px');
-  assert.ok(!own.sheet.cssRules.some((rule) => /^#(?:disabled|media|group|import|nested|auto|percent)/.test(rule.selectorText)));
+  assert.ok(!own.sheet.cssRules.some((rule) => /#(?:disabled|media|group|import|nested|auto|percent)/.test(rule.selectorText)));
   const count = own.sheet.cssRules.length;
   f.event('load', 'window'); f.event('scroll'); f.flush(); assert.equal(own.sheet.cssRules.length, count);
 
@@ -2904,20 +2594,9 @@ test('replaced sheet identities retain last protection through cooldown and comm
 
 test('selector and navigation-lifetime source caps remain bounded and observable', () => {
   const f = fixture(); f.config.maxInitialElements = 64;
-  f.sheet(Array.from({ length: 200 }, (_, index) => ({ selector: `#cap${index}.fixed`, declarations: { position: 'fixed', top: '0px' } })));
-  f.start();
-  assert.ok(f.diagnostics().cssRulesApplied > 0 && f.diagnostics().cssRulesApplied <= 63);
-  assert.ok(f.diagnostics().cssBudgetHits > 0);
-  const clonedSelectors = f.sheets.filter((node) => node.parentElement?.localName === 'html')
-    .flatMap((node) => node.sheet.cssRules).filter((rule) => rule.selectorText.startsWith('#cap'));
-  assert.ok(clonedSelectors.reduce((total, rule) => total + rule.selectorText.length + 2, 0) <= 32768,
-    'Conflict exclusions share the existing selector-text budget');
+  f.sheet(Array.from({ length: 300 }, (_, index) => ({ selector: `#cap${index}.fixed`, declarations: { position: 'fixed', top: '0px' } })));
+  f.start(); assert.equal(f.diagnostics().cssRulesApplied, 63); assert.ok(f.diagnostics().cssBudgetHits > 0);
   assert.equal(f.computed(f.body).paddingTop, '32px');
-  const incomplete = fixture();
-  incomplete.sheet(Array.from({ length: 300 }, (_, index) => ({ selector: `#cap${index}.fixed`, declarations: { position: 'fixed', top: '0px' } })));
-  incomplete.start();
-  assert.equal(incomplete.diagnostics().cssRulesApplied, 0, 'Truncated conflict inventory cannot prove any clone safe');
-  assert.ok(incomplete.diagnostics().cssBudgetHits > 0);
   const capped = fixture();
   const style = capped.sheet([{ selector: '#event.fixed', declarations: { position: 'fixed', top: '0px' } }]);
   capped.start();

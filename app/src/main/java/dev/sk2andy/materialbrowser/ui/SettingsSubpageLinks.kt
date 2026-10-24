@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import dev.sk2andy.materialbrowser.R
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
 
 @Composable
 internal fun AppearanceSubpageLinks(onDestinationChanged: (SettingsDestination) -> Unit) {
@@ -80,13 +82,6 @@ internal fun BrowserSubpageLinks(onDestinationChanged: (SettingsDestination) -> 
             subtitle = stringResource(R.string.settings_external_app_links_title) + " · " +
                 stringResource(R.string.settings_external_link_preview_title),
             onClick = { onDestinationChanged(SettingsDestination.BrowserLinks) },
-        )
-        SettingsPreferenceDivider()
-        SettingsLink(
-            icon = ImageVector.vectorResource(R.drawable.ic_player_volume),
-            title = stringResource(R.string.reader_voice_settings_title),
-            subtitle = stringResource(R.string.reader_voice_settings_summary),
-            onClick = { onDestinationChanged(SettingsDestination.ReadAloud) },
         )
     }
 }

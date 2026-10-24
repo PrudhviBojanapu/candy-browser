@@ -1,5 +1,11 @@
 package dev.sk2andy.materialbrowser.ui
 
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.disabled
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsRadioOption
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +32,8 @@ import dev.sk2andy.materialbrowser.browser.ExternalAppLinkHandling
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsHeaderArtwork
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsHeaderIllustration
 import dev.sk2andy.materialbrowser.shared.ui.settings.settingsSearchTarget
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
 
 internal object ExternalAppLinksSettingsTestTags {
     const val Handling = "external_app_links_handling"
@@ -143,5 +151,28 @@ internal fun ExternalAppLinksSettingsPage(
                 }
             },
         )
+    }
+}
+
+
+@Composable
+internal fun <T> BrowserRadioChoices(
+    title: String,
+    selected: T,
+    choices: List<T>,
+    label: @Composable (T) -> String,
+    enabled: Boolean,
+    onSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.settingsSearchTarget(title).selectableGroup().semantics { if (!enabled) disabled() }) {
+        SettingsSectionTitle(title)
+        choices.forEachIndexed { index, choice ->
+            if (index > 0) SettingsPreferenceDivider()
+            SettingsRadioOption(
+                label = label(choice), selected = choice == selected, enabled = enabled,
+                onClick = { if (choice != selected) onSelected(choice) },
+            )
+        }
     }
 }

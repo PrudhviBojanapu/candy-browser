@@ -28,8 +28,6 @@ import dev.sk2andy.materialbrowser.data.BrowserAppearanceMode
 import dev.sk2andy.materialbrowser.data.BrowserColorPalette
 import dev.sk2andy.materialbrowser.data.BrowserShapeStyle
 import dev.sk2andy.materialbrowser.data.BrowserSurfaceStyle
-import dev.sk2andy.materialbrowser.ui.AndroidLibrarySearchBarRenderer
-import dev.sk2andy.materialbrowser.shared.ui.LocalLibrarySearchBarRenderer
 import dev.sk2andy.materialbrowser.ui.CandyChromeSurfaceRenderer
 import dev.sk2andy.materialbrowser.ui.LocalCandyChromeSurfaceRenderer
 import dev.sk2andy.materialbrowser.ui.androidCandyChromeSurfaceRenderer
@@ -82,7 +80,6 @@ internal fun CandyTheme(
             LocalCandyDesignLanguage provides designLanguage,
             LocalCandyMotionScheme provides CandyMotionSchemes.forDesignLanguage(designLanguage),
             LocalCandyChromeSurfaceRenderer provides chromeSurfaceRenderer,
-            LocalLibrarySearchBarRenderer provides AndroidLibrarySearchBarRenderer,
             content = content,
         )
     }

@@ -113,10 +113,15 @@ internal class GeckoDefaultExtensionProvisioner(
                 installer.install(extension)
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
+                android.util.Log.e("GeckoDefaultExt", "Failed to install ${extension.id}", e)
                 null
             }
             if (provisioned == null || !GeckoDefaultExtensionRules.matches(extension, provisioned)) {
+                android.util.Log.w(
+                    "GeckoDefaultExt",
+                    "Extension provision validation failed: expected=${extension.id}@${extension.version}, got=${provisioned?.id}@${provisioned?.version}, signedState=${provisioned?.signedState}, enabled=${provisioned?.enabled}"
+                )
                 if (provisioned != null && !provisioned.isBuiltIn) {
                     try {
                         installer.uninstall(provisioned.id)
@@ -240,7 +245,7 @@ internal object GeckoDefaultExtensionRules {
     private const val MAX_ID_LENGTH = 512
     private const val MAX_NAME_LENGTH = 512
     private const val MAX_VERSION_LENGTH = 128
-    private const val MAX_XPI_BYTES = 16L * 1024L * 1024L
+    private const val MAX_XPI_BYTES = 32L * 1024L * 1024L
     private const val MIN_TRUSTED_SIGNED_STATE = 2
     private const val PINNED_AMO_FILE_PREFIX =
         "https://addons.mozilla.org/firefox/downloads/file/"
