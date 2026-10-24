@@ -14,7 +14,7 @@ internal class GeckoWebTextSelectionDelegate(
     private val canHighlight: () -> Boolean,
     private val onAction: (WebTextSelectionAction, String) -> Unit,
 ) : BasicSelectionActionDelegate(activity), AutoCloseable {
-    override fun getAllActions(): Array<String> = super.getAllActions() + arrayOf(HIGHLIGHT, TRANSLATE, READ_ALOUD)
+    override fun getAllActions(): Array<String> = super.getAllActions() + arrayOf(HIGHLIGHT, TRANSLATE)
 
     override fun isActionAvailable(action: String): Boolean {
         val kind = actionKind(action) ?: return super.isActionAvailable(action)
@@ -31,7 +31,7 @@ internal class GeckoWebTextSelectionDelegate(
         when (action) {
             HIGHLIGHT -> item.setTitle(R.string.web_annotation_mark)
             TRANSLATE -> item.setTitle(R.string.web_annotation_translate)
-            READ_ALOUD -> item.setTitle(R.string.process_text_read_aloud)
+            
             else -> super.prepareAction(action, item)
         }
     }
@@ -48,7 +48,7 @@ internal class GeckoWebTextSelectionDelegate(
     private fun actionKind(action: String): WebTextSelectionAction? = when (action) {
         HIGHLIGHT -> WebTextSelectionAction.Highlight
         TRANSLATE -> WebTextSelectionAction.Translate
-        READ_ALOUD -> WebTextSelectionAction.ReadAloud
+        
         else -> null
     }
 

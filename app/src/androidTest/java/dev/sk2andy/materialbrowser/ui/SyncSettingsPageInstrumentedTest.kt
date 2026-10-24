@@ -6,7 +6,6 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -169,44 +168,6 @@ class SyncSettingsPageInstrumentedTest {
     }
 
     @Test
-    fun extensionStoresOpenAndShareOnlyTheirPublicInstallationLinks() {
-        val openedUrl = AtomicReference<String>()
-        val sharedUrl = AtomicReference<String>()
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                SyncSettingsPage(
-                    state = unconfiguredState(),
-                    iconCatalog = catalog(),
-                    onConfigure = { true },
-                    onEnroll = { _, _, _ -> },
-                    onRefresh = {},
-                    onOpenDocumentation = openedUrl::set,
-                    onShareExtensionLink = sharedUrl::set,
-                    onBack = {},
-                )
-            }
-        }
-
-        listOf(
-            Triple(
-                SyncSettingsTestTags.ChromeStore,
-                SyncSettingsTestTags.ChromeStoreShare,
-                "https://chromewebstore.google.com/detail/candy-sync/mbmmijoehjmjdehhbikpflhahamohbge",
-            ),
-            Triple(
-                SyncSettingsTestTags.FirefoxStore,
-                SyncSettingsTestTags.FirefoxStoreShare,
-                "https://addons.mozilla.org/en-US/firefox/addon/candy-sync/",
-            ),
-        ).forEach { (openTag, shareTag, expectedUrl) ->
-            composeRule.onNodeWithTag(openTag).performScrollTo().performClick()
-            assertEquals(expectedUrl, openedUrl.get())
-            composeRule.onNodeWithTag(shareTag).performScrollTo().performClick()
-            assertEquals(expectedUrl, sharedUrl.get())
-        }
-    }
-
-    @Test
     fun setupCanBindAnExistingLocalProfile() {
         val configured = AtomicReference<SyncConnectionSettings>()
         composeRule.setContent {
@@ -233,9 +194,9 @@ class SyncSettingsPageInstrumentedTest {
         composeRule.onNodeWithTag(SyncSettingsTestTags.LocalProfile)
             .performScrollTo()
             .performClick()
-        composeRule.onNodeWithContentDescription(
-            "💼 ${context.getString(R.string.sync_local_profile_existing)}",
-        ).assertIsNotSelected().performClick()
+        composeRule.onNodeWithText(
+            "💼  ${context.getString(R.string.sync_local_profile_existing)}",
+        ).performClick()
         composeRule.onNodeWithTag(SyncSettingsTestTags.Endpoint)
             .performTextInput("https://sync.example")
         composeRule.onNodeWithTag(SyncSettingsTestTags.Username).performTextInput("candy")

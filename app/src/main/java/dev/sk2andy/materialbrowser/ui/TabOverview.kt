@@ -19,12 +19,9 @@ import dev.sk2andy.materialbrowser.shared.ui.TabOverviewChromeTestTags
 import dev.sk2andy.materialbrowser.shared.ui.TabTitleRow
 import dev.sk2andy.materialbrowser.shared.ui.CompactTabGrid
 import dev.sk2andy.materialbrowser.shared.ui.CompactTabList
-import dev.sk2andy.materialbrowser.browser.guest.GuestBubbleLauncher
-import dev.sk2andy.materialbrowser.browser.guest.GuestBubbleSessionStore
 import dev.sk2andy.materialbrowser.ui.ProfileSwitcher
 import dev.sk2andy.materialbrowser.ui.allowTopOverflow
 
-import android.app.Activity
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -117,7 +114,6 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -178,7 +174,6 @@ internal fun TabOverview(
     onSelectDismissAnchor: (String) -> Unit = onSelect,
     onNewTab: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenReaderStudio: () -> Unit = {},
     onOpenSyncSettings: () -> Unit = onOpenSettings,
     onEditProfileWallpaper: (String, ProfileWallpaperTarget) -> Unit = { _, _ -> },
     onConfigureCreatedProfile: (String, ProfileCreationOptions) -> Unit = { _, _ -> },
@@ -198,9 +193,6 @@ internal fun TabOverview(
     onSnoozeTab: (String) -> Unit,
     onHeroPagerSnapshotObserved: ((HeroPagerSnapshotObservation) -> Unit)? = null,
 ) {
-    val context = LocalContext.current
-    val guestBubbleStore = remember(context) { GuestBubbleSessionStore(context) }
-    val guestBubbleEnabled by rememberGuestBubbleEnabled(guestBubbleStore)
     val rootView = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
     // Frosted content moves into a nested ComposeView whose parent already consumed these insets.
@@ -1093,16 +1085,6 @@ internal fun TabOverview(
                         rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                         emojiPickerTargetId = NEW_PROFILE_TARGET
                     },
-                    onAddLongClick = if (guestBubbleEnabled) {
-                        {
-                            val activity = context as? Activity
-                            if (activity != null && GuestBubbleLauncher.start(activity)) {
-                                rootView.performConfirmHaptic()
-                            }
-                        }
-                    } else {
-                        null
-                    },
                     modifier = Modifier
                         .zIndex(1f)
                         .graphicsLayer {
@@ -1225,7 +1207,6 @@ internal fun TabOverview(
                     cardModifier = { tab ->
                         Modifier.testTag(SnoozeTestTags.overviewTab(tab.id))
                     },
-                    titleOverlayTopOffset = (-12).dp,
                     modifier = Modifier
                         .weight(1f)
                         .graphicsLayer {
@@ -1467,71 +1448,51 @@ internal fun TabOverview(
                     )
                 },
                 leadingAction = {
-                    Row(
-                        modifier = Modifier.align(Alignment.CenterStart).zIndex(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TabOverviewEdgeAction(
-                            visible = destinationChromeVisible && !controller.selectedTab.isIncognito,
-                            enabled = chromeEnabled,
-                            contentDescription = stringResource(R.string.reader_studio_title),
-                            testTag = TabOverviewChromeTestTags.ReaderStudio,
-                            animationLabel = "tab-overview-reader-alpha",
-                            onHaptic = {
-                                rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            },
-                            onClick = onOpenReaderStudio,
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_reader_studio),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-                            )
-                        }
-                        TabOverviewEdgeAction(
-                            visible = pinnedTabsJumpVisible,
-                            enabled = chromeEnabled,
-                            contentDescription = stringResource(R.string.cd_scroll_to_pinned_tabs),
-                            testTag = TabOverviewChromeTestTags.PinnedTabsJump,
-                            animationLabel = "pinned-tabs-jump-alpha",
-                            onHaptic = {
-                                rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            },
-                            onClick = {
-                                overviewScope.launch {
-                                    when (controller.tabOverviewMode) {
-                                        TabOverviewMode.Hero ->
-                                            pagerState.animateScrollToPage(
-                                                page = 0,
-                                                animationSpec = spring(
-                                                    dampingRatio = 0.86f,
-                                                    stiffness = 720f,
-                                                ),
-                                            )
-                                        TabOverviewMode.Grid -> gridState.animateScrollToItem(0)
-                                        TabOverviewMode.List -> listState.animateScrollToItem(0)
-                                    }
+                    TabOverviewEdgeAction(
+                        visible = pinnedTabsJumpVisible,
+                        enabled = chromeEnabled,
+                        contentDescription = stringResource(R.string.cd_scroll_to_pinned_tabs),
+                        testTag = TabOverviewChromeTestTags.PinnedTabsJump,
+                        animationLabel = "pinned-tabs-jump-alpha",
+                        onHaptic = {
+                            rootView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        },
+                        onClick = {
+                            overviewScope.launch {
+                                when (controller.tabOverviewMode) {
+                                    TabOverviewMode.Hero ->
+                                        pagerState.animateScrollToPage(
+                                            page = 0,
+                                            animationSpec = spring(
+                                                dampingRatio = 0.86f,
+                                                stiffness = 720f,
+                                            ),
+                                        )
+                                    TabOverviewMode.Grid -> gridState.animateScrollToItem(0)
+                                    TabOverviewMode.List -> listState.animateScrollToItem(0)
                                 }
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .zIndex(1f),
+                    ) {
+                        Icon(
+                            imageVector = if (controller.tabOverviewMode == TabOverviewMode.Hero) {
+                                Icons.AutoMirrored.Filled.KeyboardArrowLeft
+                            } else {
+                                Icons.Default.KeyboardArrowUp
                             },
-                        ) {
-                            Icon(
-                                imageVector = if (controller.tabOverviewMode == TabOverviewMode.Hero) {
-                                    Icons.AutoMirrored.Filled.KeyboardArrowLeft
-                                } else {
-                                    Icons.Default.KeyboardArrowUp
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-                            )
-                            Icon(
-                                painter = painterResource(R.drawable.ic_push_pin),
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-                            )
-                        }
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
+                        )
+                        Icon(
+                            painter = painterResource(R.drawable.ic_push_pin),
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
+                        )
                     }
                 },
                 trailingAction = {
@@ -1803,17 +1764,6 @@ internal fun TabOverview(
                     tab = candyTrailTab,
                     trail = candyTrail,
                     favicon = controller.favicons[candyTrailTab.id],
-                    pageFavicons = controller.activeTabs.asSequence()
-                        .filter { candidate ->
-                            candidate.profileId == candyTrailTab.profileId &&
-                                candidate.isIncognito == candyTrailTab.isIncognito &&
-                                candyTrail.nodes.any { it.url == candidate.url }
-                        }
-                        .mapNotNull { candidate ->
-                            controller.favicons[candidate.id]?.takeUnless { it.isRecycled }
-                                ?.let { candidate.url to it }
-                        }
-                        .toMap(),
                     forkFavicons = candyTrail.forks.mapNotNull { fork ->
                         val destinationId = fork.destinationTabId ?: return@mapNotNull null
                         controller.favicons[destinationId]?.let { destinationId to it }
@@ -2282,45 +2232,9 @@ internal fun TabOverviewBackground(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    val backgroundModifier = if (wallpaper == null) {
-        Modifier.background(
-            Brush.linearGradient(
-                colors = listOf(
-                    colors.primaryContainer,
-                    colors.tertiaryContainer,
-                    colors.surface,
-                ),
-            ),
-        )
-    } else {
-        Modifier.drawBehind {
-            drawProfileWallpaper(
-                bitmap = wallpaper.bitmap,
-                wallpaper = wallpaper.wallpaper,
-                scrimAlpha = 0.54f,
-            )
-        }
-    }
     Box(
         modifier = modifier
             .testTag(TabOverviewChromeTestTags.Background)
-            .then(backgroundModifier),
-    ) {
-        if (wallpaper != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .windowInsetsTopHeight(statusBarInsets)
-                    .background(colors.surface.copy(alpha = 0.92f)),
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .windowInsetsBottomHeight(navigationBarInsets)
-                    .background(colors.surface.copy(alpha = 0.92f)),
-            )
-        }
-    }
+            .background(colors.background),
+    )
 }

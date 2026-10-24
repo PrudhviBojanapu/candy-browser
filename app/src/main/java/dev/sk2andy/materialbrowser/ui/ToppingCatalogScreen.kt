@@ -88,7 +88,7 @@ internal fun ToppingCatalogScreen(
         modifier = modifier
             .fillMaxSize()
             .testTag(ToppingCatalogTestTags.Screen),
-        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsPageColor(),
+        color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
@@ -215,7 +215,7 @@ private fun ToppingCatalogList(
             .fillMaxSize()
             .testTag(ToppingCatalogTestTags.List),
         contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (cached) {
             item {
@@ -242,8 +242,6 @@ private fun ToppingCatalogList(
         } else {
             items(items, key = ToppingCatalogItem::id) { topping ->
                 ToppingCatalogCard(
-                            groupIndex = items.indexOf(topping),
-                            groupCount = items.size,
                     topping = topping,
                     onToggle = { onToggle(topping.id, it) },
                     onUpdate = { onUpdate(topping.id) },
@@ -260,7 +258,7 @@ private fun ToppingCatalogEmpty() {
             .fillMaxWidth()
             .testTag(ToppingCatalogTestTags.Empty),
         shape = MaterialTheme.shapes.large,
-        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -282,8 +280,6 @@ private fun ToppingCatalogEmpty() {
 
 @Composable
 private fun ToppingCatalogCard(
-    groupIndex: Int,
-    groupCount: Int,
     topping: ToppingCatalogItem,
     onToggle: (Boolean) -> Unit,
     onUpdate: () -> Unit,
@@ -293,8 +289,8 @@ private fun ToppingCatalogCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ToppingCatalogTestTags.topping(topping.id)),
-        shape = dev.sk2andy.materialbrowser.shared.ui.settings.settingsConnectedShape(groupIndex, groupCount),
-        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),

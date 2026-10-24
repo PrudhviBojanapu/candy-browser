@@ -20,7 +20,6 @@ data class BrowserTab(
     val syncCandyId: String? = null,
     val httpStatusCode: Int? = null,
     val failureKind: BrowserEngineFailureKind? = null,
-    val snoozePurpose: String = "",
 )
 
 val BrowserTab.isSynced: Boolean
@@ -29,7 +28,6 @@ val BrowserTab.isSynced: Boolean
 val BrowserTab.isFreshBlankTab: Boolean
     get() = url == BLANK_URL &&
         title.isBlank() &&
-        snoozePurpose.isBlank() &&
         progress == 0 &&
         !isLoading &&
         !canGoBack &&

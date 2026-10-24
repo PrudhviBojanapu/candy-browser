@@ -22,7 +22,7 @@ enum class PageTranslationProvider(
 
     companion object {
         fun fromStableId(stableId: String?): PageTranslationProvider =
-            entries.firstOrNull { it.stableId == stableId } ?: Yandex
+            entries.firstOrNull { it.stableId == stableId } ?: Google
     }
 }
 

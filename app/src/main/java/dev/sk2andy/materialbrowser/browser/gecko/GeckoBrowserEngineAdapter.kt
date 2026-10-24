@@ -44,7 +44,6 @@ import org.mozilla.geckoview.GeckoView
 internal interface BrowserEngineViewPort {
     /** A short-lived renderer surface; it never attaches a window or changes the selected tab. */
     fun createOffscreenSurface(widthPx: Int, heightPx: Int): BrowserEngineOffscreenSurface? = null
-
     fun setBackdropCaptureEnabled(enabled: Boolean) = Unit
 
     fun setBackdropBlurRegion(region: BrowserBackdropBlurRegion?) = Unit
@@ -115,19 +114,18 @@ internal interface BrowserEngineViewPort {
         view.dispatchKeyEvent(event)
 }
 
+/** One Android browser tab: shared commands plus the platform renderer host. */
 internal interface BrowserEngineOffscreenSurface {
     fun capture(scrollY: Int, onComplete: (Bitmap?) -> Unit): BrowserEnginePreviewCapture?
 
     fun close()
 }
 
-/** One Android browser tab: shared commands plus the platform renderer host. */
 internal interface AndroidBrowserEngineSessionPort :
     BrowserEngineSessionPort,
     BrowserEngineViewPort {
     fun setActive(active: Boolean)
 
-    /** Marks an explicitly committed temporary preview as regular browsing content. */
     fun promoteToRegularTab() = Unit
 
     fun setSelectedPriority(selected: Boolean) = Unit
@@ -218,6 +216,8 @@ internal interface AndroidBrowserEngineSessionPort :
     fun executeMediaCommand(command: GeckoMediaCommand)
 
     fun seekMedia(positionMillis: Long)
+ 
+    fun stopWebVideoPlayback() = Unit
 
     fun notifyPictureInPictureModeChanged(inPictureInPicture: Boolean) = Unit
 
@@ -250,14 +250,7 @@ internal interface AndroidBrowserEngineSessionPort :
 
     fun setWebAnnotationClickListener(listener: ((String) -> Unit)?) = Unit
 
-    fun setFormDraftListener(listener: ((String) -> Unit)?) = Unit
-
-    fun restoreFormDraft(payload: String, onComplete: (Boolean) -> Unit) = onComplete(false)
-
     fun extractPageForReader(onComplete: (String?) -> Unit)
-
-    /** Returns bounded raw JSON containing sourceUrl, title and visible page text. */
-    fun extractPageText(onComplete: (String?) -> Unit) = onComplete(null)
 
     fun probeTextInputOcclusion(
         viewportRect: BrowserViewportRect,
@@ -507,11 +500,6 @@ internal class GeckoBrowserEngineSessionAdapter(
     }
 
     @UiThread
-    override fun promoteToRegularTab() {
-        if (!closed) session.bindToppingSession(tabId, BrowserEngineContentKind.RegularTab)
-    }
-
-    @UiThread
     override fun execute(command: BrowserEngineCommand) {
         if (closed) return
         when (command.type) {
@@ -563,6 +551,10 @@ internal class GeckoBrowserEngineSessionAdapter(
     }
 
     @UiThread
+    override fun promoteToRegularTab() {
+        if (!closed) session.bindToppingSession(tabId, BrowserEngineContentKind.RegularTab)
+    }
+
     override fun setActive(active: Boolean) {
         if (!closed) {
             session.setActive(active)
@@ -585,16 +577,15 @@ internal class GeckoBrowserEngineSessionAdapter(
         if (closed) onResult(null) else session.containsFormData(onResult)
     }
 
-    @UiThread
-    override fun containsUserInput(onResult: (Boolean?) -> Unit) {
-        if (closed) onResult(null) else session.containsUserInput(onResult)
-    }
-
     override val supportsSiteDataDeletion: Boolean
         get() = !closed && session.supportsSiteDataDeletion
 
     override fun clearSiteData(url: String, onComplete: (Boolean) -> Unit) {
         if (closed) onComplete(false) else session.clearSiteData(url, onComplete)
+    }
+
+    override fun containsUserInput(onResult: (Boolean?) -> Unit) {
+        if (closed) onResult(null) else session.containsUserInput(onResult)
     }
 
     @UiThread
@@ -761,6 +752,11 @@ internal class GeckoBrowserEngineSessionAdapter(
     }
 
     @UiThread
+    override fun stopWebVideoPlayback() {
+        if (!closed) session.stopWebVideoPlayback()
+    }
+
+    @UiThread
     override fun notifyPictureInPictureModeChanged(inPictureInPicture: Boolean) {
         if (closed || this.inPictureInPicture == inPictureInPicture) return
         this.inPictureInPicture = inPictureInPicture
@@ -834,10 +830,6 @@ internal class GeckoBrowserEngineSessionAdapter(
     }
 
     @UiThread
-    override fun createOffscreenSurface(widthPx: Int, heightPx: Int): BrowserEngineOffscreenSurface? =
-        if (closed) null else session.createOffscreenSurface(widthPx, heightPx)
-
-    @UiThread
     override fun findInPage(
         query: String,
         forward: Boolean,
@@ -853,11 +845,6 @@ internal class GeckoBrowserEngineSessionAdapter(
     @UiThread
     override fun clearFindInPage() {
         if (!closed) session.clearFindInPage()
-    }
-
-    @UiThread
-    override fun extractPageText(onComplete: (String?) -> Unit) {
-        if (closed) onComplete(null) else session.extractPageText(onComplete)
     }
 
     @UiThread
@@ -883,14 +870,6 @@ internal class GeckoBrowserEngineSessionAdapter(
         if (!closed) session.setWebAnnotationClickListener(listener)
     }
 
-    override fun setFormDraftListener(listener: ((String) -> Unit)?) {
-        if (!closed) session.setFormDraftListener(listener)
-    }
-
-    override fun restoreFormDraft(payload: String, onComplete: (Boolean) -> Unit) {
-        if (closed) onComplete(false) else session.restoreFormDraft(payload, onComplete)
-    }
-
     override fun probeTextInputOcclusion(
         viewportRect: BrowserViewportRect,
         mode: TextInputOcclusionProbeMode,
@@ -905,6 +884,10 @@ internal class GeckoBrowserEngineSessionAdapter(
 
     @UiThread
     override fun printPage(): Boolean = !closed && session.printPage()
+
+    @UiThread
+    override fun createOffscreenSurface(widthPx: Int, heightPx: Int): BrowserEngineOffscreenSurface? =
+        if (closed) null else session.createOffscreenSurface(widthPx, heightPx)
 
     override fun updatePrivacyPolicy(
         policy: GeckoPrivacyPolicy,

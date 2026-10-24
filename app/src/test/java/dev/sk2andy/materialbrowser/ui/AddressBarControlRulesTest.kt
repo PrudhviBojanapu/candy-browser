@@ -20,7 +20,7 @@ class AddressBarControlRulesTest {
     }
 
     @Test
-    fun `editor uses full width only with focus and visible ime`() {
+    fun `editor uses full width when editing`() {
         assertTrue(
             AddressBarControlRules.editorUsesFullWidth(
                 editing = true,
@@ -28,18 +28,11 @@ class AddressBarControlRulesTest {
                 imeVisible = true,
             ),
         )
-        assertFalse(
-            AddressBarControlRules.editorUsesFullWidth(
-                editing = true,
-                addressFieldFocused = true,
-                imeVisible = false,
-            ),
-        )
-        assertFalse(
+        assertTrue(
             AddressBarControlRules.editorUsesFullWidth(
                 editing = true,
                 addressFieldFocused = false,
-                imeVisible = true,
+                imeVisible = false,
             ),
         )
         assertFalse(

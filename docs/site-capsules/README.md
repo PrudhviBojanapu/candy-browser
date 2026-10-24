@@ -15,7 +15,6 @@
 | Full Candy transition contract | `CapsuleFullCandyTransitionRulesTest` |
 | Editor and launch contracts | `SiteCapsuleEditorContractInstrumentedTest`, `CapsuleCustomIconEditorContractInstrumentedTest`, `CapsuleIconPackPickerContractInstrumentedTest`, `SiteCapsuleLaunchInstrumentedTest` |
 | Icon crop, packs and rendering | `CapsuleIconCropRulesTest`, `CapsuleIconPackRulesTest`, `CapsuleCustomIconProcessorInstrumentedTest`, `CapsuleIconPackParserInstrumentedTest`, `CapsuleIconRendererInstrumentedTest` |
-| Separate Android tasks | `CapsuleWindowLauncherInstrumentedTest`, `CapsuleWindowSessionInstrumentedTest`, `CapsuleWindowTaskInstrumentedTest` |
 | Storage | `SiteCapsuleStoreInstrumentedTest`, `SiteCapsuleIconStoreInstrumentedTest` |
 | Compose UI | `SiteCapsuleScreenInstrumentedTest`, `CapsuleCustomIconEditorScreenInstrumentedTest`, `CapsuleIconPackPickerScreenInstrumentedTest` |
 | Gecko renderer/session handoff | `GeckoSiteCapsuleTransitionInstrumentedTest` |

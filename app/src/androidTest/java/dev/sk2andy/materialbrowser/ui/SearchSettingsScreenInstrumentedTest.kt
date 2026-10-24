@@ -3,18 +3,12 @@ package dev.sk2andy.materialbrowser.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.SearchEngine
 import dev.sk2andy.materialbrowser.browser.SearxngSettings
 import dev.sk2andy.materialbrowser.browser.suggestions.SearchSuggestionProvider
@@ -53,7 +47,6 @@ class SearchSettingsScreenInstrumentedTest {
 
         composeRule.onNodeWithTag(SearchSettingsTestTags.SearxngInstanceUrl)
             .assertExists()
-            .performScrollTo()
             .performTextReplacement("https://search.example/searxng")
         assertEquals("https://search.example/searxng", settings.instanceUrl)
 
@@ -61,8 +54,8 @@ class SearchSettingsScreenInstrumentedTest {
             .performTextReplacement("https://alice:secret@search.example?token=secret")
         assertEquals("https://search.example/searxng", settings.instanceUrl)
 
-        composeRule.onNodeWithTag(SearchSettingsTestTags.fallback(SearchSuggestionProvider.Brave))
-            .performScrollTo().performClick().assertIsSelected()
+        composeRule.onNodeWithTag(SearchSettingsTestTags.SearxngFallback).performClick()
+        composeRule.onNodeWithText("Brave Search").performClick()
         assertEquals(SearchSuggestionProvider.Brave, settings.suggestionFallback)
     }
 
@@ -87,7 +80,7 @@ class SearchSettingsScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithTag(SearchSettingsTestTags.HistorySuggestions).performScrollTo().performClick()
+        composeRule.onNodeWithTag(SearchSettingsTestTags.HistorySuggestions).performClick()
 
         assertFalse(enabled)
     }
@@ -113,164 +106,9 @@ class SearchSettingsScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithTag(SearchSettingsTestTags.suggestion(SearchSuggestionProvider.Google))
-            .performScrollTo().performClick().assertIsSelected()
+        composeRule.onNodeWithTag(SearchSettingsTestTags.SuggestionProvider).performClick()
+        composeRule.onNodeWithText("Google").performClick()
 
         assertEquals(SearchSuggestionProvider.Google, provider)
-    }
-
-    @Test
-    fun radioChoicesKeepAiInstanceAndFallbackDependencies() {
-        var engine by mutableStateOf(SearchEngine.Google)
-        var provider by mutableStateOf(SearchSuggestionProvider.None)
-        var settings by mutableStateOf(SearxngSettings(instanceUrl = "https://search.example"))
-        var settingsWrites = 0
-        var aiWrites = 0
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                SearchSettingsPage(
-                    searchEngine = engine,
-                    searxngSettings = settings,
-                    isAiModeToggleVisible = false,
-                    searchSuggestionProvider = provider,
-                    isHistorySuggestionsEnabled = true,
-                    onSearchEngineChanged = { engine = it },
-                    onSearxngSettingsChanged = {
-                        settings = it
-                        settingsWrites++
-                    },
-                    onAiModeToggleVisibleChanged = { aiWrites++ },
-                    onSearchSuggestionProviderChanged = { provider = it },
-                    onHistorySuggestionsEnabledChanged = {},
-                    onBack = {},
-                )
-            }
-        }
-        for (candidate in SearchEngine.entries) {
-            composeRule.onNodeWithTag("search_settings_engine_${candidate.stableId}")
-                .performScrollTo().performClick().assertIsSelected()
-            composeRule.runOnIdle { assertEquals(candidate, engine) }
-            val ai = composeRule.onNodeWithTag(SearchSettingsTestTags.AiMode).performScrollTo()
-            if (candidate.supportsAiSearch) {
-                ai.assertIsEnabled()
-            } else {
-                ai.assertIsNotEnabled().performClick()
-                composeRule.runOnIdle { assertEquals(0, aiWrites) }
-            }
-            val instance = composeRule.onNodeWithTag(SearchSettingsTestTags.SearxngInstanceUrl)
-                .performScrollTo()
-            if (candidate == SearchEngine.SearXNG) instance.assertIsEnabled()
-            else instance.assertIsNotEnabled()
-        }
-        composeRule.onNodeWithTag("search_settings_engine_google").performScrollTo().performClick()
-        for (candidate in SearchSuggestionProvider.entries) {
-            composeRule.onNodeWithTag(SearchSettingsTestTags.suggestion(candidate))
-                .performScrollTo().performClick().assertIsSelected()
-            composeRule.runOnIdle { assertEquals(candidate, provider) }
-            val fallback = composeRule.onNodeWithTag(
-                SearchSettingsTestTags.fallback(SearchSuggestionProvider.Brave),
-            )
-            if (candidate == SearchSuggestionProvider.SearXNG) {
-                fallback.performScrollTo().assertIsEnabled()
-            } else {
-                fallback.assertDoesNotExist()
-                composeRule.runOnIdle { assertEquals(0, settingsWrites) }
-            }
-            val instance = composeRule.onNodeWithTag(SearchSettingsTestTags.SearxngInstanceUrl)
-            if (candidate == SearchSuggestionProvider.SearXNG) instance.assertIsEnabled()
-            else instance.assertIsNotEnabled()
-        }
-        composeRule.onNodeWithTag(SearchSettingsTestTags.suggestion(SearchSuggestionProvider.SearXNG))
-            .performScrollTo().performClick()
-        for (candidate in SearchSuggestionProvider.entries.filterNot { it == SearchSuggestionProvider.SearXNG }) {
-            composeRule.onNodeWithTag(SearchSettingsTestTags.fallback(candidate))
-                .performScrollTo().performClick().assertIsSelected()
-            composeRule.runOnIdle {
-                assertEquals(candidate, settings.suggestionFallback)
-                assertEquals("https://search.example", settings.instanceUrl)
-            }
-        }
-        composeRule.onNodeWithTag(SearchSettingsTestTags.fallback(SearchSuggestionProvider.SearXNG))
-            .assertDoesNotExist()
-    }
-
-    @Test
-    fun fallbackIsAbsentForEveryNonSearxngSuggestionProvider() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        var provider by mutableStateOf(SearchSuggestionProvider.None)
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                SearchSettingsPage(
-                    searchEngine = SearchEngine.SearXNG,
-                    searxngSettings = SearxngSettings(
-                        suggestionFallback = SearchSuggestionProvider.Brave,
-                    ),
-                    isAiModeToggleVisible = false,
-                    searchSuggestionProvider = provider,
-                    isHistorySuggestionsEnabled = true,
-                    onSearchEngineChanged = {},
-                    onSearxngSettingsChanged = {},
-                    onAiModeToggleVisibleChanged = {},
-                    onSearchSuggestionProviderChanged = { provider = it },
-                    onHistorySuggestionsEnabledChanged = {},
-                    onBack = {},
-                )
-            }
-        }
-
-        SearchSuggestionProvider.entries
-            .filterNot { it == SearchSuggestionProvider.SearXNG }
-            .forEach { candidate ->
-                composeRule.runOnIdle { provider = candidate }
-
-                composeRule.onNodeWithTag(SearchSettingsTestTags.SearxngFallback)
-                    .assertDoesNotExist()
-                composeRule.onNodeWithText(
-                    context.getString(R.string.settings_searxng_suggestion_fallback),
-                ).assertDoesNotExist()
-                composeRule.onNodeWithText(
-                    context.getString(R.string.settings_searxng_suggestion_fallback_summary),
-                ).assertDoesNotExist()
-            }
-    }
-
-    @Test
-    fun changingSuggestionProviderHidesAndRestoresSavedFallback() {
-        var provider by mutableStateOf(SearchSuggestionProvider.SearXNG)
-        var settings by mutableStateOf(
-            SearxngSettings(suggestionFallback = SearchSuggestionProvider.Brave),
-        )
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                SearchSettingsPage(
-                    searchEngine = SearchEngine.Google,
-                    searxngSettings = settings,
-                    isAiModeToggleVisible = false,
-                    searchSuggestionProvider = provider,
-                    isHistorySuggestionsEnabled = true,
-                    onSearchEngineChanged = {},
-                    onSearxngSettingsChanged = { settings = it },
-                    onAiModeToggleVisibleChanged = {},
-                    onSearchSuggestionProviderChanged = { provider = it },
-                    onHistorySuggestionsEnabledChanged = {},
-                    onBack = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag(SearchSettingsTestTags.fallback(SearchSuggestionProvider.Brave))
-            .performScrollTo().assertIsSelected()
-        composeRule.onNodeWithTag(SearchSettingsTestTags.suggestion(SearchSuggestionProvider.Google))
-            .performScrollTo().performClick()
-
-        composeRule.onNodeWithTag(SearchSettingsTestTags.SearxngFallback).assertDoesNotExist()
-        assertEquals(SearchSuggestionProvider.Brave, settings.suggestionFallback)
-
-        composeRule.onNodeWithTag(SearchSettingsTestTags.suggestion(SearchSuggestionProvider.SearXNG))
-            .performScrollTo().performClick()
-
-        composeRule.onNodeWithTag(SearchSettingsTestTags.fallback(SearchSuggestionProvider.Brave))
-            .performScrollTo().assertIsSelected()
-        assertEquals(SearchSuggestionProvider.Brave, settings.suggestionFallback)
     }
 }

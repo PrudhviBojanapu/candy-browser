@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.sk2andy.materialbrowser.R
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
 import dev.sk2andy.materialbrowser.browser.workflow.CustomWorkflow
 import dev.sk2andy.materialbrowser.browser.workflow.CustomWorkflowBinding
 import dev.sk2andy.materialbrowser.browser.workflow.CustomWorkflowConfiguration

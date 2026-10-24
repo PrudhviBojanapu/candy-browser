@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -49,7 +48,6 @@ internal object CandySettingsRouteRules {
             destination == SettingsDestination.AppearanceColors ||
             destination == SettingsDestination.AppearanceWebsites ||
             destination == SettingsDestination.Search ||
-            destination == SettingsDestination.RssFeeds ||
             destination == SettingsDestination.TabsAndGestures ||
             destination == SettingsDestination.MenuActions ||
             destination == SettingsDestination.MenuStyle ||
@@ -95,8 +93,6 @@ internal object CandySettingsHomeResources : SettingsHomeResources {
         SettingsHomeLabel.PlayerTitle -> "Player"
         SettingsHomeLabel.PlayerSummary -> "Videowiedergabe, Autoplay und Doppeltipp-Sprünge"
         SettingsHomeLabel.DownloadsTitle -> "Downloads"
-        SettingsHomeLabel.RssFeedsTitle -> "RSS-Feeds"
-        SettingsHomeLabel.RssFeedsSummary -> "Feeds folgen und Beiträge im Reader Studio öffnen"
         SettingsHomeLabel.UserscriptsTitle -> "Toppings"
         SettingsHomeLabel.UserscriptsSummary -> "Passende Seiten mit Toppings anpassen"
         SettingsHomeLabel.FirefoxExtensionsTitle -> "Firefox-Erweiterungen"
@@ -136,7 +132,6 @@ internal fun CandySettingsHomeIcon(
         SettingsHomeIcon.Browser -> Icons.Filled.Settings
         SettingsHomeIcon.Player -> Icons.Filled.PlayArrow
         SettingsHomeIcon.Downloads -> Icons.Filled.Download
-        SettingsHomeIcon.RssFeeds -> Icons.Filled.Notifications
         SettingsHomeIcon.Userscripts -> Icons.Filled.AutoAwesome
         SettingsHomeIcon.FirefoxExtensions -> Icons.Filled.Extension
         SettingsHomeIcon.SiteCapsules -> Icons.Filled.Favorite
@@ -157,7 +152,6 @@ internal fun CandySettingsHomeIcon(
             SettingsHomeIcon.Browser -> "globe"
             SettingsHomeIcon.Player -> "play.rectangle"
             SettingsHomeIcon.Downloads -> "arrow.down.circle"
-            SettingsHomeIcon.RssFeeds -> "dot.radiowaves.left.and.right"
             SettingsHomeIcon.Userscripts -> "wand.and.stars"
             SettingsHomeIcon.FirefoxExtensions -> "puzzlepiece.extension"
             SettingsHomeIcon.SiteCapsules -> "shippingbox"
@@ -183,23 +177,23 @@ internal fun CandySettingsHome(
     onTabOverviewModeChanged: (TabOverviewMode) -> Unit,
     tabListStartsAtBottom: Boolean,
     onTabListStartsAtBottomChanged: (Boolean) -> Unit,
-    dismissResistancePercent: Int,
-    onDismissResistanceChanged: (Int) -> Unit,
-    appearanceSettings: AppearanceSettings,
-    onAppearanceSettingsChanged: (AppearanceSettings) -> Unit,
+    dismissResistancePercent: Int = 0,
+    onDismissResistanceChanged: (Int) -> Unit = {},
+    appearanceSettings: AppearanceSettings = AppearanceSettings(),
+    onAppearanceSettingsChanged: (AppearanceSettings) -> Unit = {},
     translationProvider: PageTranslationProvider,
     onTranslationProviderChanged: (PageTranslationProvider) -> Unit,
     menuLayout: BrowserMenuLayout,
     menuConfigurableEntries: List<BrowserMenuEntry>,
     onBrowserMenuLocationChanged: (BrowserMenuEntry, BrowserMenuLocation) -> Unit,
-    onBrowserMenuLayoutChanged: (BrowserMenuLayout) -> Unit,
+    onBrowserMenuLayoutChanged: (BrowserMenuLayout) -> Unit = {},
     toppings: List<BrowserViewportTopping>,
     onSaveTopping: (id: String?, source: String) -> Unit,
     toppingSource: (id: String) -> String?,
     onSetToppingEnabled: (id: String, enabled: Boolean) -> Unit,
     onSetToppingFrameScope: (id: String, scope: ToppingFrameScope) -> Unit,
     onDeleteTopping: (id: String) -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit = {},
     syncState: SyncSettingsUiState = SyncSettingsUiState(),
     syncActions: SyncSettingsActionSink? = null,
 ) {

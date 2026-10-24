@@ -14,8 +14,9 @@ import android.view.MotionEvent
 import android.view.RoundedRectBlurRegion
 import android.view.SurfaceView
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.ViewConfiguration
+import kotlin.math.abs
 import android.widget.FrameLayout
 import androidx.annotation.RequiresApi
 import androidx.annotation.UiThread
@@ -24,6 +25,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.sk2andy.materialbrowser.BuildConfig
 import dev.sk2andy.materialbrowser.browser.BrowserPerformanceTrace
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
 import dev.sk2andy.materialbrowser.browser.BrowserBackdropBlurRegion
 import dev.sk2andy.materialbrowser.browser.BrowserBackdropBlurRules
 import dev.sk2andy.materialbrowser.browser.BrowserSurfaceBackdropBlurRegion
@@ -57,12 +59,12 @@ import dev.sk2andy.materialbrowser.browser.TextInputOcclusionProbeMode
 import dev.sk2andy.materialbrowser.browser.TextInputOcclusionProbeResult
 import dev.sk2andy.materialbrowser.browser.WebContentTopInsetTransitionRules
 import dev.sk2andy.materialbrowser.browser.WebRtcProtectionMode
-import dev.sk2andy.materialbrowser.browser.annotation.WebTextSelectionAction
 import dev.sk2andy.materialbrowser.browser.smoothWebContentTopInsetChange
 import dev.sk2andy.materialbrowser.browser.actions.BrowserContentTargetKind
 import dev.sk2andy.materialbrowser.browser.actions.BrowserContentTargetListener
 import dev.sk2andy.materialbrowser.browser.actions.BrowserContentTargetRules
 import dev.sk2andy.materialbrowser.browser.actions.WebContentTarget
+import dev.sk2andy.materialbrowser.browser.annotation.WebTextSelectionAction
 import dev.sk2andy.materialbrowser.browser.credentials.AndroidCredentialPromptHost
 import dev.sk2andy.materialbrowser.browser.credentials.CredentialPromptHost
 import dev.sk2andy.materialbrowser.browser.credentials.CredentialPromptIdentity
@@ -110,7 +112,6 @@ import org.mozilla.geckoview.WebExtension
 import org.mozilla.geckoview.WebExtensionController
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.math.abs
 
 internal class GeckoViewRuntimeHandle private constructor(
     private val context: Context,
@@ -263,6 +264,26 @@ internal class GeckoViewRuntimeHandle private constructor(
         if (runtime.activityDelegate === delegate) runtime.activityDelegate = null
     }
 
+    override fun onTrimMemory(level: Int) {
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE) {
+            try {
+                runtime.storageController.clearData(org.mozilla.geckoview.StorageController.ClearFlags.ALL_CACHES)
+                android.util.Log.d("GeckoViewRuntimeHandle", "Purged Gecko ALL_CACHES on critical trim $level")
+            } catch (t: Throwable) {
+                android.util.Log.w("GeckoViewRuntimeHandle", "Failed to purge Gecko caches: ${t.message}")
+            }
+        } else if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+                   level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            try {
+                runtime.storageController.clearData(org.mozilla.geckoview.StorageController.ClearFlags.IMAGE_CACHE)
+                android.util.Log.d("GeckoViewRuntimeHandle", "Purged Gecko IMAGE_CACHE on trim $level")
+            } catch (t: Throwable) {
+                android.util.Log.w("GeckoViewRuntimeHandle", "Failed to purge Gecko image cache: ${t.message}")
+            }
+        }
+    }
+
     @VisibleForTesting
     fun preferredColorSchemeForTesting(): Int = runtime.settings.preferredColorScheme
 
@@ -323,7 +344,6 @@ internal class GeckoViewRuntimeHandle private constructor(
             val runtime = GeckoRuntime.create(appContext, runtimeSettings)
             GeckoLogging.attach(appContext)
             runtime.webNotificationDelegate = GeckoWebNotificationPresenter(appContext)
-            GeckoWebPushCoordinator.attach(appContext, runtime)
             val extensionController = runtime.webExtensionController
             val toppingHost = GeckoViewToppingHostRuntime(
                 controller = extensionController,
@@ -894,8 +914,8 @@ private class GeckoViewBrowserSession(
     private val downloadTransfers: GeckoDownloadTransferManager,
     private val cookieBehavior: GeckoCookieBehaviorCoordinator,
     private val trackingPermissions: GeckoTrackingPermissionCoordinator,
-    private val siteData: GeckoSiteDataRuntime,
     initialPrivacyPolicy: GeckoPrivacyPolicy,
+    private val siteData: GeckoSiteDataRuntime,
     privacyEventSink: GeckoPrivacyEventSink,
     private val session: GeckoSession = GeckoSession(
         GeckoSessionSettings.Builder()
@@ -919,6 +939,9 @@ private class GeckoViewBrowserSession(
 
     private val storageController = runtime.storageController
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val mediaRestorationReadback = GeckoMediaRestorationReadback(mainHandler)
+    private val cookieBehaviorOwner = Any()
+    private val trackingPermissionOwner = Any()
 
     override val supportsSiteDataDeletion: Boolean get() = !closed
 
@@ -941,10 +964,6 @@ private class GeckoViewBrowserSession(
             onComplete = onComplete,
         )
     }
-
-    private val mediaRestorationReadback = GeckoMediaRestorationReadback(mainHandler)
-    private val cookieBehaviorOwner = Any()
-    private val trackingPermissionOwner = Any()
 
     @Volatile
     private var state = GeckoBrowserSessionState()
@@ -1055,7 +1074,6 @@ private class GeckoViewBrowserSession(
     private var toppingHostWaitRegistered = false
     private var trackingPermissionWaitRegistered = false
     private var pendingInitialUrl: String? = null
-    private var stoppedInitialUrl: String? = null
     private var replaceBootstrapHistoryOnNextLoad = openSession
     private var latestPageIsBootstrap = false
     private var pendingFailedPageRetryUrl: String? = null
@@ -1127,6 +1145,15 @@ private class GeckoViewBrowserSession(
 
             override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
                 fullscreenStateListener?.onStateChanged(fullScreen)
+                if (fullScreen) {
+                    val stream = dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader.preloadedStream.value
+                    if (stream != null) {
+                        runCatching {
+                            session.exitFullScreen()
+                        }
+                        dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader.launchPreloadedStream(context, stream)
+                    }
+                }
             }
 
             override fun onTitleChange(session: GeckoSession, title: String?) =
@@ -1253,22 +1280,6 @@ private class GeckoViewBrowserSession(
                 if (CandyPrivacyHostContract.isBootstrapDocumentUrl(request.uri)) {
                     return GeckoResult.deny()
                 }
-                val pendingResult = GeckoResult<AllowOrDeny>()
-                var responseCompleted = false
-                val nativePopupResponse = if (
-                    request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW
-                ) {
-                    BrowserEngineBooleanResponse { allowed ->
-                        if (!responseCompleted) {
-                            responseCompleted = true
-                            pendingResult.complete(
-                                if (allowed && !closed) AllowOrDeny.ALLOW else AllowOrDeny.DENY,
-                            )
-                        }
-                    }
-                } else {
-                    null
-                }
                 val decision = navigationRequestListener?.onNavigationRequest(
                     GeckoMainFrameNavigationRequest(
                         url = request.uri,
@@ -1282,7 +1293,6 @@ private class GeckoViewBrowserSession(
                                 BrowserEngineNavigationTarget.None
                             else -> BrowserEngineNavigationTarget.Current
                         },
-                        nativePopupResponse = nativePopupResponse,
                     ),
                 ) ?: GeckoNavigationRequestDecision.Allow
                 return when (decision) {
@@ -1298,7 +1308,6 @@ private class GeckoViewBrowserSession(
                         }
                         GeckoResult.deny()
                     }
-                    GeckoNavigationRequestDecision.Pending -> pendingResult
                 }
             }
 
@@ -1331,6 +1340,7 @@ private class GeckoViewBrowserSession(
                 if (privacyHost.isBootstrapNavigation(session, url)) return
                 invalidateDomProbe()
                 currentPageUrl = url
+                dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge.clearActiveStream()
                 if (!isPrivate) {
                     PermissionOrigin.normalize(url)?.let { origin ->
                         notificationPermissionDecisionProvider?.invoke(origin)?.let { decision ->
@@ -1985,6 +1995,13 @@ private class GeckoViewBrowserSession(
                 meta: MediaSession.ElementMetadata?,
             ) {
                 if (!ownsMediaSession(mediaSession)) return
+                if (enabled) {
+                    val stream = dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader.preloadedStream.value
+                    if (stream != null) {
+                        runCatching { mediaSession.pause() }
+                        dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader.launchPreloadedStream(context, stream)
+                    }
+                }
                 updateMediaState { current ->
                     current.copy(
                         isFullscreen = enabled,
@@ -2727,6 +2744,10 @@ private class GeckoViewBrowserSession(
         mediaSession.seekTo(positionMillis.coerceAtLeast(0L) / 1_000.0, true)
     }
 
+    override fun stopWebVideoPlayback() {
+        if (!closed) privacyBinding.stopWebVideoPlayback()
+    }
+
     @UiThread
     override fun notifyPictureInPictureModeChanged(inPictureInPicture: Boolean) {
         if (closed || this.inPictureInPicture == inPictureInPicture) return
@@ -3118,17 +3139,6 @@ private class GeckoViewBrowserSession(
     }
 
     @UiThread
-    override fun extractPageText(onComplete: (String?) -> Unit) {
-        if (closed || isPrivate || !privacyBound || currentPageUrl == null ||
-            contentKind != BrowserEngineContentKind.RegularTab
-        ) {
-            onComplete(null)
-            return
-        }
-        privacyBinding.extractPageText(onComplete)
-    }
-
-    @UiThread
     override fun extractPageForReader(onComplete: (String?) -> Unit) {
         if (closed || !privacyBound || currentPageUrl == null) {
             onComplete(null)
@@ -3146,8 +3156,7 @@ private class GeckoViewBrowserSession(
         delegate.close()
     }
 
-    private var selectedTextActionListener:
-        ((WebTextSelectionAction, String) -> Unit)? = null
+    private var selectedTextActionListener: ((WebTextSelectionAction, String) -> Unit)? = null
 
     override fun setSelectedTextActionListener(
         listener: ((WebTextSelectionAction, String) -> Unit)?,
@@ -3171,15 +3180,6 @@ private class GeckoViewBrowserSession(
         if (!closed) privacyBinding.setWebAnnotationClickListener(listener?.let { next ->
             { id -> if (!closed && !session.settings.usePrivateMode && contentKind == BrowserEngineContentKind.RegularTab) next(id) }
         })
-    }
-
-    override fun setFormDraftListener(listener: ((String) -> Unit)?) {
-        if (!closed) privacyBinding.setFormDraftListener(listener)
-    }
-
-    override fun restoreFormDraft(payload: String, onComplete: (Boolean) -> Unit) {
-        if (closed || !privacyBound) onComplete(false)
-        else privacyBinding.restoreFormDraft(payload, onComplete)
     }
 
     override fun probeTextInputOcclusion(
@@ -3453,12 +3453,7 @@ private class GeckoViewBrowserSession(
     }
 
     override fun reload() {
-        if (closed) return
-        stoppedInitialUrl?.let { url ->
-            loadValidatedUrl(url)
-            return
-        }
-        if (privacyBound) {
+        if (!closed && privacyBound) {
             pendingRestoredHttpsOnlyUrl = null
             invalidateCredentialPrompts(recreateHost = false)
             if (state.failureKind == BrowserEngineFailureKind.HttpsOnly && httpsOnlyRetryUrl != null) {
@@ -3471,16 +3466,15 @@ private class GeckoViewBrowserSession(
 
     override fun stop() {
         if (!closed) {
-            stoppedInitialUrl = pendingInitialUrl ?: stoppedInitialUrl
             pendingInitialUrl = null
             pendingFailedPageRetryUrl = null
+            latestPageIsBootstrap = false
             pendingRestoredSessionState = null
             pendingRestoredHttpsOnlyUrl = null
             finishRestoredHistoryWait()
             finishNavigation()
             invalidateCredentialPrompts(recreateHost = true)
-            // The internal bootstrap must finish binding even when the user's queued load stops.
-            if (privacyBound) session.stop()
+            session.stop()
         }
     }
 
@@ -3496,10 +3490,10 @@ private class GeckoViewBrowserSession(
         downloadTransfers.cancelOwner(session)
         extensionRuntime.detachChromeSession(session)
         extensionIdentity = null
-        active = false
-        invalidateCredentialPrompts(recreateHost = false)
         selectedTextActionListener = null
         releaseTextSelectionDelegate()
+        active = false
+        invalidateCredentialPrompts(recreateHost = false)
         boundView?.releaseSession()
         boundView = null
         retainedViewInsetLayout = null
@@ -3528,7 +3522,6 @@ private class GeckoViewBrowserSession(
         inPictureInPicture = false
         pictureInPicturePlaybackExpected = false
         pendingInitialUrl = null
-        stoppedInitialUrl = null
         pendingFailedPageRetryUrl = null
         latestPageIsBootstrap = false
         pendingRestoredSessionState = null
@@ -3653,7 +3646,6 @@ private class GeckoViewBrowserSession(
     }
 
     private fun beginNavigation(url: String) {
-        stoppedInitialUrl = null
         prepareNavigation(url, forceNewGeneration = true)
     }
 
@@ -3846,7 +3838,6 @@ private class GeckoViewBrowserSession(
         privacyBound = false
         privacyFailureDescription = description
         pendingInitialUrl = null
-        stoppedInitialUrl = null
         pendingFailedPageRetryUrl = null
         pendingRestoredSessionState = null
         pendingRestoredHttpsOnlyUrl = null
@@ -3879,7 +3870,6 @@ private class GeckoViewBrowserSession(
         boundView?.onNavigationStarted()
         invalidateDomProbe()
         pendingInitialUrl = null
-        stoppedInitialUrl = null
         pendingFailedPageRetryUrl = null
         latestPageIsBootstrap = false
         pendingRestoredSessionState = null
@@ -4057,7 +4047,6 @@ internal class CandyGeckoView(
     }
 
     fun cancelActiveTouch(): Boolean = engineView.cancelActiveTouch()
-
     fun hasCancelledTouchStream(): Boolean = engineView.hasCancelledTouchStream()
 
     fun requestEngineFocus(): Boolean = engineView.requestFocus()
@@ -4253,8 +4242,6 @@ private class CandyGeckoEngineView(context: Context) : CandyGeckoViewSafeAreaBri
             val requestGeneration = pullToRefreshTouchState.start()
             pullTouchDownX = event.x
             pullTouchDownY = event.y
-            // Fail closed until Gecko has hit-tested this DOWN. Dispatch it exactly once;
-            // Gecko's detail API also requests focus and forwards the event to APZ.
             parent?.requestDisallowInterceptTouchEvent(true)
             dispatchPullTouchDetail(event, requestGeneration, isDown = true)
             return true
@@ -4264,8 +4251,6 @@ private class CandyGeckoEngineView(context: Context) : CandyGeckoViewSafeAreaBri
             val deltaY = event.y - pullTouchDownY
             if (deltaY > pullTouchSlop && deltaY > abs(deltaX)) {
                 pullToRefreshTouchState.requestMove()?.let { requestGeneration ->
-                    // The first drag may be consumed by a touchmove listener even when DOWN
-                    // was at the top. Query once, forwarding this MOVE exactly once as well.
                     dispatchPullTouchDetail(event, requestGeneration, isDown = false)
                     return true
                 }
@@ -4311,7 +4296,6 @@ private class CandyGeckoEngineView(context: Context) : CandyGeckoViewSafeAreaBri
                 parent?.requestDisallowInterceptTouchEvent(!release)
             }
         }, { _ ->
-            // Failed or missing details keep the stream with Gecko.
         })
     }
 

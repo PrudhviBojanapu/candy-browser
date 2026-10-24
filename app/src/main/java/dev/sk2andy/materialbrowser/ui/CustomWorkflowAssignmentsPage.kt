@@ -23,6 +23,8 @@ import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.workflow.CustomWorkflowConfiguration
 import dev.sk2andy.materialbrowser.browser.workflow.CustomWorkflowPlacement
 import dev.sk2andy.materialbrowser.browser.workflow.CustomWorkflowRules
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsRadioOption
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsSelectionLink
 

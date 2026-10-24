@@ -25,8 +25,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.onSizeChanged
@@ -53,7 +51,6 @@ internal fun InlineMediaPlayerSeekSlider(
     enabled: Boolean,
     onSecondsChanged: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    inPreferenceGroup: Boolean = false,
 ) {
     val options = InlineMediaPlayerSeekSettingsRules.SupportedSeconds
     val index = options.indexOf(InlineMediaPlayerSeekSettingsRules.normalizeSeconds(seconds))
@@ -72,12 +69,8 @@ internal fun InlineMediaPlayerSeekSlider(
 
     Surface(
         modifier = Modifier.fillMaxWidth().settingsSearchTarget(title),
-        shape = if (inPreferenceGroup) RectangleShape else MaterialTheme.shapes.large,
-        color = if (inPreferenceGroup) {
-            Color.Transparent
-        } else {
-            browserChromeColor(MaterialTheme.colorScheme.surfaceContainerHigh)
-        },
+        shape = MaterialTheme.shapes.large,
+        color = browserChromeColor(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

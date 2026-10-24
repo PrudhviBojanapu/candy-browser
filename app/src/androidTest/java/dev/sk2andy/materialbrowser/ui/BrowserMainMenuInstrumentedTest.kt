@@ -318,13 +318,12 @@ class BrowserMainMenuInstrumentedTest {
             candyGroup and
                 hasAnyDescendant(hasText(context.getString(R.string.action_open_candy_trail))) and
                 hasAnyDescendant(hasText(context.getString(R.string.action_add_site_capsule))) and
-                hasAnyDescendant(hasText(context.getString(R.string.site_widget_editor_title))) and
                 hasAnyDescendant(hasText(context.getString(R.string.action_summarize))) and
                 hasAnyDescendant(hasText(context.getString(R.string.action_snooze_tab))),
         ).assertExists()
         composeRule.onNodeWithTag(BrowserMainMenuTestTags.CandyGroup)
             .onChildren()
-            .assertCountEquals(5)
+            .assertCountEquals(4)
         composeRule.onNodeWithText(
             context.getString(R.string.browser_menu_browser_group),
         ).assertExists()
@@ -906,10 +905,6 @@ class BrowserMainMenuInstrumentedTest {
             .assertIsNotEnabled()
         composeRule.onNodeWithTag(BrowserMainMenuTestTags.ForcePageZooming)
             .assertDoesNotExist()
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.ToppingsGroup).assertDoesNotExist()
-        composeRule.onNodeWithTag(BrowserMainMenuTestTags.WorkflowsToggle)
-            .performScrollTo()
-            .performClick()
         composeRule.onNodeWithTag(BrowserMainMenuTestTags.ToppingsGroup).assertExists()
         composeRule.onNodeWithText("Password helper").assertExists()
         composeRule.onNodeWithTag(BrowserMainMenuTestTags.userScriptCommand("reveal"))

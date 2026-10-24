@@ -1,40 +1,25 @@
 package dev.sk2andy.materialbrowser.shared.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -49,94 +34,70 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sk2andy.materialbrowser.reader.ReaderBlock
 import dev.sk2andy.materialbrowser.reader.ReaderBlockKind
-import dev.sk2andy.materialbrowser.reader.ReaderChromeMode
-import dev.sk2andy.materialbrowser.reader.ReaderChromeRules
 import dev.sk2andy.materialbrowser.reader.ReaderDocument
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionFailure
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionResult
-import dev.sk2andy.materialbrowser.reader.ReaderFont
-import dev.sk2andy.materialbrowser.reader.ReaderLibraryDataSource
 import dev.sk2andy.materialbrowser.reader.ReaderLibraryRules
 import dev.sk2andy.materialbrowser.reader.ReaderLibraryState
+import dev.sk2andy.materialbrowser.reader.ReaderLibraryDataSource
 import dev.sk2andy.materialbrowser.reader.ReaderSettings
 import dev.sk2andy.materialbrowser.reader.ReaderSnapshot
 import dev.sk2andy.materialbrowser.reader.ReaderSpeech
-import dev.sk2andy.materialbrowser.reader.ReaderSpeechRules
 import dev.sk2andy.materialbrowser.reader.ReaderSpeechState
+import dev.sk2andy.materialbrowser.reader.ReaderSpeechRules
 import dev.sk2andy.materialbrowser.reader.ReaderSpeechStatus
-import dev.sk2andy.materialbrowser.reader.ReaderTextAlignment
 import dev.sk2andy.materialbrowser.reader.ReaderTheme
+import dev.sk2andy.materialbrowser.reader.ReaderTextAlignment
 import kotlinx.coroutines.delay
 
 object ReaderStudioTestTags {
-    const val Back = "reader_studio_back"
-    const val Pill = "reader_studio_pill"
-    const val Url = "reader_studio_url"
-    const val Toggle = "reader_studio_toggle"
-    const val Settings = "reader_studio_settings"
-    const val Sheet = "reader_studio_sheet"
-    const val Hide = "reader_studio_hide"
-    const val Continue = "reader_studio_continue"
-    const val Typeface = "reader_studio_typeface"
     const val Screen = "reader_studio_screen"
     const val Loading = "reader_studio_loading"
     const val Error = "reader_studio_error"
-    const val ArticleTitle = "reader_studio_article_title"
-    const val StatusBarScrim = "reader_studio_status_bar_scrim"
     const val Article = "reader_studio_article"
     const val Progress = "reader_studio_progress"
     const val Save = "reader_studio_save"
-    const val Saved = "reader_studio_saved"
-    const val LibraryContent = "reader_studio_library_content"
     const val Library = "reader_studio_library"
     const val PrivateNotice = "reader_studio_private_notice"
     const val SpeechPlay = "reader_studio_speech_play"
@@ -150,14 +111,6 @@ object ReaderStudioTestTags {
 
 enum class ReaderStudioLabel {
     Close,
-    Settings,
-    CompactControls,
-    ExpandControls,
-    HideControls,
-    HiddenControlsHint,
-    ContinueReading,
-    FontSerif,
-    FontSans,
     Title,
     Article,
     Original,
@@ -171,7 +124,6 @@ enum class ReaderStudioLabel {
     SaveOffline,
     OfflineShort,
     ThemeSystem,
-    ThemeLight,
     ThemePaper,
     ThemeNight,
     FontDecrease,
@@ -214,14 +166,6 @@ interface ReaderStudioResources {
 internal object DefaultReaderStudioResources : ReaderStudioResources {
     @Composable
     override fun text(label: ReaderStudioLabel, value: Int?): String = when (label) {
-        ReaderStudioLabel.Settings -> "Reading settings"
-        ReaderStudioLabel.CompactControls -> "Use compact controls"
-        ReaderStudioLabel.ExpandControls -> "Show URL and controls"
-        ReaderStudioLabel.HideControls -> "Hide controls completely"
-        ReaderStudioLabel.HiddenControlsHint -> "Use the back button to show the controls again."
-        ReaderStudioLabel.ContinueReading -> "Continue reading"
-        ReaderStudioLabel.FontSerif -> "Serif"
-        ReaderStudioLabel.FontSans -> "Sans"
         ReaderStudioLabel.Close -> "Close Reader Studio"
         ReaderStudioLabel.Title -> "Reader Studio"
         ReaderStudioLabel.Article -> "Article"
@@ -239,7 +183,6 @@ internal object DefaultReaderStudioResources : ReaderStudioResources {
         ReaderStudioLabel.SaveOffline -> "Save offline"
         ReaderStudioLabel.OfflineShort -> "Offline"
         ReaderStudioLabel.ThemeSystem -> "System"
-        ReaderStudioLabel.ThemeLight -> "Light"
         ReaderStudioLabel.ThemePaper -> "Paper"
         ReaderStudioLabel.ThemeNight -> "Night"
         ReaderStudioLabel.FontDecrease -> "Decrease text size"
@@ -264,17 +207,8 @@ internal object DefaultReaderStudioResources : ReaderStudioResources {
         modifier: Modifier,
         contentDescription: String?,
     ) {
-        LocalCandyBrowserChromeEffects.current.icon(
-            symbol = when (icon) {
-                ReaderStudioIcon.Download -> "arrow.down.to.line"
-                ReaderStudioIcon.FontDecrease -> "textformat.size.smaller"
-                ReaderStudioIcon.FontIncrease -> "textformat.size.larger"
-                ReaderStudioIcon.AlignmentStart -> "text.alignleft"
-                ReaderStudioIcon.AlignmentJustified -> "text.justify"
-                ReaderStudioIcon.Pause -> "pause.fill"
-                ReaderStudioIcon.Stop -> "stop.fill"
-            },
-            fallback = when (icon) {
+        Icon(
+            imageVector = when (icon) {
                 ReaderStudioIcon.Download -> Icons.Filled.Download
                 ReaderStudioIcon.FontDecrease -> Icons.Filled.Remove
                 ReaderStudioIcon.FontIncrease -> Icons.Filled.Add
@@ -355,8 +289,6 @@ internal class UnavailableReaderSpeech : ReaderSpeech {
     }
 }
 
-private enum class ReaderContent { Loading, Error, Article, Library }
-
 @Composable
 fun ReaderStudioScreen(
     result: ReaderExtractionResult?,
@@ -369,76 +301,24 @@ fun ReaderStudioScreen(
     onDismiss: () -> Unit,
     onOpenOriginal: (String) -> Unit,
     onOpenLink: (String) -> Unit,
-    backHandler: (@Composable (Boolean, () -> Unit) -> Unit)? = null,
-    systemBarAppearance: @Composable (Boolean) -> Unit = {},
-    speechOptions: @Composable (ReaderSpeech) -> Unit = {},
-    initialSnapshot: ReaderSnapshot? = null,
-    onOpenCollection: (() -> Unit)? = null,
-    extraActions: @Composable () -> Unit = {},
-    documentActions: @Composable (ReaderDocument) -> Unit = {},
 ) {
     var library by remember(isPrivate) { mutableStateOf(ReaderLibraryState()) }
-    val sessionActive = remember(repository, result, sourceUrl, isPrivate) { mutableStateOf(true) }
-    DisposableEffect(sessionActive) {
-        onDispose { sessionActive.value = false }
+    var activeDocument by remember(result) {
+        mutableStateOf((result as? ReaderExtractionResult.Success)?.document)
     }
-    val restoredSnapshot = initialSnapshot?.takeIf {
-        !isPrivate && !it.isPrivate && it.document.sourceUrl == sourceUrl
-    }
-    var activeDocument by remember(result, sourceUrl, isPrivate, restoredSnapshot) {
-        mutableStateOf(restoredSnapshot?.document ?: (result as? ReaderExtractionResult.Success)?.document)
-    }
-    var activeSnapshot by remember(result, sourceUrl, isPrivate, restoredSnapshot) {
-        mutableStateOf(restoredSnapshot)
-    }
-    var libraryVisible by rememberSaveable(sourceUrl, isPrivate) { mutableStateOf(false) }
-    var chrome by rememberSaveable(sourceUrl, isPrivate) { mutableStateOf(ReaderChromeMode.Expanded) }
-    var scrollDistanceDp by remember(activeDocument?.sourceUrl, isPrivate) { mutableFloatStateOf(0f) }
-    var settingsVisible by rememberSaveable(sourceUrl, isPrivate) { mutableStateOf(false) }
-    val onBack: () -> Unit = {
-        when {
-            settingsVisible -> settingsVisible = false
-            chrome == ReaderChromeMode.Hidden -> {
-                chrome = ReaderChromeRules.restore(chrome)
-                scrollDistanceDp = 0f
-            }
-            libraryVisible -> libraryVisible = false
-            else -> onDismiss()
-        }
-    }
-    backHandler?.invoke(true, onBack)
+    var activeSnapshot by remember { mutableStateOf<ReaderSnapshot?>(null) }
+    var libraryVisible by remember { mutableStateOf(false) }
     var libraryLoaded by remember(isPrivate) { mutableStateOf(isPrivate) }
     var sessionSettings by remember(library.settings, isPrivate) {
         mutableStateOf(library.settings)
     }
     val colors = readerColors(sessionSettings.theme)
-    val reduceMotion = LocalCandyBrowserChromeEffects.current.reducesMotion()
-    val articleScrollState = key(activeDocument?.sourceUrl, isPrivate) { rememberScrollState() }
-    val libraryScrollState = rememberScrollState()
-    var articleScrollRestored by remember(activeDocument?.sourceUrl, isPrivate) { mutableStateOf(false) }
-    val content = when {
-        libraryVisible && !isPrivate -> ReaderContent.Library
-        activeDocument != null -> ReaderContent.Article
-        result is ReaderExtractionResult.Failure -> ReaderContent.Error
-        else -> ReaderContent.Loading
-    }
-    systemBarAppearance(colors.article.luminance() > 0.5f)
-    DisposableEffect(repository, result, sourceUrl, isPrivate) {
-        var active = true
+    LaunchedEffect(result, isPrivate) {
         libraryLoaded = false
         repository.load(isPrivate) { loaded ->
-            if (active) {
-                library = loaded
-                libraryLoaded = true
-                if (activeDocument == null && result is ReaderExtractionResult.Failure) {
-                    ReaderLibraryRules.snapshotForSourceUrl(loaded, sourceUrl, isPrivate)?.let { snapshot ->
-                        activeSnapshot = snapshot
-                        activeDocument = snapshot.document
-                    }
-                }
-            }
+            library = loaded
+            libraryLoaded = true
         }
-        onDispose { active = false }
     }
 
     Surface(
@@ -448,209 +328,128 @@ fun ReaderStudioScreen(
         color = colors.background,
         contentColor = colors.content,
     ) {
-        Box(
-            modifier = Modifier.windowInsetsPadding(
-                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-            ),
-        ) {
-            ReaderContentTransition(content, reduceMotion) {
-                if (content == ReaderContent.Library) {
-                    ReaderLibraryContent(
-                        resources = resources,
-                        snapshots = library.snapshots,
-                        scrollState = libraryScrollState,
-                        progressByUrl = library.progressByUrl,
-                        colors = colors,
-                        backButtonVisible = backHandler == null,
-                        onOpen = { snapshot ->
-                            activeSnapshot = snapshot
-                            activeDocument = snapshot.document
-                            libraryVisible = false
-                        },
-                        onDelete = { snapshot ->
-                            if (activeSnapshot?.id == snapshot.id) activeSnapshot = null
-                            repository.deleteSnapshot(snapshot.id, isPrivate = false) { updated ->
-                                library = updated
-                            }
-                        },
-                    )
-                } else {
-                    when {
-                        content == ReaderContent.Loading -> ReaderLoading(resources, colors)
-                        content == ReaderContent.Error ->
-                            ReaderError(
-                                resources,
-                                (result as? ReaderExtractionResult.Failure)?.reason
-                                    ?: ReaderExtractionFailure.InvalidResponse,
-                                colors,
-                                onRetry,
-                                onOpenOriginal = { onOpenOriginal(sourceUrl) },
-                                onOpenLibrary = if (!isPrivate &&
-                                    (library.snapshots.isNotEmpty() || onOpenCollection != null)
-                                ) {
-                                    { onOpenCollection?.invoke() ?: run { libraryVisible = true } }
-                                } else {
-                                    null
-                                },
-                            )
-                        activeDocument != null -> ReaderArticle(
-                            document = checkNotNull(activeDocument),
-                            scrollState = articleScrollState,
-                            restored = articleScrollRestored,
-                            onScrollRestored = { articleScrollRestored = true },
-                            snapshotProgress = activeSnapshot?.progress,
-                            isPrivate = isPrivate,
-                            settings = sessionSettings,
-                            library = library,
-                            libraryLoaded = libraryLoaded,
-                            repository = repository,
-                            resources = resources,
-                            speechFactory = speechFactory,
-                            speechOptions = speechOptions,
-                            colors = colors,
-                            backButtonVisible = backHandler == null,
-                            onSettingsChanged = { settings ->
-                                sessionSettings = settings.copy(fontScale = settings.fontScale.coerceIn(0.8f, 1.6f))
-                                if (!isPrivate) {
-                                    repository.updateSettings(
-                                        sessionSettings,
-                                        isPrivate = false,
-                                    ) { updated ->
-                                        library = updated
-                                    }
-                                }
-                            },
-                            onLibraryChanged = { updatedLibrary ->
-                                if (sessionActive.value) {
-                                    library = updatedLibrary
-                                    activeSnapshot = library.snapshots.firstOrNull {
-                                        it.document.sourceUrl == activeDocument?.sourceUrl
-                                    }
-                                }
-                            },
-                            onOpenLink = onOpenLink,
-                            onScroll = { deltaDp, atTop ->
-                                val update = ReaderChromeRules.onScroll(chrome, scrollDistanceDp, deltaDp, atTop)
-                                chrome = update.mode
-                                scrollDistanceDp = update.accumulatedDistanceDp
-                            },
-                            settingsVisible = settingsVisible,
-                            onCloseSettings = { settingsVisible = false },
-                            onHideControls = {
-                                chrome = ReaderChromeMode.Hidden
-                                scrollDistanceDp = 0f
-                                settingsVisible = false
-                            },
-                            onLibrary = {
-                                settingsVisible = false
-                                if (onOpenCollection != null) onOpenCollection() else libraryVisible = true
-                            },
-                            onOpenOriginal = { onOpenOriginal(checkNotNull(activeDocument).sourceUrl) },
-                            extraActions = {
-                                documentActions(checkNotNull(activeDocument))
-                                extraActions()
-                            },
-                        )
-                    }
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .windowInsetsTopHeight(WindowInsets.statusBars)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(colors.article, colors.article.copy(alpha = 0.86f)),
-                        ),
-                    )
-                    .testTag(ReaderStudioTestTags.StatusBarScrim),
+        Column(modifier = Modifier.safeDrawingPadding()) {
+            ReaderStudioHeader(
+                resources = resources,
+                libraryVisible = libraryVisible,
+                isPrivate = isPrivate,
+                snapshotCount = library.snapshots.size,
+                onDismiss = onDismiss,
+                onOpenOriginal = {
+                    onOpenOriginal(activeDocument?.sourceUrl ?: sourceUrl)
+                },
+                onLibrary = { libraryVisible = !libraryVisible },
             )
-            if (backHandler == null) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(8.dp)
-                        .testTag(ReaderStudioTestTags.Back),
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = resources.text(
-                            if (chrome == ReaderChromeMode.Hidden || libraryVisible || settingsVisible) {
-                                ReaderStudioLabel.ContinueReading
-                            } else {
-                                ReaderStudioLabel.Close
-                            },
-                        ),
-                    )
-                }
-            }
-            if (chrome != ReaderChromeMode.Hidden) {
-                ReaderPill(
+            if (libraryVisible && !isPrivate) {
+                ReaderLibraryContent(
                     resources = resources,
-                    sourceUrl = activeDocument?.sourceUrl ?: sourceUrl,
-                    mode = chrome,
+                    snapshots = library.snapshots,
+                    progressByUrl = library.progressByUrl,
                     colors = colors,
-                    onSettings = { settingsVisible = true },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(4.dp),
-                )
-            }
-            if (settingsVisible && (libraryVisible || activeDocument == null)) {
-                ReaderSettingsSheet(
-                    resources = resources,
-                    colors = colors,
-                    onDismiss = { settingsVisible = false },
-                    onHide = {
-                        chrome = ReaderChromeMode.Hidden
-                        scrollDistanceDp = 0f
-                        settingsVisible = false
+                    onOpen = { snapshot ->
+                        activeSnapshot = snapshot
+                        activeDocument = snapshot.document
+                        libraryVisible = false
                     },
-                    onLibrary = if (isPrivate) null else {
-                        {
-                            if (onOpenCollection != null) onOpenCollection() else libraryVisible = !libraryVisible
-                            settingsVisible = false
+                    onDelete = { snapshot ->
+                        if (activeSnapshot?.id == snapshot.id) activeSnapshot = null
+                        repository.deleteSnapshot(snapshot.id, isPrivate = false) { updated ->
+                            library = updated
                         }
                     },
-                    onOpenOriginal = { onOpenOriginal(activeDocument?.sourceUrl ?: sourceUrl) },
-                ) {}
+                )
+            } else {
+                when {
+                    result == null && activeDocument == null -> ReaderLoading(resources, colors)
+                    result is ReaderExtractionResult.Failure && activeDocument == null ->
+                        ReaderError(
+                            resources,
+                            result.reason,
+                            colors,
+                            onRetry,
+                            onOpenOriginal = { onOpenOriginal(sourceUrl) },
+                        )
+                    activeDocument != null -> ReaderArticle(
+                        document = checkNotNull(activeDocument),
+                        snapshotProgress = activeSnapshot?.progress,
+                        isPrivate = isPrivate,
+                        settings = sessionSettings,
+                        library = library,
+                        libraryLoaded = libraryLoaded,
+                        repository = repository,
+                        resources = resources,
+                        speechFactory = speechFactory,
+                        colors = colors,
+                        onSettingsChanged = { settings ->
+                            sessionSettings = settings
+                            if (!isPrivate) {
+                                repository.updateSettings(
+                                    settings,
+                                    isPrivate = false,
+                                ) { updated ->
+                                    library = updated
+                                }
+                            }
+                        },
+                        onLibraryChanged = { updatedLibrary ->
+                            library = updatedLibrary
+                            activeSnapshot = library.snapshots.firstOrNull {
+                                it.document.sourceUrl == activeDocument?.sourceUrl
+                            }
+                        },
+                        onOpenLink = onOpenLink,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ReaderContentTransition(
-    destination: ReaderContent,
-    reduceMotion: Boolean,
-    content: @Composable () -> Unit,
+private fun ReaderStudioHeader(
+    resources: ReaderStudioResources,
+    libraryVisible: Boolean,
+    isPrivate: Boolean,
+    snapshotCount: Int,
+    onDismiss: () -> Unit,
+    onOpenOriginal: () -> Unit,
+    onLibrary: () -> Unit,
 ) {
-    var previousDestination by remember { mutableStateOf(destination) }
-    var direction by remember { mutableFloatStateOf(0f) }
-    val progress = remember { Animatable(1f) }
-    LaunchedEffect(destination, reduceMotion) {
-        direction = when {
-            destination == ReaderContent.Library -> 1f
-            previousDestination == ReaderContent.Library -> -1f
-            else -> 0f
-        }
-        val changed = previousDestination != destination
-        previousDestination = destination
-        if (reduceMotion || !changed) {
-            progress.snapTo(1f)
-        } else {
-            progress.snapTo(0f)
-            progress.animateTo(1f, tween(220))
-        }
-    }
-    Box(
-        modifier = Modifier.fillMaxSize().graphicsLayer {
-            alpha = progress.value
-            translationX = 24.dp.toPx() * direction * (1f - progress.value)
-        },
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        content()
+        IconButton(onClick = onDismiss) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = resources.text(ReaderStudioLabel.Close),
+            )
+        }
+        Text(
+            resources.text(ReaderStudioLabel.Title),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        if (!isPrivate) {
+            TextButton(
+                onClick = onLibrary,
+                modifier = Modifier.testTag(ReaderStudioTestTags.Library),
+            ) {
+                Text(
+                    if (libraryVisible) {
+                        resources.text(ReaderStudioLabel.Article)
+                    } else {
+                        resources.text(ReaderStudioLabel.OfflineCount, snapshotCount)
+                    },
+                )
+            }
+        }
+        TextButton(onClick = onOpenOriginal) {
+            Text(resources.text(ReaderStudioLabel.Original))
+        }
     }
 }
 
@@ -680,7 +479,6 @@ private fun ReaderError(
     colors: ReaderColors,
     onRetry: () -> Unit,
     onOpenOriginal: () -> Unit,
-    onOpenLibrary: (() -> Unit)?,
 ) {
     Box(
         modifier = Modifier
@@ -720,14 +518,6 @@ private fun ReaderError(
                         Text(resources.text(ReaderStudioLabel.Retry))
                     }
                 }
-                if (onOpenLibrary != null) {
-                    TextButton(
-                        onClick = onOpenLibrary,
-                        modifier = Modifier.testTag(ReaderStudioTestTags.Library),
-                    ) {
-                        Text(resources.text(ReaderStudioLabel.OfflineLibrary))
-                    }
-                }
             }
         }
     }
@@ -736,9 +526,6 @@ private fun ReaderError(
 @Composable
 private fun ReaderArticle(
     document: ReaderDocument,
-    scrollState: ScrollState,
-    restored: Boolean,
-    onScrollRestored: () -> Unit,
     snapshotProgress: Float?,
     isPrivate: Boolean,
     settings: ReaderSettings,
@@ -747,58 +534,17 @@ private fun ReaderArticle(
     repository: ReaderLibraryDataSource,
     resources: ReaderStudioResources,
     speechFactory: () -> ReaderSpeech,
-    speechOptions: @Composable (ReaderSpeech) -> Unit,
     colors: ReaderColors,
-    backButtonVisible: Boolean,
     onSettingsChanged: (ReaderSettings) -> Unit,
     onLibraryChanged: (ReaderLibraryState) -> Unit,
     onOpenLink: (String) -> Unit,
-    onScroll: (Float, Boolean) -> Unit,
-    settingsVisible: Boolean,
-    onCloseSettings: () -> Unit,
-    onHideControls: () -> Unit,
-    onLibrary: () -> Unit,
-    onOpenOriginal: () -> Unit,
-    extraActions: @Composable () -> Unit,
 ) {
-    val density = LocalDensity.current.density
-    val currentOnScroll by rememberUpdatedState(onScroll)
-    val chromeScrollConnection = remember(document.sourceUrl, density, scrollState) {
-        object : NestedScrollConnection {
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource,
-            ): Offset {
-                if (consumed.y != 0f) {
-                    currentOnScroll(-consumed.y / density, scrollState.value == 0)
-                }
-                return Offset.Zero
-            }
-        }
-    }
+    val scrollState = rememberScrollState()
     val speech = remember(document.sourceUrl) { speechFactory() }
-    var saveConfirmation by remember(document.sourceUrl) { mutableIntStateOf(0) }
-    val reduceMotion = LocalCandyBrowserChromeEffects.current.reducesMotion()
-    val saveScale = remember(document.sourceUrl) { Animatable(1f) }
-    LaunchedEffect(saveConfirmation, reduceMotion) {
-        saveScale.snapTo(1f)
-        if (saveConfirmation > 0 && !reduceMotion) {
-            saveScale.animateTo(1.12f, tween(120))
-            saveScale.animateTo(1f, tween(180))
-        }
-    }
-    var articleActive by remember(document.sourceUrl, isPrivate) { mutableStateOf(true) }
-    DisposableEffect(document.sourceUrl, isPrivate) {
-        articleActive = true
-        onDispose { articleActive = false }
-    }
-    val savedOffline = ReaderLibraryRules.snapshotForSourceUrl(library, document.sourceUrl, isPrivate)
-        ?.document == document
+    var restored by remember(document.sourceUrl) { mutableStateOf(false) }
     val progress = ReaderLibraryRules.progress(scrollState.value, scrollState.maxValue)
 
     DisposableEffect(speech) { onDispose(speech::close) }
-    speechOptions(speech)
     LaunchedEffect(document.sourceUrl, scrollState.maxValue, libraryLoaded) {
         if (restored || !libraryLoaded || scrollState.maxValue <= 0) return@LaunchedEffect
         val savedProgress = ReaderLibraryRules.resumeProgress(
@@ -807,7 +553,7 @@ private fun ReaderArticle(
             sourceUrl = document.sourceUrl,
         )
         scrollState.scrollTo((scrollState.maxValue * savedProgress).toInt())
-        onScrollRestored()
+        restored = true
     }
     LaunchedEffect(scrollState.isScrollInProgress, restored) {
         if (restored && !scrollState.isScrollInProgress) {
@@ -823,82 +569,86 @@ private fun ReaderArticle(
         }
     }
 
-    if (settingsVisible) {
-        ReaderSettingsSheet(
-            resources = resources,
-            colors = colors,
-            onDismiss = onCloseSettings,
-            onHide = onHideControls,
-            onLibrary = onLibrary.takeUnless { isPrivate },
-            onOpenOriginal = onOpenOriginal,
-        ) {
-            extraActions()
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().testTag(ReaderStudioTestTags.Progress),
-                color = colors.accent,
-                trackColor = colors.accent.copy(alpha = 0.16f),
-            )
-            Text(resources.text(ReaderStudioLabel.ProgressPercent, (progress * 100).toInt()))
-            ReaderControls(
-                resources = resources,
-                settings = settings,
-                isPrivate = isPrivate,
-                savedOffline = savedOffline,
-                saveScale = saveScale.value,
-                speechStatus = speech.state.status,
-                speechExcerpt = ReaderSpeechRules.currentExcerpt(
-                    document.speechText,
-                    speech.state.characterOffset,
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(colors.background, colors.card.copy(alpha = 0.34f)),
                 ),
-                colors = colors,
-                onSettingsChanged = onSettingsChanged,
-                onPlay = { speech.play(document.speechText) },
-                onPause = speech::pause,
-                onStop = speech::stop,
-                onSave = {
-                    repository.saveSnapshot(document, progress, isPrivate) { updated ->
-                        onLibraryChanged(updated)
-                        if (articleActive) {
-                            if (ReaderLibraryRules.snapshotForSourceUrl(updated, document.sourceUrl, isPrivate)
-                                    ?.document == document
-                            ) {
-                                saveConfirmation++
-                            }
-                        }
-                    }
-                },
-            )
-        }
-    }
-    Box(modifier = Modifier.fillMaxSize().background(colors.article)) {
+            ),
+    ) {
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .testTag(ReaderStudioTestTags.Progress),
+            color = colors.accent,
+            trackColor = colors.accent.copy(alpha = 0.16f),
+        )
+        ReaderControls(
+            resources = resources,
+            settings = settings,
+            isPrivate = isPrivate,
+            speechStatus = speech.state.status,
+            speechExcerpt = ReaderSpeechRules.currentExcerpt(
+                document.speechText,
+                speech.state.characterOffset,
+            ),
+            colors = colors,
+            onSettingsChanged = onSettingsChanged,
+            onPlay = { speech.play(document.speechText) },
+            onPause = speech::pause,
+            onStop = speech::stop,
+            onSave = {
+                repository.saveSnapshot(document, progress, isPrivate, onLibraryChanged)
+            },
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(chromeScrollConnection)
                 .verticalScroll(scrollState)
+                .padding(horizontal = 14.dp, vertical = 8.dp)
                 .testTag(ReaderStudioTestTags.Article),
         ) {
-            Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
-            if (backButtonVisible) Spacer(Modifier.height(56.dp))
-            Box(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.TopCenter,
+                color = colors.article,
+                shape = RoundedCornerShape(32.dp),
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp,
             ) {
-                Column(
-                    modifier = Modifier
-                        .widthIn(max = 760.dp)
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
-                ) {
+                Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 24.dp)) {
+                    Surface(
+                        color = colors.accent.copy(alpha = 0.12f),
+                        contentColor = colors.accent,
+                        shape = CircleShape,
+                    ) {
+                        Text(
+                            document.siteName,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
                     Text(
                         document.title,
-                        modifier = Modifier.testTag(ReaderStudioTestTags.ArticleTitle).semantics { heading() },
+                        modifier = Modifier.semantics { heading() },
                         style = MaterialTheme.typography.headlineLarge.copy(
-                            fontFamily = settings.font.composeFamily(),
                             fontSize = 30.sp * settings.fontScale,
                             lineHeight = 36.sp * settings.fontScale,
                         ),
                         fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        document.sourceUrl,
+                        color = colors.muted,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(22.dp))
                     document.blocks.forEach { block ->
@@ -906,14 +656,13 @@ private fun ReaderArticle(
                             block = block,
                             fontScale = settings.fontScale,
                             textAlignment = settings.textAlignment,
-                            font = settings.font,
                             colors = colors,
                             onOpenLink = onOpenLink,
                         )
                     }
                 }
             }
-            Spacer(Modifier.height(112.dp))
+            Spacer(Modifier.height(36.dp))
         }
     }
 }
@@ -923,8 +672,6 @@ private fun ReaderControls(
     resources: ReaderStudioResources,
     settings: ReaderSettings,
     isPrivate: Boolean,
-    savedOffline: Boolean,
-    saveScale: Float,
     speechStatus: ReaderSpeechStatus,
     speechExcerpt: String,
     colors: ReaderColors,
@@ -934,164 +681,117 @@ private fun ReaderControls(
     onStop: () -> Unit,
     onSave: () -> Unit,
 ) {
-    LocalCandyBrowserChromeEffects.current.floatingSurface(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp),
         color = colors.card,
-        contentColor = colors.content,
         shape = RoundedCornerShape(28.dp),
         tonalElevation = 5.dp,
         shadowElevation = 2.dp,
     ) {
-        BoxWithConstraints {
-            val showSaveLabel = maxWidth >= 320.dp && LocalDensity.current.fontScale < 1.6f
-            val themeColumns = if (maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.6f) 2 else 4
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                CandySegmentedControl(
-                    options = ReaderFont.entries,
-                    selected = { settings.font == it },
-                    onSelect = { onSettingsChanged(settings.copy(font = it)) },
-                    colors = readerSegmentedColors(colors),
-                    containerColor = colors.article,
-                    contentColor = colors.content,
-                    modifier = Modifier.fillMaxWidth().testTag(ReaderStudioTestTags.Typeface),
-                ) { font ->
-                    Text(resources.text(
-                        if (font == ReaderFont.Serif) ReaderStudioLabel.FontSerif else ReaderStudioLabel.FontSans,
-                    ))
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ReaderFontSizeSegmented(
+                resources = resources,
+                settings = settings,
+                colors = colors,
+                onSettingsChanged = onSettingsChanged,
+                modifier = Modifier.weight(1f),
+            )
+            ReaderAlignmentSegmented(
+                resources = resources,
+                settings = settings,
+                colors = colors,
+                onSettingsChanged = onSettingsChanged,
+                modifier = Modifier.weight(1f),
+            )
+            if (!isPrivate) {
+                val saveDescription = resources.text(ReaderStudioLabel.SaveOffline)
+                val showSaveLabel = LocalDensity.current.fontScale < 1.6f
+                FilledTonalButton(
+                    onClick = onSave,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(ReaderStudioTestTags.Save),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = colors.accent,
+                        contentColor = colors.onAccent,
+                    ),
                 ) {
-                    ReaderFontSizeSegmented(
-                        resources = resources,
-                        settings = settings,
-                        colors = colors,
-                        onSettingsChanged = onSettingsChanged,
-                        modifier = Modifier.weight(1f),
+                    resources.icon(
+                        icon = ReaderStudioIcon.Download,
+                        modifier = Modifier.size(20.dp),
+                        contentDescription = saveDescription.takeUnless { showSaveLabel },
                     )
-                    ReaderAlignmentSegmented(
-                        resources = resources,
-                        settings = settings,
-                        colors = colors,
-                        onSettingsChanged = onSettingsChanged,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (!isPrivate) {
-                        val saveDescription = resources.text(ReaderStudioLabel.SaveOffline)
-                        val saveDescriptionOffline = resources.text(ReaderStudioLabel.OfflineShort)
-                        FilledTonalButton(
-                            onClick = onSave,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag(ReaderStudioTestTags.Save)
-                                .semantics {
-                                    if (savedOffline) stateDescription = saveDescriptionOffline
-                                },
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = colors.accent,
-                                contentColor = colors.onAccent,
-                            ),
-                        ) {
-                            ReaderSaveIcon(
-                                resources = resources,
-                                savedOffline = savedOffline,
-                                scale = saveScale,
-                                contentDescription = saveDescription.takeUnless { showSaveLabel },
-                            )
-                            if (showSaveLabel) {
-                                Spacer(Modifier.size(6.dp))
-                                Text(resources.text(ReaderStudioLabel.OfflineShort))
-                            }
-                        }
+                    if (showSaveLabel) {
+                        Spacer(Modifier.size(6.dp))
+                        Text(resources.text(ReaderStudioLabel.OfflineShort))
                     }
-                }
-                Column(modifier = Modifier.testTag(ReaderStudioTestTags.ThemeSegmented)) {
-                    ReaderTheme.entries.chunked(themeColumns).forEach { themes ->
-                        CandySegmentedControl(
-                            options = themes,
-                            equalWidths = true,
-                            selected = { settings.theme == it },
-                            onSelect = { onSettingsChanged(settings.copy(theme = it)) },
-                            colors = readerSegmentedColors(colors),
-                            containerColor = colors.article,
-                            contentColor = colors.content,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { theme ->
-                            Text(
-                                resources.text(when (theme) {
-                                    ReaderTheme.System -> ReaderStudioLabel.ThemeSystem
-                                    ReaderTheme.Light -> ReaderStudioLabel.ThemeLight
-                                    ReaderTheme.Paper -> ReaderStudioLabel.ThemePaper
-                                    ReaderTheme.Night -> ReaderStudioLabel.ThemeNight
-                                }),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-                ReaderSpeechTransport(
-                    resources = resources,
-                    status = speechStatus,
-                    excerpt = speechExcerpt,
-                    colors = colors,
-                    onPlay = onPlay,
-                    onPause = onPause,
-                    onStop = onStop,
-                )
-                if (isPrivate) {
-                    Text(
-                        resources.text(ReaderStudioLabel.PrivateNotice),
-                        modifier = Modifier.testTag(ReaderStudioTestTags.PrivateNotice),
-                        color = colors.muted,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ReaderSaveIcon(
-    resources: ReaderStudioResources,
-    savedOffline: Boolean,
-    scale: Float,
-    contentDescription: String?,
-) {
-    val effects = LocalCandyBrowserChromeEffects.current
-    val reduceMotion = effects.reducesMotion()
-    AnimatedContent(
-        targetState = savedOffline,
-        modifier = Modifier.size(20.dp).graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        },
-        transitionSpec = {
-            fadeIn(tween(if (reduceMotion) 0 else 160)) togetherWith
-                fadeOut(tween(if (reduceMotion) 0 else 120))
-        },
-        label = "Reader offline confirmation",
-    ) { saved ->
-        if (saved) {
-            effects.icon(
-                symbol = "checkmark",
-                fallback = Icons.Filled.Check,
-                modifier = Modifier.size(20.dp).testTag(ReaderStudioTestTags.Saved),
-                contentDescription = contentDescription,
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(ReaderStudioTestTags.ThemeSegmented),
+        ) {
+            ReaderTheme.entries.forEachIndexed { index, theme ->
+                SegmentedButton(
+                    modifier = Modifier.weight(1f),
+                    selected = settings.theme == theme,
+                    onClick = { onSettingsChanged(settings.copy(theme = theme)) },
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = ReaderTheme.entries.size,
+                    ),
+                    label = {
+                        Text(
+                            resources.text(
+                                when (theme) {
+                                    ReaderTheme.System -> ReaderStudioLabel.ThemeSystem
+                                    ReaderTheme.Paper -> ReaderStudioLabel.ThemePaper
+                                    ReaderTheme.Night -> ReaderStudioLabel.ThemeNight
+                                },
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = colors.accent,
+                        activeContentColor = colors.onAccent,
+                        activeBorderColor = colors.accent,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = colors.content,
+                        inactiveBorderColor = colors.muted,
+                    ),
+                )
+            }
+        }
+        ReaderSpeechTransport(
+            resources = resources,
+            status = speechStatus,
+            excerpt = speechExcerpt,
+            colors = colors,
+            onPlay = onPlay,
+            onPause = onPause,
+            onStop = onStop,
+        )
+        if (isPrivate) {
+            Text(
+                resources.text(ReaderStudioLabel.PrivateNotice),
+                modifier = Modifier.testTag(ReaderStudioTestTags.PrivateNotice),
+                color = colors.muted,
+                style = MaterialTheme.typography.labelMedium,
             )
-        } else {
-            resources.icon(
-                icon = ReaderStudioIcon.Download,
-                modifier = Modifier.size(20.dp),
-                contentDescription = contentDescription,
-            )
+        }
         }
     }
 }
@@ -1114,23 +814,33 @@ private fun ReaderFontSizeSegmented(
             onSettingsChanged(settings.copy(fontScale = settings.fontScale + 0.1f))
         },
     )
-    CandySegmentedControl(
-        options = actions,
-        selected = { false },
-        onSelect = { it.third() },
-        colors = readerSegmentedColors(colors),
-        containerColor = colors.article,
-        contentColor = colors.content,
+    SingleChoiceSegmentedButtonRow(
         modifier = modifier.testTag(ReaderStudioTestTags.FontSegmented),
-        isSelection = false,
-        showsSelectionIcon = false,
-        description = { it.second },
-    ) { (icon, _, _) ->
-        resources.icon(
-            icon = icon,
-            modifier = Modifier.size(if (icon == ReaderStudioIcon.FontDecrease) 18.dp else 20.dp),
-            contentDescription = null,
-        )
+    ) {
+        actions.forEachIndexed { index, (icon, description, action) ->
+            SegmentedButton(
+                modifier = Modifier.clearAndSetSemantics {
+                    contentDescription = description
+                    role = Role.Button
+                    onClick {
+                        action()
+                        true
+                    }
+                },
+                selected = false,
+                onClick = action,
+                shape = SegmentedButtonDefaults.itemShape(index, actions.size),
+                icon = {},
+                label = {
+                    resources.icon(
+                        icon = icon,
+                        modifier = Modifier.size(if (index == 0) 18.dp else 20.dp),
+                        contentDescription = null,
+                    )
+                },
+                colors = readerSegmentedColors(colors),
+            )
+        }
     }
 }
 
@@ -1142,23 +852,34 @@ private fun ReaderAlignmentSegmented(
     onSettingsChanged: (ReaderSettings) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    CandySegmentedControl(
-        options = ReaderTextAlignment.entries,
-        selected = { settings.textAlignment == it },
-        onSelect = { onSettingsChanged(settings.copy(textAlignment = it)) },
-        colors = readerSegmentedColors(colors),
-        containerColor = colors.article,
-        contentColor = colors.content,
+    SingleChoiceSegmentedButtonRow(
         modifier = modifier.testTag(ReaderStudioTestTags.AlignmentSegmented),
-        showsSelectionIcon = false,
-    ) { alignment ->
-        resources.icon(
-            icon = if (alignment == ReaderTextAlignment.Start) ReaderStudioIcon.AlignmentStart else ReaderStudioIcon.AlignmentJustified,
-            contentDescription = resources.text(
-                if (alignment == ReaderTextAlignment.Start) ReaderStudioLabel.AlignmentStart else ReaderStudioLabel.AlignmentJustified,
-            ),
-            modifier = Modifier.size(20.dp),
-        )
+    ) {
+        ReaderTextAlignment.entries.forEachIndexed { index, alignment ->
+            val description = resources.text(
+                when (alignment) {
+                    ReaderTextAlignment.Start -> ReaderStudioLabel.AlignmentStart
+                    ReaderTextAlignment.Justified -> ReaderStudioLabel.AlignmentJustified
+                },
+            )
+            SegmentedButton(
+                selected = settings.textAlignment == alignment,
+                onClick = { onSettingsChanged(settings.copy(textAlignment = alignment)) },
+                shape = SegmentedButtonDefaults.itemShape(index, ReaderTextAlignment.entries.size),
+                icon = {},
+                label = {
+                    resources.icon(
+                        icon = when (alignment) {
+                            ReaderTextAlignment.Start -> ReaderStudioIcon.AlignmentStart
+                            ReaderTextAlignment.Justified -> ReaderStudioIcon.AlignmentJustified
+                        },
+                        contentDescription = description,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                colors = readerSegmentedColors(colors),
+            )
+        }
     }
 }
 
@@ -1231,9 +952,7 @@ private fun ReaderSpeechTransport(
                         contentDescription = primaryActionDescription,
                     )
                 } else {
-                    LocalCandyBrowserChromeEffects.current.icon(
-                        "play.fill", Icons.Default.PlayArrow, contentDescription = primaryActionDescription,
-                    )
+                    Icon(Icons.Default.PlayArrow, contentDescription = primaryActionDescription)
                 }
             }
             Text(
@@ -1272,7 +991,6 @@ private fun ReaderBlockContent(
     block: ReaderBlock,
     fontScale: Float,
     textAlignment: ReaderTextAlignment,
-    font: ReaderFont,
     colors: ReaderColors,
     onOpenLink: (String) -> Unit,
 ) {
@@ -1317,7 +1035,6 @@ private fun ReaderBlockContent(
                     Modifier
                 },
                 style = style.copy(
-                    fontFamily = font.composeFamily(),
                     textAlign = if (justify) TextAlign.Justify else TextAlign.Start,
                     hyphens = if (justify) Hyphens.Auto else Hyphens.None,
                 ),
@@ -1348,22 +1065,17 @@ private fun ReaderBlockContent(
 private fun ReaderLibraryContent(
     resources: ReaderStudioResources,
     snapshots: List<ReaderSnapshot>,
-    scrollState: ScrollState,
     progressByUrl: Map<String, Float>,
     colors: ReaderColors,
-    backButtonVisible: Boolean,
     onOpen: (ReaderSnapshot) -> Unit,
     onDelete: (ReaderSnapshot) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .testTag(ReaderStudioTestTags.LibraryContent)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .verticalScroll(rememberScrollState())
             .padding(18.dp),
     ) {
-        if (backButtonVisible) Spacer(Modifier.height(56.dp))
         Text(
             resources.text(ReaderStudioLabel.OfflineLibrary),
             style = MaterialTheme.typography.headlineMedium,
@@ -1410,11 +1122,11 @@ private fun ReaderLibraryContent(
                 }
             }
         }
-        Spacer(Modifier.height(112.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
-internal data class ReaderColors(
+private data class ReaderColors(
     val background: Color,
     val content: Color,
     val muted: Color,
@@ -1435,15 +1147,6 @@ private fun readerColors(theme: ReaderTheme): ReaderColors = when (theme) {
         accent = MaterialTheme.colorScheme.primary,
         onAccent = MaterialTheme.colorScheme.onPrimary,
     )
-    ReaderTheme.Light -> ReaderColors(
-        background = Color(0xFFF8F9FC),
-        content = Color(0xFF1C1B20),
-        muted = Color(0xFF5D5B65),
-        card = Color(0xFFECEEF5),
-        article = Color.White,
-        accent = Color(0xFF455F91),
-        onAccent = Color.White,
-    )
     ReaderTheme.Paper -> ReaderColors(
         background = Color(0xFFFFF4D6),
         content = Color(0xFF322A1D),
@@ -1462,9 +1165,4 @@ private fun readerColors(theme: ReaderTheme): ReaderColors = when (theme) {
         accent = Color(0xFFD8B7FF),
         onAccent = Color(0xFF281338),
     )
-}
-
-private fun ReaderFont.composeFamily(): FontFamily = when (this) {
-    ReaderFont.Sans -> FontFamily.SansSerif
-    ReaderFont.Serif -> FontFamily.Serif
 }

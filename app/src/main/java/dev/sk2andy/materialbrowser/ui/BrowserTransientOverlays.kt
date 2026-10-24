@@ -28,7 +28,6 @@ import dev.sk2andy.materialbrowser.browser.commands.BrowserCommand
 import dev.sk2andy.materialbrowser.browser.commands.CommandConfirmation
 import dev.sk2andy.materialbrowser.browser.commands.CommandCookieScope
 import dev.sk2andy.materialbrowser.browser.commands.CommandSuggestion
-import dev.sk2andy.materialbrowser.browser.workflow.CustomWorkflowPlacement
 import dev.sk2andy.materialbrowser.capsule.SiteCapsule
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionFailure
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionResult
@@ -155,96 +154,26 @@ internal fun BrowserTransientOverlays(
         }
     }
 
-    if (controller.contentActions.isLinkPeekVisible) {
-        val linkTarget = controller.contentActions.target
-        LinkPeekOverlay(
-            url = requireNotNull(linkTarget?.linkUrl),
-            progress = controller.contentActions.linkPeekProgress,
-            armed = controller.contentActions.isLinkPeekArmed,
-            committing = controller.contentActions.isLinkPeekCommitting,
-            newTabTargetBounds = addressNewTabButtonBounds,
-            createPreviewView = { onProgressChanged, onCommittedUrlChanged ->
-                controller.createLinkPeekPreviewView(
-                    url = requireNotNull(linkTarget?.linkUrl),
-                    onProgressChanged = onProgressChanged,
-                    onCommittedUrlChanged = onCommittedUrlChanged,
-                )
-            },
-            releasePreviewView = controller::releaseLinkPeekPreviewView,
-            onCommitRequested = controller.contentActions::startLinkPeekCommit,
-            onOpen = {
-                rootView.performConfirmHaptic()
-                controller.openContextLinkInBackground()
-            },
-            onOpenUrl = { currentUrl ->
-                rootView.performConfirmHaptic()
-                controller.openContextLinkInBackground(currentUrl)
-            },
-            onCopyLink = { currentUrl ->
-                controller.contentActions.dismiss()
-                controller.copyLink(currentUrl)
-            },
-            onOpenInPrivate = { currentUrl ->
-                if (controller.openLinkInPrivate(currentUrl)) rootView.performConfirmHaptic()
-            },
-            onShare = { currentUrl ->
-                controller.contentActions.dismiss()
-                controller.shareLink(currentUrl)
-            },
-            onSaveReaderOffline = { currentUrl, previewWebView ->
-                controller.saveLinkPeekToReader(previewWebView, currentUrl) { result ->
-                    val message = when (result) {
-                        is ReaderExtractionResult.Success -> readerSavedMessage
-                        is ReaderExtractionResult.Failure -> when (result.reason) {
-                            ReaderExtractionFailure.UnsupportedPage -> readerUnsupportedMessage
-                            ReaderExtractionFailure.EmptyArticle -> readerEmptyMessage
-                            ReaderExtractionFailure.InvalidResponse -> readerInvalidMessage
-                        }
-                    }
-                    Toast.makeText(rootView.context, message, Toast.LENGTH_SHORT).show()
-                }
-            },
-            onFavorite = onFavoriteLink,
-            onSnooze = { currentUrl, title ->
-                controller.contextLinkSourceTabId?.let { sourceTabId ->
-                    controller.contentActions.dismiss()
-                    onSnoozeLink(currentUrl, title, sourceTabId)
-                }
-            },
-            onOpenForeground = { currentUrl ->
+    if (controller.contentActions.isVisible) {
+        val target = controller.contentActions.target
+        LinkContextMenuSheet(
+            target = target,
+            onOpenInForeground = { currentUrl ->
                 controller.openContextLinkInForeground(currentUrl)
             },
-            actionLayout = controller.linkPeekActionLayout,
-            rightSwipeAction = controller.linkPeekSwipeAction,
-            customActionSlots = controller.customWorkflowConfiguration.surfaceSlots(CustomWorkflowPlacement.LinkPeekToolbar),
-            hasCustomSwipeAction = controller.customWorkflowConfiguration.bindings.any {
-                it.placement == CustomWorkflowPlacement.LinkPeekSwipe && it.slot == 0
+            onOpenInBackground = { currentUrl ->
+                controller.openContextLinkInBackground(currentUrl)
             },
-            customSwipeAction = controller.customWorkflowConfiguration.surfaceSlots(CustomWorkflowPlacement.LinkPeekSwipe)[0],
-            onCustomAction = { id, currentUrl, previewView ->
-                controller.runCustomWorkflow(id, inputUrl = currentUrl, previewView = previewView)
+            onOpenInPrivate = { currentUrl ->
+                controller.openLinkInPrivate(currentUrl)
             },
-            canOpenNewStack = controller.canOpenContextLinkInNewStack,
-            onOpenNewStack = { currentUrl ->
-                if (controller.openContextLinkInNewStack(currentUrl)) {
-                    rootView.performConfirmHaptic()
-                }
+            onCopyLink = { currentUrl ->
+                controller.copyLink(currentUrl)
             },
-            isFavorite = controller::isFavorite,
-            canSaveReaderOffline = controller.canPersistContextLink,
-            canFavorite = controller.canPersistContextLink,
-            canSnooze = controller.canSnoozeContextLink,
-            canOpenInPrivate = controller.canOpenLinkInPrivate,
+            onShareLink = { currentUrl ->
+                controller.shareLink(currentUrl)
+            },
             onDownloadLink = controller::downloadContextLink,
-            onDownloadImage = linkTarget.takeIf { it?.canDownloadImage == true }?.let {
-                controller::downloadContextImage
-            },
-            onDismiss = controller.contentActions::dismiss,
-        )
-    } else if (controller.contentActions.isVisible) {
-        WebContentContextSheet(
-            target = controller.contentActions.target,
-            onOpenLinkInBackground = controller::openContextLinkInBackground,
             onDownloadImage = controller::downloadContextImage,
             onDismiss = controller.contentActions::dismiss,
         )

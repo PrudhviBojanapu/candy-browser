@@ -436,7 +436,6 @@ function contentPolicy(policy) {
     maxInitialElements: boundedSafeAreaInteger(policy?.maxInitialElements, 64, 2048, 512),
     navigationGeneration: Number.isSafeInteger(policy?.navigationGeneration) ?
       Math.max(0, policy.navigationGeneration) : 0,
-    formDraftSavingEnabled: policy?.formDraftSavingEnabled === true,
     scrollMetricsEnabled: policy?.scrollMetricsEnabled === true,
     inlineMediaPlayerEnabled: policy?.inlineMediaPlayerEnabled === true &&
       inlineMediaPlayerMode !== "disabled",
@@ -735,7 +734,95 @@ function observeMainFrameRequest(details, policy, token) {
   scheduleContentPolicy(details.tabId);
 }
 
+function extractMediaStreamCandidate(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return null;
+  const lowerUrl = rawUrl.toLowerCase();
+  const pathOnly = lowerUrl.split("?")[0].split("#")[0];
+
+  // Exclude segments, captions, ad domains
+  if (lowerUrl.includes(".ts?") || lowerUrl.includes(".ts&") || pathOnly.endsWith(".ts") ||
+      lowerUrl.includes(".m4s?") || lowerUrl.includes(".m4s&") || pathOnly.endsWith(".m4s") ||
+      lowerUrl.includes(".vtt") || lowerUrl.includes(".srt") ||
+      lowerUrl.includes("doubleclick.net") || lowerUrl.includes("googleads") ||
+      lowerUrl.includes("/pagead/") || lowerUrl.includes("adnxs.com") ||
+      lowerUrl.includes("googlevideo.com") || lowerUrl.includes("/videoplayback")) {
+    return null;
+  }
+
+  const isImageOrBeacon = pathOnly.endsWith(".gif") || pathOnly.endsWith(".png") ||
+      pathOnly.endsWith(".jpg") || pathOnly.endsWith(".jpeg") || pathOnly.endsWith(".webp") ||
+      pathOnly.endsWith(".svg") || pathOnly.endsWith(".ico") || pathOnly.endsWith(".css") ||
+      pathOnly.endsWith(".js") || pathOnly.endsWith(".json") || pathOnly.endsWith(".xml") ||
+      lowerUrl.includes("jwpltx.com") ||
+      lowerUrl.includes("/ping") || lowerUrl.includes("/beacon") ||
+      lowerUrl.includes("/analytics") || lowerUrl.includes("/telemetry") ||
+      lowerUrl.includes("/pixel") || lowerUrl.includes("/track");
+
+  // Attempt to unpack nested media streams from beacon tracking pings or wrappers
+  if (rawUrl.includes("?") || rawUrl.includes("&")) {
+    try {
+      const qIndex = rawUrl.indexOf("?");
+      const queryStr = qIndex >= 0 ? rawUrl.substring(qIndex + 1) : "";
+      const params = new URLSearchParams(queryStr);
+      const mediaParams = ["mu", "file", "url", "stream", "source", "src", "video_url", "video", "media", "m3u8", "mpd", "link"];
+      for (const param of mediaParams) {
+        let val = params.get(param);
+        if (val) {
+          if (val.includes("%")) {
+            try { val = decodeURIComponent(val); } catch (_) {}
+          }
+          if (val.startsWith("http://") || val.startsWith("https://")) {
+            const lowerVal = val.toLowerCase();
+            const valPath = lowerVal.split("?")[0].split("#")[0];
+            if ((lowerVal.includes(".m3u8") || lowerVal.includes(".mpd") || lowerVal.includes(".mp4") || lowerVal.includes(".webm")) &&
+                !valPath.endsWith(".gif") && !valPath.endsWith(".png") && !valPath.endsWith(".jpg") &&
+                !valPath.endsWith(".json") && !valPath.endsWith(".xml") &&
+                !valPath.endsWith(".ts") && !valPath.endsWith(".m4s")) {
+              let pu = params.get("pu") || params.get("ref") || params.get("referer");
+              if (pu && pu.includes("%")) {
+                try { pu = decodeURIComponent(pu); } catch (_) {}
+              }
+              return { url: val, pageUrl: pu || null };
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Reject beacons/images that have no unpacked media
+  if (isImageOrBeacon) {
+    return null;
+  }
+
+  // Check if rawUrl itself is a direct media candidate
+  const isDirect = pathOnly.endsWith(".m3u8") || pathOnly.endsWith(".mpd") ||
+      pathOnly.endsWith(".mp4") || pathOnly.endsWith(".webm") || pathOnly.endsWith(".mkv") ||
+      lowerUrl.includes(".m3u8") || lowerUrl.includes(".mpd") ||
+      lowerUrl.includes(".mp4") || lowerUrl.includes(".webm") ||
+      lowerUrl.includes("/manifest.mpd") || lowerUrl.includes("/manifest.m3u8") ||
+      lowerUrl.includes("/manifest/video") || lowerUrl.includes("/manifest/hls") ||
+      lowerUrl.includes("/hls/") ||
+      lowerUrl.includes("/playlist") || lowerUrl.includes("format=m3u8") ||
+      lowerUrl.includes("type=m3u8");
+
+  if (isDirect) {
+    return { url: rawUrl, pageUrl: null };
+  }
+  return null;
+}
+
 browser.webRequest.onBeforeRequest.addListener((details) => {
+  const candidate = extractMediaStreamCandidate(details.url);
+  if (candidate && nativePort && (candidate.url.startsWith("http://") || candidate.url.startsWith("https://"))) {
+    nativePort.postMessage({
+      type: "media-stream-detected",
+      protocolVersion: PROTOCOL_VERSION,
+      url: candidate.url,
+      pageUrl: candidate.pageUrl || details.documentUrl || null,
+    });
+  }
+
   // Service Worker requests have no tab. Never borrow a session's privacy policy.
   if (details.tabId === -1) return {};
   const token = tokenByTab.get(details.tabId);
@@ -752,7 +839,7 @@ browser.webRequest.onBeforeRequest.addListener((details) => {
     observeMainFrameRequest(details, policy, token);
     return {};
   }
-  if (!policy) return { cancel: true };
+  if (!policy) return {};
   const requestHost = hostFromUrl(details.url);
   const pageHost = policy.pageHost;
   if (!requestHost) return {};
@@ -777,10 +864,45 @@ browser.webRequest.onBeforeRequest.addListener((details) => {
     });
     return { cancel: true };
   }
+
   return {};
 }, { urls: ["http://*/*", "https://*/*"] }, ["blocking"]);
 
 browser.webRequest.onBeforeSendHeaders.addListener((details) => {
+  const candidate = extractMediaStreamCandidate(details.url);
+
+  if (candidate && nativePort && (candidate.url.startsWith("http://") || candidate.url.startsWith("https://"))) {
+    const headerMap = {};
+    let referer = candidate.pageUrl;
+    let userAgent = null;
+    let origin = null;
+    (details.requestHeaders || []).forEach((h) => {
+      if (h.name && h.value) {
+        headerMap[h.name] = h.value;
+        const lowerName = h.name.toLowerCase();
+        if (lowerName === "referer") referer = h.value;
+        if (lowerName === "user-agent") userAgent = h.value;
+        if (lowerName === "origin") origin = h.value;
+      }
+    });
+    if (!referer && details.documentUrl) referer = details.documentUrl;
+    if (!origin && referer) {
+      try {
+        const parsed = new URL(referer);
+        origin = parsed.origin;
+        headerMap["Origin"] = origin;
+      } catch (_) {}
+    }
+    nativePort.postMessage({
+      type: "media-stream-detected",
+      protocolVersion: PROTOCOL_VERSION,
+      url: candidate.url,
+      pageUrl: referer,
+      userAgent: userAgent,
+      headers: headerMap,
+    });
+  }
+
   const token = tokenByTab.get(details.tabId);
   const policy = token && policiesByToken.get(token);
   if (!policy) return {};
@@ -790,7 +912,44 @@ browser.webRequest.onBeforeSendHeaders.addListener((details) => {
 }, { urls: ["http://*/*", "https://*/*"] }, ["blocking", "requestHeaders"]);
 
 browser.webRequest.onHeadersReceived.addListener((details) => {
-  if (details.type !== "main_frame") return;
+  if (!nativePort || !Number.isInteger(details.statusCode)) {
+    return;
+  }
+  // Check for media Content-Type responses (.m3u8, video/mp4, etc.)
+  if (details.statusCode >= 200 && details.statusCode < 400 && details.type !== "main_frame") {
+    const contentTypeHeader = (details.responseHeaders || []).find((h) =>
+      typeof h.name === "string" && h.name.toLowerCase() === "content-type"
+    );
+    const contentType = (contentTypeHeader?.value || "").toLowerCase();
+    const candidate = extractMediaStreamCandidate(details.url);
+    const isDirectMediaContentType = (
+      contentType.includes("application/vnd.apple.mpegurl") ||
+      contentType.includes("application/x-mpegurl") ||
+      contentType.includes("application/dash+xml") ||
+      contentType.includes("video/mp4") ||
+      contentType.includes("video/webm")
+    );
+
+    if (candidate) {
+      nativePort.postMessage({
+        type: "media-stream-detected",
+        protocolVersion: PROTOCOL_VERSION,
+        url: candidate.url,
+        pageUrl: candidate.pageUrl || details.documentUrl || details.initiator || null,
+      });
+    } else if (isDirectMediaContentType && !details.url.toLowerCase().includes(".ts") && !details.url.toLowerCase().includes(".m4s")) {
+      nativePort.postMessage({
+        type: "media-stream-detected",
+        protocolVersion: PROTOCOL_VERSION,
+        url: details.url,
+        pageUrl: details.documentUrl || details.initiator || null,
+      });
+    }
+  }
+
+  if (details.type !== "main_frame") {
+    return;
+  }
   const request = mainFrameRequestsById.get(details.requestId);
   mainFrameRequestsById.delete(details.requestId);
   if (!request || !nativePort || !Number.isInteger(details.statusCode)) return;
@@ -842,31 +1001,28 @@ browser.runtime.onMessage.addListener((message, sender) => {
     }
     return undefined;
   }
-  if (message.type === "web-annotation-click") {
-    const token = tokenByTab.get(sender.tab.id);
-    const policy = token && policiesByToken.get(token);
-    if (sender.frameId === 0 && policy && policy.revision === message.revision &&
-        policy.navigationGeneration === message.navigationGeneration && message.url === sender.url &&
-        typeof message.id === "string" && message.id.length >= 1 && message.id.length <= 64) {
-      nativePort?.postMessage({ type: "web-annotation-click", token, protocolVersion: PROTOCOL_VERSION,
-        revision: message.revision, navigationGeneration: message.navigationGeneration, id: message.id });
-    }
-    return undefined;
-  }
-  if (message.type === "form-draft-snapshot") {
-    const token = tokenByTab.get(sender.tab.id);
-    const policy = token && policiesByToken.get(token);
-    if (sender.frameId === 0 && policy?.formDraftSavingEnabled === true &&
-        policy.revision === message.revision && policy.navigationGeneration === message.navigationGeneration &&
-        message.payload?.url === sender.url && JSON.stringify(message.payload).length <= 150000) {
-      nativePort?.postMessage({ ...message, token, protocolVersion: PROTOCOL_VERSION });
-    }
-    return undefined;
-  }
   if (message.type === "content-policy-request") {
     const token = tokenByTab.get(sender.tab.id);
     const policy = token && policiesByToken.get(token);
     return Promise.resolve(contentPolicy(policy));
+  }
+  if (message.type === "media-stream-detected") {
+    if (nativePort && typeof message.url === "string") {
+      const page = message.pageUrl || sender.tab?.url || "";
+      const headers = message.headers || {};
+      if (page && !headers["Referer"]) headers["Referer"] = page;
+      headers["User-Agent"] = navigator.userAgent;
+      nativePort.postMessage({
+        type: "media-stream-detected",
+        protocolVersion: PROTOCOL_VERSION,
+        url: message.url,
+        title: message.title || "",
+        pageUrl: page,
+        userAgent: navigator.userAgent,
+        headers: headers,
+      });
+    }
+    return undefined;
   }
   if (message.type === "inline-video-state") {
     updateInlineVideoState(message, sender);
@@ -929,6 +1085,17 @@ browser.runtime.onMessage.addListener((message, sender) => {
     }
     return undefined;
   }
+  if (message.type === "web-annotation-click") {
+    const token = tokenByTab.get(sender.tab.id);
+    const policy = token && policiesByToken.get(token);
+    if (sender.frameId === 0 && policy && policy.revision === message.revision &&
+        policy.navigationGeneration === message.navigationGeneration && message.url === sender.url &&
+        typeof message.id === "string" && message.id.length >= 1 && message.id.length <= 64) {
+      nativePort?.postMessage({ type: "web-annotation-click", token, protocolVersion: PROTOCOL_VERSION,
+        revision: message.revision, navigationGeneration: message.navigationGeneration, id: message.id });
+    }
+    return undefined;
+  }
   if (message.type === "cosmetics") {
     const token = tokenByTab.get(sender.tab.id);
     const policy = token && policiesByToken.get(token);
@@ -957,43 +1124,6 @@ browser.tabs.onRemoved.addListener((tabId) => {
     latestPolicyRevisionByToken.delete(token);
   }
 });
-
-function extractPageText(message) {
-  const policy = policiesByToken.get(message.token);
-  const post = payload => nativePort?.postMessage({
-    type: "text-extraction-result",
-    protocolVersion: PROTOCOL_VERSION,
-    token: message.token,
-    revision: message.revision,
-    navigationGeneration: message.navigationGeneration,
-    requestId: message.requestId,
-    payload,
-  });
-  if (!policy || policy.revision !== message.revision ||
-      policy.navigationGeneration !== message.navigationGeneration ||
-      typeof message.requestId !== "string" || message.requestId.length > 64) {
-    post(null);
-    return;
-  }
-  const tabEntry = Array.from(tokenByTab.entries()).find(([, token]) => token === message.token);
-  if (!tabEntry) {
-    post(null);
-    return;
-  }
-  browser.tabs.sendMessage(tabEntry[0], {
-    type: "text-extract", revision: message.revision,
-    navigationGeneration: message.navigationGeneration,
-  }, { frameId: 0 }).then(payload => {
-    const current = policiesByToken.get(message.token);
-    if (current?.revision !== message.revision ||
-        current?.navigationGeneration !== message.navigationGeneration ||
-        tokenByTab.get(tabEntry[0]) !== message.token) {
-      post(null);
-      return;
-    }
-    post(payload && JSON.stringify(payload).length <= 150000 ? payload : null);
-  }, () => post(null));
-}
 
 function postReaderResult(message, payload) {
   if (!nativePort) return;
@@ -1334,6 +1464,12 @@ function connectNative() {
       });
     } else if (message.type === "performance-diagnostics-state") {
       publishPerformanceDiagnosticsState(message);
+    } else if (message.type === "stop-web-video-playback") {
+      browser.tabs.query({}).then((tabs) => {
+        for (const tab of tabs) {
+          browser.tabs.sendMessage(tab.id, { type: "stop-web-video-playback" }).catch(() => {});
+        }
+      }).catch(() => {});
     } else if (message.type === "performance-diagnostics-gap") {
       publishPerformanceDiagnosticsGap(message);
     } else if (
@@ -1416,30 +1552,6 @@ function connectNative() {
           inlineVideosByTab.delete(tabId);
         }
       }
-    } else if (message.type === "web-text-operation" && typeof message.token === "string") {
-      const policy = policiesByToken.get(message.token);
-      const entry = Array.from(tokenByTab).find(([, token]) => token === message.token);
-      if (entry && policy?.revision === message.revision &&
-          policy.navigationGeneration === message.navigationGeneration) {
-        browser.tabs.sendMessage(entry[0], message, { frameId: 0 }).then(applied => {
-          nativePort?.postMessage({ type: "web-text-operation-result", protocolVersion: PROTOCOL_VERSION,
-            token: message.token, revision: message.revision, navigationGeneration: message.navigationGeneration,
-            requestId: message.requestId, applied: applied === true });
-        }).catch(() => {});
-      }
-    } else if (message.type === "form-draft-restore" && typeof message.token === "string") {
-      const policy = policiesByToken.get(message.token);
-      const entry = Array.from(tokenByTab).find(([, token]) => token === message.token);
-      if (entry && policy?.formDraftSavingEnabled === true && policy.revision === message.revision &&
-          policy.navigationGeneration === message.navigationGeneration) {
-        browser.tabs.sendMessage(entry[0], message, { frameId: 0 }).then(restored => {
-          nativePort?.postMessage({ type: "form-draft-restored", protocolVersion: PROTOCOL_VERSION,
-            token: message.token, revision: message.revision, navigationGeneration: message.navigationGeneration,
-            requestId: message.requestId, restored: restored === true });
-        }).catch(() => {});
-      }
-    } else if (message.type === "text-extract" && typeof message.token === "string") {
-      extractPageText(message);
     } else if (message.type === "reader-extract" && typeof message.token === "string") {
       extractReader(message);
     } else if (

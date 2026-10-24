@@ -5,14 +5,9 @@
 | Need | Detail | Main code |
 | --- | --- | --- |
 | Runtime ownership, WebView lifecycle and navigation | [`runtime-and-navigation.md`](runtime-and-navigation.md) | `MainActivity`, `MainActivityPictureInPictureController`, `BrowserController`, `BrowserViewport`, `BrowserTab` |
-| Gecko pull-to-refresh admission for nested scroll containers and website-owned touches | [`runtime-and-navigation.md`](runtime-and-navigation.md#invariants) | `GeckoPullToRefreshRules`, `CandyGeckoEngineView`, `BrowserPullToRefreshLayout` |
 | Background UI-memory trimming, renderer-view release, selected-session priority, audio visibility and delayed Gecko residency budget | [`../tabs-and-profiles/lifecycle-and-persistence.md`](../tabs-and-profiles/lifecycle-and-persistence.md#background-memory) | `BrowserBackgroundMemoryRules`, `GeckoSessionPriorityController`, `BrowserController`, `MainActivity`, `GeckoResumeCover` |
 | Gecko process isolation, multi-page history-cache lifetime and developer memory controls | [`../tabs-and-profiles/lifecycle-and-persistence.md`](../tabs-and-profiles/lifecycle-and-persistence.md#gecko-history-cache-and-developer-controls) | `GeckoRuntimeSettingsFactory`, `GeckoHistoryCacheRules`, `GeckoHistoryCacheConfig`, `BrowserMemorySettings` |
 | Gecko page continuity across tab switches and long background intervals | [`runtime-and-navigation.md`](runtime-and-navigation.md) | `GeckoContentPresentationGate`, `GeckoResumeCover`, `GeckoTabInteractionInstrumentedTest`, `BrowserPageResumeInstrumentedTest` |
-| Explicit address-bar URLs, URL suggestions and QR app handoffs | [`runtime-and-navigation.md`](runtime-and-navigation.md#navigation-paths) | `BrowserController.submitAddressFromAddressBar`, `BrowserScreen`, `BrowserAddressChrome`, `ExternalAppLauncher` |
-| External-app return Snackbar, global website exceptions and reset settings | [`runtime-and-navigation.md`](runtime-and-navigation.md#external-app-return-and-website-exceptions) | `ExternalAppSiteRules`, `ExternalAppFeedback`, `ExternalAppFeedbackSnackbar`, `ExternalAppLinksSettingsPage`, `BrowserSessionStore` |
-| Installed app lookup and empty-root-path compatibility | [`runtime-and-navigation.md`](runtime-and-navigation.md#invariants) | `ExternalAppWebUrlRules`, `ExternalAppLauncher`, opt-in `InstalledGitHubAppInstrumentedTest` |
-| App-link source identity when an engine reports the target before its request | [`runtime-and-navigation.md`](runtime-and-navigation.md#invariants) | `BrowserController`, `BrowserUriPolicy`, `BrowserControllerGeckoViewBindingInstrumentedTest` |
 | Default-on Auto De-AMP navigation and trusted URL shapes | [`runtime-and-navigation.md`](runtime-and-navigation.md#navigation-paths) | `AutoDeAmpRules`, `BrowserController`, `BrowserSessionStore`, `ProtectionSettingsPage` |
 | Android Gecko, Firefox extensions and iOS WebKit boundary | [`platform-engines.md`](platform-engines.md) | `BrowserController`, `browser/gecko`, `shared`, `iosApp` |
 | HTTPS-only modes, local warning and session exceptions | [`platform-engines.md`](platform-engines.md#https-only) | `HttpsOnlyMode`, `GeckoHttpsOnlyErrorPage`, `ProtectionSettingsPage` |
@@ -26,39 +21,22 @@
 | Google Cast remote video playback | [`google-cast.md`](google-cast.md) | `CastMediaRules`, `CastSessionController`, `CastControls` |
 | GeckoView website push delivery | [`web-push.md`](web-push.md) | `GeckoWebPushCoordinator`, `FossWebPushTransport`, `FossWebPushStore` |
 | Address input, commands, gestures, Link Peek, actions | [`address-actions-and-ui.md`](address-actions-and-ui.md) | `browser/commands`, `browser/actions`, `browser/integration`, `ui/Address*` |
-| Site cookie/storage deletion and engine boundaries | [`site-data.md`](site-data.md) | `SiteDataRules`, `WebViewSiteData`, `GeckoSiteDataRuntime`, `candy_site_data`, `SiteDataConfirmationDialog` |
+| Site cookie/storage deletion and engine limitations | [`site-data.md`](site-data.md) | `SiteDataRules`, `WebViewSiteData`, `SiteDataConfirmationDialog` |
 | Candy Recall local full-text history search | [`recall.md`](recall.md) | `recall`, `RecallRepository`, address suggestions, History search |
-| Opt-in text rescue, encrypted regular drafts and private memory-only recovery | [`form-drafts.md`](form-drafts.md) | `browser/formdraft`, `FormDraftStore`, engine draft bridges |
-| Candy Constellations / semantic page map | [`constellations.md`](constellations.md), [`constellations-model.md`](constellations-model.md) | `constellations/`, `ConstellationRepository`, `ConstellationStore`, `ConstellationActivity`, `ui/ConstellationScreen` |
 | SearXNG search, instance configuration, suggestions, fallback | [`searxng.md`](searxng.md) | `SearxngSettings`, `SearchEngine`, `SearchSuggestionProvider`, `BrowserSessionStore` |
-| User-defined `!` search chips, autocomplete and editable URL templates | [`searxng.md`](searxng.md#user-search-shortcuts) | `SearchShortcutRules`, `AddressResolver`, `SearchSettingsPage`, `BrowserSessionStore` |
 | Kagi search and privacy-enhanced suggestions | [`kagi.md`](kagi.md) | `SearchEngine`, `SearchSuggestionProvider` |
 | Google AI Mode user flow, routing, persistence, and privacy | [`google-ai-mode.md`](google-ai-mode.md) | `SearchEngine`, `AddressAiModeRules`, `BrowserSessionStore`, `AddressAiModeToggle` |
 | Page translation providers, URL routing, persistence, and privacy | [`page-translation.md`](page-translation.md) | `PageTranslationRules`, `BrowserController`, `BrowserSessionStore`, `BrowserMainMenu`, `BrowserSettingsPage` |
-| Settings option inventory, focused section hierarchy, retained keys/search IDs and dependencies | [`settings-option-map.md`](settings-option-map.md) | Settings pages, action editors, shared `SettingsNavigationRules` |
 | Appearance and browser theme | [`appearance-and-settings.md`](appearance-and-settings.md) | `AppearanceSettings`, `MaterialBrowserTheme`, `AppearanceNightMode`, `SettingsScreen`, `AppearanceSettingsPage` |
-| Flat Candy Player mode artwork, source prompts and live theme rendering | [`../design/player-mode-artwork.md`](../design/player-mode-artwork.md) | `SettingsPlayerModeIllustration`, `SettingsRasterIllustration`, `PlayerModeSettingsPage` |
-| Approved settings motifs, exact source provenance and runtime Material coloring | [`appearance-and-settings.md`](appearance-and-settings.md#approved-settings-header-artwork) | `SettingsHeaderIllustration`, `SettingsHeaderArtworkRules`, `SettingsHeaderArtworkRulesTest`, `SettingsHeaderArtworkInstrumentedTest` |
-| Current bounded settings validation and known lint/permission limits | [`settings-option-map.md`](settings-option-map.md#current-validation) | Affected API 35 device suite, JVM suites, artwork captures and source-byte audit |
-| Focused Menu selectors, parent page-state restoration and Back behavior | [`settings-option-map.md`](settings-option-map.md#menu-and-shared-core-completion), [`appearance-and-settings.md`](appearance-and-settings.md#explanatory-selection-pages) | `SettingsSelectionDialog`, `BrowserMenuSettingsPage`, `BrowserMenuPresentationSettings`, `SettingsRouter`, `SettingsNavigationRules` |
 | Localized settings search and capability-filtered navigation | [`appearance-and-settings.md`](appearance-and-settings.md#settings-search) | `SettingsSearchRules`, `SettingsSearchCatalog`, `SettingsSearchField`, shared `SettingsSearchTarget` |
 | Profile-scoped browsing history and retention controls | [`history.md`](history.md) | `BrowsingHistoryRepository`, `HistoryActivity`, `HistoryScreen` |
 | Local download progress, search and cleanup | [`downloads.md`](downloads.md) | `DownloadRepository`, `DownloadsActivity`, `DownloadsScreen` |
-| Saved Reader PDFs and completed files in Android's document picker | [`documents-provider.md`](documents-provider.md) | `CandyDocumentsProvider`, `browser/documents`, `DownloadProvenanceStore` |
 | Favorite library, search and deletion undo | [`favorites.md`](favorites.md) | `BrowserSessionStore`, `BrowsingFavoritesRules`, `FavoritesActivity`, `FavoritesScreen` |
-| Persistent page highlights and native inline text actions | [`web-annotations.md`](web-annotations.md) | `browser/annotation`, `WebAnnotationStore`, native selection delegates and `web_text_operations.js` |
-| Android selected-text research and speech | [`selected-text-actions.md`](selected-text-actions.md) | `SelectedTextActivities`, `ProcessTextRules`, `ProcessTextResearchIntentHandler`, `ReaderSpeechController` |
-| Selected bookmarks/articles in system search | [`device-search.md`](device-search.md) | `browser/integration/devicesearch`, `DeviceSearchSettingsActivity` |
-| Personal incoming-link rules | [`link-routing.md`](link-routing.md) | `browser/integration/linkrouting`, `LinkRoutingStore`, `LinkRoutingSettingsPage` |
-| Selected website areas as Android homescreen widgets (prototype) | [`website-widgets.md`](website-widgets.md) | `browser/sitewidget`, `SiteWidgetStore`, `SiteWidgetCropEditor`, `SiteWidgetProvider` |
 | App data ZIP export/import | [`app-data-archive.md`](app-data-archive.md) | `AppDataArchive*`, `AppDataTransferActivity`, `MainActivity`, `ProtectionSettingsPage` |
 | Toppings / local userscripts | [`userscripts.md`](userscripts.md) | `browser/userscript`, `UserScriptStore`, `ToppingCatalogRepository` |
 | Default bottom-sheet menu, configurable footer, fixed address/shortcuts and scroll/swipe sections | [`address-actions-and-ui.md`](address-actions-and-ui.md#configurable-menu-actions) | `BrowserMenuLayout`, shared `BrowserMenuBottomSheetContent` / `BrowserMenuBottomSheetRules` / `BrowserMenuBottomSheetToolbarRules`, Android `BrowserMenuBottomSheet` / `BrowserMenuSheetAddressBar` |
 
 ## Test lookup
-
-Issue 302's remembered-edge automatic parking reproduction, real-engine checks
-and limits are recorded in [`../audits/issue-302-address-pill-side.md`](../audits/issue-302-address-pill-side.md).
 
 Issue 205's controlled reproductions and integrated checks are recorded in
 [`../audits/issue-205-gecko-loading-and-recovery.md`](../audits/issue-205-gecko-loading-and-recovery.md).
@@ -82,14 +60,8 @@ Issue 239's Google identity popup routing, native close lifecycle and live Claud
 Issue 259's System WebView OAuth popup adoption, POST/opener preservation and scoped login
 compatibility checks are recorded in [`../audits/issue-259-system-webview-google-login.md`](../audits/issue-259-system-webview-google-login.md).
 
-Real installed GitHub discovery and empty-root-path reproduction are recorded in
-[`../audits/github-installed-app-resolution.md`](../audits/github-installed-app-resolution.md).
-
 Issue 222's search-link History API race and navigation cancellation checks are recorded in
 [`../audits/issue-222-external-app-navigation.md`](../audits/issue-222-external-app-navigation.md).
-
-Issue 304's cross-session app-lookup cancellation regression and native navigation controls are
-recorded in [`../audits/issue-304-reddit-navigation.md`](../audits/issue-304-reddit-navigation.md).
 
 Issue 278's Gecko REWE header jump and retained Cover safe-area checks are recorded in
 [`../audits/issue-278-cover-header-jumping.md`](../audits/issue-278-cover-header-jumping.md).
@@ -105,21 +77,18 @@ are recorded in [`../audits/dark-appearance-and-address-tab-handoff.md`](../audi
 | URL, search, AI mode, URI policy | `AddressResolverTest`, `SearchEngineTest`, `AddressAiModeRulesTest`, `AddressAiModeToggleInstrumentedTest`, `BrowserUriPolicyTest` |
 | Foreground idle/background memory budgets, developer persistence/UI, startup cache configuration | `BrowserForegroundMemoryRulesTest`, `BrowserBackgroundMemoryRulesTest`, `BrowserMemorySettingsTest`, `GeckoHistoryCacheRulesTest`, `BrowserControllerBackgroundMemoryInstrumentedTest`, `BrowserSessionStoreInstrumentedTest`, `DeveloperOptionsSettingsPageInstrumentedTest`, `GeckoHistoryCacheConfigInstrumentedTest` |
 | Gecko internal pages and engine boundary | `GeckoInternalPageRulesTest`, `AddressResolverTest`, `AddressAiModeRulesTest`, `SearchSuggestionProviderTest`, `GeckoInternalPageNavigationInstrumentedTest`, `GeckoRuntimeSettingsInstrumentedTest` |
-| External-preview promotion without reloading, retained forms/DOM/scroll/history and early Open | `ExternalLinkPreviewPromotionInstrumentedTest` |
-| External-preview native safe-area fallback and stale navigation reports | `ExternalLinkPreviewSafeAreaInstrumentedTest` |
 | Gecko first-page Back, native popup binding, POST and private navigation | `GeckoBootstrapHistoryRulesTest`, `GeckoNativeSessionBindingRulesTest`, `PopupNavigationRulesTest`, `GeckoBootstrapHistoryInstrumentedTest`, `GeckoPopupNavigationInstrumentedTest`, `scripts/gecko_native_session_binding.test.mjs` |
 | Auto De-AMP URL policy, persistence, navigation and UI | `AutoDeAmpRulesTest`, `AutoDeAmpSettingsInstrumentedTest`, focused `BrowserControllerGeckoViewBindingInstrumentedTest` method |
 | External app settings, host-specific handlers, availability, prompts, redirects and returned links | `GeckoExternalAppNavigationInstrumentedTest`, `ExternalAppLinkHandlingTest`, `ExternalWebAppHandlerRulesInstrumentedTest`, `ExternalAppLauncherInstrumentedTest`, `BrowserSessionStoreInstrumentedTest`, `BrowserSettingsScreenInstrumentedTest`, focused `BrowserControllerGeckoViewBindingInstrumentedTest` methods |
 | Commands and suggestions | `browser/commands/*Test`, `SearchSuggestionProviderTest` |
 | Candy Recall rules, extraction, SQLite ranking and UI | `recall/*Test`, `RecallRepositoryInstrumentedTest`, focused address/History instrumented tests |
 | Gestures and motion | `ui/Address*Test`, `ui/Address*InstrumentedTest` |
-| Native predictive Back shrink, cancellation, nested settings parents and Snoozed dismissal | `PredictiveBackMotionTest`, `SettingsBackRulesTest`, `PredictiveBackSurfaceInstrumentedTest`, `NativeScreenBackHandlerInstrumentedTest` |
 | Optional viewport swipe pill mode | `BrowserChromeSwipeRulesTest`, `BrowserChromeSwipeTouchObserverInstrumentedTest`, focused `GeckoBottomBarScrollInstrumentedTest`, `BrowserSessionStoreInstrumentedTest`, `TabSettingsScreenInstrumentedTest` |
 | Gecko keyboard viewport, focused input, chrome-owned IME and new-tab suggestion handoff | `GeckoViewInsetRulesTest`, `GeckoKeyboardInsetsInstrumentedTest`, `GeckoAddressTabSelectionInstrumentedTest`, `FullImmersiveModeInstrumentedTest` |
 | Missed hidden-IME delivery after Activity resume or restored window focus | `GeckoKeyboardInsetsInstrumentedTest#resumeReconcilesKeyboardMarginsWhenHiddenInsetsWereMissed`, `#restoredWindowFocusReconcilesKeyboardMarginsWhenHiddenInsetsWereMissed`; assert native margins, visual viewport and restored lower-page pixels |
-| Bottom control obstruction and remembered-edge automatic parking | `AddressBarAutoDockRulesTest`, `TextInputOcclusionScriptTest`, `scripts/text_input_occlusion.test.mjs`, `GeckoPageControlOcclusionInstrumentedTest`, `AddressBarDockPersistenceInstrumentedTest`, focused controller/System WebView instrumented tests |
+| Bottom control obstruction and automatic right parking | `AddressBarAutoDockRulesTest`, `TextInputOcclusionScriptTest`, `scripts/text_input_occlusion.test.mjs`, `GeckoPageControlOcclusionInstrumentedTest`, focused controller/System WebView instrumented tests |
 | Restored launcher tab and initial Gecko viewport | `StartupPresentationRulesTest`, `BrowserInitialNavigationRulesTest`, `MainActivityRestoredTabInstrumentedTest`, `BrowserControllerInitialViewportInstrumentedTest` |
-| WebView runtime, Basic authentication and Link Peek | `browser/*InstrumentedTest`, `BrowserControllerHttpAuthInstrumentedTest`, `ui/HttpAuthPromptDialogInstrumentedTest`, `ui/LinkPeekOverlayInstrumentedTest`, `LinkPeekSwipeInstrumentedTest`, `LinkPeekSwipeRulesTest`, shared `LinkPeekSwipeActionTest` |
+| WebView runtime, Basic authentication and Link Peek | `browser/*InstrumentedTest`, `BrowserControllerHttpAuthInstrumentedTest`, `ui/HttpAuthPromptDialogInstrumentedTest`, `ui/LinkPeekOverlayInstrumentedTest` |
 | System WebView native OAuth popups, POST, close, Blob downloads and login compatibility | `SystemWebViewPopupNavigationInstrumentedTest`, `SystemWebViewBlobDownloadInstrumentedTest`, `FederatedLoginRulesTest` |
 | Held OS Back over page links and canceled gesture recovery | `GeckoContentGestureRulesTest`, `GeckoBackGestureLinkPeekInstrumentedTest` |
 | Payment Request and checkout popup routing | `SystemWebViewBrowserEngineInstrumentedTest`, `BrowserControllerGeckoViewBindingInstrumentedTest` |

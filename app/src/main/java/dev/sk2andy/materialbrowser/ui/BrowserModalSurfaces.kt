@@ -60,21 +60,11 @@ internal fun BoxScope.BrowserModalSurfaces(
     onSnoozedTabsDismiss: () -> Unit,
 ) {
     controller.pendingDownloadChoice?.let { choice ->
-        val existing = choice.existingDownload
-        if (existing != null) {
-            DownloadAgainDialog(
-                fileName = existing.fileName,
-                onDownloadAgain = { controller.confirmDownloadChoice(null, choice) },
-                onOpenExisting = { controller.openExistingDownload(choice) },
-                onDismiss = { controller.dismissDownloadChoice(choice) },
-            )
-        } else {
-            DownloadManagerChooserDialog(
-                choice = choice,
-                onSelect = { managerId -> controller.confirmDownloadChoice(managerId, choice) },
-                onDismiss = { controller.dismissDownloadChoice(choice) },
-            )
-        }
+        DownloadManagerChooserDialog(
+            choice = choice,
+            onSelect = { managerId -> controller.confirmDownloadChoice(managerId, choice) },
+            onDismiss = { controller.dismissDownloadChoice(choice) },
+        )
     }
 
     privacyXRayTabId?.let { tabId ->
@@ -292,7 +282,6 @@ internal fun BoxScope.BrowserModalSurfaces(
 
     SnackbarHost(
         hostState = feedbackSnackbarHostState,
-        snackbar = { data -> BrowserFeedbackSnackbar(data) },
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
@@ -310,7 +299,6 @@ internal fun BoxScope.BrowserModalSurfaces(
             profiles = visibleProfiles,
             onBack = onSnoozedTabsDismiss,
             onReschedule = controller::rescheduleSnoozedTab,
-            onUpdatePurpose = controller::updateSnoozedTabPurpose,
             onOpenNow = { tabId ->
                 controller.openSnoozedTabNow(tabId)
             },

@@ -20,10 +20,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -73,7 +75,7 @@ fun SharedProfileActionsSheet(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
 ) {
     if (profile == null) return
-    CandyModalSheet(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = containerColor,
     ) {
@@ -98,20 +100,20 @@ fun SharedProfileActionsSheet(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            CandyActionButton(
+            TextButton(
                 onClick = onChangeEmoji,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(copy.changeIcon)
             }
             onCustomizeWallpaper?.let { customizeWallpaper ->
-                CandyActionButton(
+                TextButton(
                     onClick = { customizeWallpaper(ProfileWallpaperTarget.NewTab) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(copy.newTabWallpaper)
                 }
-                CandyActionButton(
+                TextButton(
                     onClick = { customizeWallpaper(ProfileWallpaperTarget.TabSwitcher) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -131,7 +133,7 @@ fun SharedProfileActionsSheet(
             )
             additionalContent?.invoke()
             if (canDelete && onDelete != null) {
-                CandyActionButton(
+                TextButton(
                     onClick = onDelete,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -165,7 +167,7 @@ fun SharedProfileEmojiPickerSheet(
     } else {
         { BottomSheetDefaults.DragHandle() }
     }
-    CandyModalSheet(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = Modifier.testTag(ProfileCreationTestTags.Sheet),
@@ -181,13 +183,13 @@ fun SharedProfileEmojiPickerSheet(
                 .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
         ) {
             if (creatingProfile) {
-                if (!LocalCandyBrowserChromeEffects.current.usesGroupedSettings) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        BottomSheetDefaults.DragHandle()
-                    }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BottomSheetDefaults.DragHandle()
                 }
                 Column(
                     modifier = Modifier
@@ -224,8 +226,7 @@ fun SharedProfileEmojiPickerSheet(
                     )
                 }
                 Spacer(Modifier.height(12.dp))
-                CandyActionButton(
-                    prominent = true,
+                Button(
                     onClick = {
                         draftEmoji?.let { emoji -> onCreate(emoji, draftIsolationEnabled) }
                     },
@@ -277,10 +278,7 @@ private fun ProfileEmojiGrid(
                     modifier = Modifier
                         .padding(vertical = 4.dp)
                         .size(48.dp)
-                        .semantics {
-                            contentDescription = emoji
-                            selected = isSelected
-                        }
+                        .semantics { contentDescription = emoji }
                         .clickable(
                             role = Role.Button,
                             onClick = { onSelect(emoji) },
@@ -291,7 +289,7 @@ private fun ProfileEmojiGrid(
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerHigh
                     },
-                    tonalElevation = if (isSelected && !LocalCandyBrowserChromeEffects.current.usesGroupedSettings) 5.dp else 0.dp,
+                    tonalElevation = if (isSelected) 5.dp else 0.dp,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         PlatformProfileEmoji(

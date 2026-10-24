@@ -162,7 +162,7 @@ internal fun FirefoxExtensionMenuSection(
 }
 
 @Composable
-private fun FirefoxExtensionActionIcon(action: GeckoExtensionActionState) {
+internal fun FirefoxExtensionActionIcon(action: GeckoExtensionActionState) {
     BadgedBox(
         badge = {
             action.badgeText?.takeIf(String::isNotBlank)?.let { badge ->

@@ -1,5 +1,8 @@
 package dev.sk2andy.materialbrowser.shared.ui.settings
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.mutableStateOf
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -37,16 +40,45 @@ fun TabOverviewSettings(
     listStartsAtBottom: Boolean,
     strings: TabOverviewSettingsStrings,
     containerColor: Color,
-    onOpenMode: () -> Unit,
+    onOpenMode: (() -> Unit)? = null,
+    onModeChanged: ((TabOverviewMode) -> Unit)? = null,
     onListStartsAtBottomChanged: (Boolean) -> Unit,
     listStartsAtBottomAvailable: Boolean = true,
     listStartsAtBottomModifier: Modifier = Modifier,
 ) {
-    SettingsSelectionLink(
-        title = strings.overviewMode,
-        value = strings.modeNames.getValue(mode),
-        onClick = onOpenMode,
-    )
+    if (onOpenMode != null) {
+        SettingsSelectionLink(
+            title = strings.overviewMode,
+            value = strings.modeNames.getValue(mode),
+            onClick = onOpenMode,
+        )
+    } else if (onModeChanged != null) {
+        var menuExpanded by remember { mutableStateOf(false) }
+        Box {
+            SettingsChoice(
+                title = strings.overviewMode,
+                value = strings.modeNames.getValue(mode),
+                expanded = menuExpanded,
+                onClick = { menuExpanded = true },
+                containerColor = containerColor,
+            )
+            SettingsDropdown(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                TabOverviewMode.entries.forEach { candidate ->
+                    SettingsDropdownItem(
+                        label = strings.modeNames.getValue(candidate),
+                        selected = candidate == mode,
+                        onClick = {
+                            menuExpanded = false
+                            onModeChanged(candidate)
+                        },
+                    )
+                }
+            }
+        }
+    }
     SettingsPageSpacer()
     SettingsSwitch(
         title = strings.listStartsAtBottom,

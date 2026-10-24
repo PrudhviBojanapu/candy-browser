@@ -51,12 +51,10 @@ class SnoozeWakeNotifier(context: Context) {
             )
         }
         val body = if (tabs.size == 1) {
-            val pageTitle = firstTab.title.ifBlank {
+            firstTab.title.ifBlank {
                 firstTab.url.takeUnless { it == BLANK_URL }
                     ?: appContext.getString(R.string.new_tab_title)
             }
-            val purpose = SnoozePurposeRules.normalize(firstTab.snoozePurpose)
-            if (purpose.isBlank()) pageTitle else "$pageTitle\n$purpose"
         } else {
             appContext.getString(R.string.snooze_notification_open_app)
         }

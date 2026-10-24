@@ -19,8 +19,7 @@ object SettingsNavigationRules {
         SettingsDestination.BrowserStartup,
         SettingsDestination.BrowserFavorites,
         SettingsDestination.BrowserWebsites,
-        SettingsDestination.BrowserLinks,
-        SettingsDestination.ReadAloud -> SettingsDestination.Browser
+        SettingsDestination.BrowserLinks -> SettingsDestination.Browser
         SettingsDestination.LinkRouting,
         SettingsDestination.Translations -> SettingsDestination.BrowserWebsites
         SettingsDestination.ExternalAppLinks,

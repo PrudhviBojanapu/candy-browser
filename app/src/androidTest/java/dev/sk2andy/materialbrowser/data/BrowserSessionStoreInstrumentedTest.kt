@@ -23,7 +23,6 @@ import dev.sk2andy.materialbrowser.browser.ProfileWallpaper
 import dev.sk2andy.materialbrowser.browser.ProfileLockTrigger
 import dev.sk2andy.materialbrowser.browser.ProfileProtection
 import dev.sk2andy.materialbrowser.browser.SearchEngine
-import dev.sk2andy.materialbrowser.browser.SearchShortcut
 import dev.sk2andy.materialbrowser.browser.SearxngRules
 import dev.sk2andy.materialbrowser.browser.SearxngSettings
 import dev.sk2andy.materialbrowser.browser.StartupAddressFocusMode
@@ -31,7 +30,6 @@ import dev.sk2andy.materialbrowser.browser.TabStack
 import dev.sk2andy.materialbrowser.browser.TabStackColor
 import dev.sk2andy.materialbrowser.browser.WebRtcProtectionMode
 import dev.sk2andy.materialbrowser.browser.LinkLongPressAction
-import dev.sk2andy.materialbrowser.browser.LinkPeekSwipeAction
 import dev.sk2andy.materialbrowser.browser.suggestions.SearchSuggestionProvider
 import dev.sk2andy.materialbrowser.browser.BrowserSessionResidencyRules
 import dev.sk2andy.materialbrowser.blocking.SitePrivacyOverrides
@@ -112,17 +110,6 @@ class BrowserSessionStoreInstrumentedTest {
         assertEquals(listOf(true, false), tabs.map(BrowserTab::isPinned))
         assertEquals("regular", tabs.first().openerTabId)
         assertEquals("regular", selectedId)
-    }
-
-    @Test
-    fun externalLinkPreviewProfilePreferenceRoundTripsAndClears() {
-        val store = BrowserSessionStore(context)
-
-        assertNull(store.loadExternalLinkPreviewProfileId())
-        store.saveExternalLinkPreviewProfileId("work")
-        assertEquals("work", BrowserSessionStore(context).loadExternalLinkPreviewProfileId())
-        store.saveExternalLinkPreviewProfileId(null)
-        assertNull(BrowserSessionStore(context).loadExternalLinkPreviewProfileId())
     }
 
     @Test
@@ -1167,22 +1154,6 @@ class BrowserSessionStoreInstrumentedTest {
     }
 
     @Test
-    fun searchShortcutsRoundTripAndInvalidPersistedValuesAreDropped() {
-        val store = BrowserSessionStore(context)
-        val shortcut = SearchShortcut("gh", "https://github.com/search?q=%s")
-        store.saveSearchShortcuts(listOf(shortcut))
-        assertEquals(listOf(shortcut), store.loadSearchShortcuts())
-
-        preferences.edit().putString(
-            "search_shortcuts",
-            "[{\"keyword\":\"gh\",\"template\":\"https://github.com/search?q=%s\"}," +
-                "{\"keyword\":\"GH\",\"template\":\"https://other.example/?q=%s\"}," +
-                "{\"keyword\":\"bad\",\"template\":\"javascript:alert(%s)\"}]",
-        ).commit()
-        assertEquals(listOf(shortcut), store.loadSearchShortcuts())
-    }
-
-    @Test
     fun pageTranslationProviderRoundTripsAndUnknownValueUsesDefault() {
         val store = BrowserSessionStore(context)
         assertEquals(PageTranslationProvider.Yandex, store.loadPageTranslationProvider())
@@ -1380,22 +1351,6 @@ class BrowserSessionStoreInstrumentedTest {
 
         preferences.edit().putString("link_long_press_action", "broken").commit()
         assertEquals(LinkLongPressAction.LinkPeek, store.loadLinkLongPressAction())
-    }
-
-    @Test
-    fun linkPeekSwipeActionDefaultsToBackgroundAndRoundTrips() {
-        val store = BrowserSessionStore(context)
-        assertEquals(LinkPeekSwipeAction.OpenBackground, store.loadLinkPeekSwipeAction())
-
-        LinkPeekSwipeAction.entries.forEach { action ->
-            store.saveLinkPeekSwipeAction(action)
-            assertEquals(action, BrowserSessionStore(context).loadLinkPeekSwipeAction())
-        }
-
-        preferences.edit()
-            .putString(BrowserSessionStore.KEY_LINK_PEEK_SWIPE_ACTION, "broken")
-            .commit()
-        assertEquals(LinkPeekSwipeAction.OpenBackground, store.loadLinkPeekSwipeAction())
     }
 
     @Test
@@ -1875,45 +1830,6 @@ class BrowserSessionStoreInstrumentedTest {
         assertEquals(ExternalAppLinkHandling.AskEveryTime, store.loadExternalAppLinkHandling())
         preferences.edit().putString("external_app_link_handling", "unknown").commit()
         assertEquals(ExternalAppLinkHandling.Automatic, store.loadExternalAppLinkHandling())
-    }
-
-    @Test
-    fun externalAppSiteExceptionsDefaultEmptyAndRoundTripGlobally() {
-        val store = BrowserSessionStore(context)
-        val capsuleStore = BrowserSessionStore(context, "157f006a-8e24-4baa-b143-bf9ed154639f")
-
-        assertEquals(emptyList<String>(), store.loadExternalAppSiteExceptions())
-        store.saveExternalAppSiteExceptions(
-            listOf("WWW.GITHUB.COM", "mobile.example.co.uk", "github.com", "invalid host.test"),
-        )
-
-        assertEquals(listOf("example.co.uk", "github.com"), store.loadExternalAppSiteExceptions())
-        assertEquals(listOf("example.co.uk", "github.com"), capsuleStore.loadExternalAppSiteExceptions())
-        assertEquals(
-            setOf("example.co.uk", "github.com"),
-            preferences.getStringSet("external_app_site_exceptions", null),
-        )
-
-        capsuleStore.saveExternalAppSiteExceptions(emptyList())
-        assertEquals(emptyList<String>(), store.loadExternalAppSiteExceptions())
-    }
-
-    @Test
-    fun externalAppSiteExceptionsNormalizeAndBoundPersistedInput() {
-        val store = BrowserSessionStore(context)
-        preferences.edit().putStringSet(
-            "external_app_site_exceptions",
-            ((1..80).map { "site${it.toString().padStart(2, '0')}.example" } +
-                listOf("www.github.com", "github.com", "invalid host.test")).toSet(),
-        ).commit()
-
-        val sites = store.loadExternalAppSiteExceptions()
-        assertEquals(64, sites.size)
-        assertEquals("github.com", sites.first())
-        assertEquals("site63.example", sites.last())
-
-        preferences.edit().putString("external_app_site_exceptions", "corrupt").commit()
-        assertEquals(emptyList<String>(), store.loadExternalAppSiteExceptions())
     }
 
     @Test

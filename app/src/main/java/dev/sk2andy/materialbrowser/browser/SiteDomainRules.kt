@@ -3,10 +3,9 @@ package dev.sk2andy.materialbrowser.browser
 import com.google.common.net.InternetDomainName
 import dev.sk2andy.materialbrowser.blocking.CandyHostCanonicalizer
 import dev.sk2andy.materialbrowser.blocking.PrivacyRequestSanitizer
-import dev.sk2andy.materialbrowser.shared.browser.BrowserSitePreferenceRules
 
 object SiteDomainRules {
-    const val MAX_PER_PROFILE = BrowserSitePreferenceRules.MAX_PER_PROFILE
+    const val MAX_PER_PROFILE = 64
 
     fun domainForUrl(url: String?): String? {
         val safeUrl = url ?: return null
@@ -36,11 +35,13 @@ object SiteDomainRules {
         limit: Int = MAX_PER_PROFILE,
     ): Set<String> {
         val normalizedDomain = normalizedDomain(domain) ?: return current.toSet()
-        return BrowserSitePreferenceRules.withEnabledHost(
-            current = current.mapNotNull(::normalizedDomain),
-            host = normalizedDomain,
-            enabled = enabled,
-            limit = limit,
-        )
+        val retained = current.asSequence()
+            .mapNotNull(::normalizedDomain)
+            .filterNot { it == normalizedDomain }
+            .distinct()
+        if (!enabled) return retained.toCollection(linkedSetOf())
+        if (limit <= 0) return emptySet()
+        return (retained.take(limit - 1) + sequenceOf(normalizedDomain))
+            .toCollection(linkedSetOf())
     }
 }

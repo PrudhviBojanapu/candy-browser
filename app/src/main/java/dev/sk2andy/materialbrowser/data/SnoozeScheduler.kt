@@ -132,6 +132,11 @@ internal object SnoozeRestoreCoordinator {
         restoredTabIds: Set<String>,
         profiles: List<BrowserProfile>,
     ): List<BrowserTab> {
-        return SnoozeNotificationRules.eligibleTabs(tabs, restoredTabIds, profiles)
+        val protectedProfileIds = profiles.asSequence()
+            .filter { profile -> profile.protection != null }
+            .mapTo(hashSetOf(), BrowserProfile::id)
+        return tabs.filter { tab ->
+            tab.id in restoredTabIds && tab.profileId !in protectedProfileIds
+        }
     }
 }

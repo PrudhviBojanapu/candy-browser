@@ -3,7 +3,6 @@ package dev.sk2andy.materialbrowser.data
 import android.content.Context
 import android.content.SharedPreferences
 import dev.sk2andy.materialbrowser.BuildConfig
-import dev.sk2andy.materialbrowser.capsule.SiteCapsuleRules
 import dev.sk2andy.materialbrowser.blocking.BlockerSettings
 import dev.sk2andy.materialbrowser.blocking.SiteExceptionRules
 import dev.sk2andy.materialbrowser.blocking.SitePrivacyOverrides
@@ -22,6 +21,7 @@ import dev.sk2andy.materialbrowser.browser.HttpsOnlyMode
 import dev.sk2andy.materialbrowser.browser.DomainMuteRules
 import dev.sk2andy.materialbrowser.browser.ExternalAppLinkHandling
 import dev.sk2andy.materialbrowser.browser.ExternalAppSiteRules
+import dev.sk2andy.materialbrowser.browser.StatusBarScrollRules
 import dev.sk2andy.materialbrowser.browser.FavoriteAnimationSpeed
 import dev.sk2andy.materialbrowser.browser.InlineMediaPlayerMode
 import dev.sk2andy.materialbrowser.browser.InlineMediaPlayerSeekSettings
@@ -37,7 +37,6 @@ import dev.sk2andy.materialbrowser.browser.PrivacySignalSettings
 import dev.sk2andy.materialbrowser.browser.SearchEngine
 import dev.sk2andy.materialbrowser.browser.SearchShortcut
 import dev.sk2andy.materialbrowser.browser.SearchShortcutRules
-import dev.sk2andy.materialbrowser.browser.StatusBarScrollRules
 import dev.sk2andy.materialbrowser.browser.StartupAddressFocusMode
 import dev.sk2andy.materialbrowser.browser.SearxngRules
 import dev.sk2andy.materialbrowser.browser.SearxngSettings
@@ -46,7 +45,6 @@ import dev.sk2andy.materialbrowser.browser.TabStack
 import dev.sk2andy.materialbrowser.browser.TabStackColor
 import dev.sk2andy.materialbrowser.browser.WebRtcProtectionMode
 import dev.sk2andy.materialbrowser.browser.LinkLongPressAction
-import dev.sk2andy.materialbrowser.browser.LinkPeekSwipeAction
 import dev.sk2andy.materialbrowser.browser.LinkPeekActionLayout
 import dev.sk2andy.materialbrowser.browser.LinkPeekActionLayoutRules
 import dev.sk2andy.materialbrowser.browser.suggestions.SearchSuggestionProvider
@@ -59,19 +57,13 @@ import org.json.JSONObject
 
 class BrowserSessionStore internal constructor(
     private val preferences: SharedPreferences,
-    private val sessionPreferences: SharedPreferences = preferences,
 ) {
     constructor(context: Context) : this(
         context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
     )
 
-    constructor(context: Context, capsuleId: String) : this(
-        context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
-        context.getSharedPreferences(capsulePreferencesName(capsuleId), Context.MODE_PRIVATE),
-    )
-
     fun loadTabs(nowMillis: Long = System.currentTimeMillis()): Pair<List<BrowserTab>, String?> {
-        val raw = sessionPreferences.getString(KEY_TABS, null) ?: return emptyList<BrowserTab>() to null
+        val raw = preferences.getString(KEY_TABS, null) ?: return emptyList<BrowserTab>() to null
         return runCatching {
             val array = JSONArray(raw)
             val tabs = buildList {
@@ -92,9 +84,6 @@ class BrowserSessionStore internal constructor(
                             isPinned = item.optBoolean("isPinned", false),
                             title = item.optString("title", ""),
                             url = item.optString("url", BLANK_URL),
-                            snoozePurpose = SnoozePurposeRules.normalize(
-                                item.optString("snoozePurpose", ""),
-                            ),
                             syncCandyId = item.optString("syncCandyId")
                                 .takeIf(SyncTabRules::isValidCandyId),
                         ),
@@ -104,7 +93,7 @@ class BrowserSessionStore internal constructor(
             val persistentTabs = TabPinningRules.orderedTabs(
                 TabPersistenceRules.persistentTabs(tabs),
             )
-            persistentTabs to sessionPreferences.getString(KEY_SELECTED_TAB, null)
+            persistentTabs to preferences.getString(KEY_SELECTED_TAB, null)
                 ?.takeIf { selectedId -> persistentTabs.any { it.id == selectedId } }
         }.getOrDefault(emptyList<BrowserTab>() to null)
     }
@@ -116,11 +105,7 @@ class BrowserSessionStore internal constructor(
     fun saveTabsImmediately(tabs: List<BrowserTab>, selectedTabId: String): Boolean =
         tabsEditor(tabs, selectedTabId).commit()
 
-    fun flush(): Boolean {
-        val settingsFlushed = preferences.edit().commit()
-        val sessionFlushed = sessionPreferences === preferences || sessionPreferences.edit().commit()
-        return settingsFlushed && sessionFlushed
-    }
+    fun flush(): Boolean = preferences.edit().commit()
 
     @Synchronized
     fun saveTabsAndSnoozedImmediately(
@@ -128,16 +113,16 @@ class BrowserSessionStore internal constructor(
         selectedTabId: String,
         snoozedTabs: List<SnoozedTab>,
     ): Boolean {
-        val originalTabs = sessionPreferences.getString(KEY_TABS, null)
-        val originalSelection = sessionPreferences.getString(KEY_SELECTED_TAB, null)
-        val originalSnoozedTabs = sessionPreferences.getString(SnoozedTabStore.KEY_TABS, null)
+        val originalTabs = preferences.getString(KEY_TABS, null)
+        val originalSelection = preferences.getString(KEY_SELECTED_TAB, null)
+        val originalSnoozedTabs = preferences.getString(SnoozedTabStore.KEY_TABS, null)
         val committed = SnoozedTabStore.putTabs(
             tabsEditor(tabs, selectedTabId),
             snoozedTabs,
         ).commit()
         if (committed) return true
 
-        sessionPreferences.edit()
+        preferences.edit()
             .restoreString(KEY_TABS, originalTabs)
             .restoreString(KEY_SELECTED_TAB, originalSelection)
             .restoreString(SnoozedTabStore.KEY_TABS, originalSnoozedTabs)
@@ -151,7 +136,7 @@ class BrowserSessionStore internal constructor(
     ): SharedPreferences.Editor = if (value == null) remove(key) else putString(key, value)
 
     private fun tabsEditor(tabs: List<BrowserTab>, selectedTabId: String) =
-        sessionPreferences.edit().also { editor ->
+        preferences.edit().also { editor ->
             val persistentTabs = TabPersistenceRules.persistentTabs(tabs)
             val persistentSelection = TabPersistenceRules.persistentSelection(tabs, selectedTabId)
             val array = JSONArray()
@@ -166,7 +151,6 @@ class BrowserSessionStore internal constructor(
                         .put("isPinned", tab.isPinned)
                         .put("title", tab.title)
                         .put("url", tab.url)
-                        .put("snoozePurpose", SnoozePurposeRules.normalize(tab.snoozePurpose))
                         .put("syncCandyId", tab.syncCandyId),
                 )
             }
@@ -176,11 +160,11 @@ class BrowserSessionStore internal constructor(
         }
 
     fun saveSelectedTab(selectedTabId: String) {
-        sessionPreferences.edit().putString(KEY_SELECTED_TAB, selectedTabId).apply()
+        preferences.edit().putString(KEY_SELECTED_TAB, selectedTabId).apply()
     }
 
     fun loadTabStacks(tabs: Collection<BrowserTab>): List<TabStack> {
-        val raw = sessionPreferences.getString(KEY_TAB_STACKS, null) ?: return emptyList()
+        val raw = preferences.getString(KEY_TAB_STACKS, null) ?: return emptyList()
         if (raw.length > MAX_TAB_STACKS_JSON_LENGTH) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
@@ -232,7 +216,7 @@ class BrowserSessionStore internal constructor(
                     .put("isCollapsed", stack.isCollapsed),
             )
         }
-        sessionPreferences.edit().putString(KEY_TAB_STACKS, array.toString()).apply()
+        preferences.edit().putString(KEY_TAB_STACKS, array.toString()).apply()
     }
 
     fun loadProfiles(): Pair<List<BrowserProfile>, String> {
@@ -271,6 +255,7 @@ class BrowserSessionStore internal constructor(
                                         } else {
                                             legacyWallpaper
                                         },
+                                        videoDetectionRedirectEnabled = item.optBoolean("videoDetectionRedirectEnabled", true),
                                     ),
                                 )
                             }
@@ -304,7 +289,8 @@ class BrowserSessionStore internal constructor(
                     .put(
                         "tabSwitcherWallpaper",
                         profile.tabSwitcherWallpaper.toJson(),
-                    ),
+                    )
+                    .put("videoDetectionRedirectEnabled", profile.videoDetectionRedirectEnabled),
             )
         }
         preferences.edit()
@@ -717,9 +703,9 @@ class BrowserSessionStore internal constructor(
     }
 
     fun loadPendingTabClearOnTaskRemoval(): Boolean =
-        sessionPreferences.getBoolean(KEY_PENDING_TAB_CLEAR_ON_TASK_REMOVAL, false)
+        preferences.getBoolean(KEY_PENDING_TAB_CLEAR_ON_TASK_REMOVAL, false)
 
-    fun savePendingTabClearOnTaskRemoval(pending: Boolean): Boolean = sessionPreferences.edit()
+    fun savePendingTabClearOnTaskRemoval(pending: Boolean): Boolean = preferences.edit()
         .putBoolean(KEY_PENDING_TAB_CLEAR_ON_TASK_REMOVAL, pending)
         .commit()
 
@@ -745,7 +731,7 @@ class BrowserSessionStore internal constructor(
     }
 
     fun loadSearchShortcuts(): List<SearchShortcut> = runCatching {
-        val array = JSONArray(preferences.getString(KEY_SEARCH_SHORTCUTS, "[]"))
+        val array = org.json.JSONArray(preferences.getString(KEY_SEARCH_SHORTCUTS, "[]"))
         List(array.length()) { index ->
             array.getJSONObject(index).let { item ->
                 SearchShortcut(item.optString("keyword"), item.optString("template"))
@@ -754,9 +740,9 @@ class BrowserSessionStore internal constructor(
     }.getOrDefault(emptyList()).let(SearchShortcutRules::sanitize)
 
     fun saveSearchShortcuts(shortcuts: List<SearchShortcut>) {
-        val array = JSONArray()
+        val array = org.json.JSONArray()
         SearchShortcutRules.sanitize(shortcuts).forEach { shortcut ->
-            array.put(JSONObject().put("keyword", shortcut.keyword).put("template", shortcut.template))
+            array.put(org.json.JSONObject().put("keyword", shortcut.keyword).put("template", shortcut.template))
         }
         preferences.edit().putString(KEY_SEARCH_SHORTCUTS, array.toString()).apply()
     }
@@ -842,12 +828,6 @@ class BrowserSessionStore internal constructor(
             normalizeHost = StatusBarScrollRules::normalizedDomain,
             limit = StatusBarScrollRules.MAX_DISABLED_DOMAINS_PER_PROFILE,
         )
-    }
-
-    fun loadFormDraftSavingEnabled(): Boolean = preferences.getBoolean(KEY_FORM_DRAFT_SAVING_ENABLED, false)
-
-    fun saveFormDraftSavingEnabled(enabled: Boolean) {
-        preferences.edit().putBoolean(KEY_FORM_DRAFT_SAVING_ENABLED, enabled).apply()
     }
 
     fun loadRecallEnabled(): Boolean = preferences.getBoolean(KEY_RECALL_ENABLED, false)
@@ -998,13 +978,6 @@ class BrowserSessionStore internal constructor(
         preferences.edit().putBoolean(KEY_EXTERNAL_LINK_PREVIEW_ENABLED, enabled).apply()
     }
 
-    fun loadExternalLinkPreviewProfileId(): String? =
-        preferences.getString(KEY_EXTERNAL_LINK_PREVIEW_PROFILE_ID, null)
-
-    fun saveExternalLinkPreviewProfileId(profileId: String?) {
-        preferences.edit().putString(KEY_EXTERNAL_LINK_PREVIEW_PROFILE_ID, profileId).apply()
-    }
-
     fun loadExternalAppLinkHandling(): ExternalAppLinkHandling =
         ExternalAppLinkHandling.fromStableId(
             preferences.getString(KEY_EXTERNAL_APP_LINK_HANDLING, null),
@@ -1032,14 +1005,6 @@ class BrowserSessionStore internal constructor(
 
     fun saveLinkLongPressAction(action: LinkLongPressAction) {
         preferences.edit().putString(KEY_LINK_LONG_PRESS_ACTION, action.stableId).apply()
-    }
-
-    fun loadLinkPeekSwipeAction(): LinkPeekSwipeAction = LinkPeekSwipeAction.fromWireValue(
-        preferences.getString(KEY_LINK_PEEK_SWIPE_ACTION, null),
-    )
-
-    fun saveLinkPeekSwipeAction(action: LinkPeekSwipeAction) {
-        preferences.edit().putString(KEY_LINK_PEEK_SWIPE_ACTION, action.wireValue).apply()
     }
 
     fun loadAddressBarLongPressAction(): AddressBarLongPressAction =
@@ -1144,9 +1109,11 @@ class BrowserSessionStore internal constructor(
     }
 
     fun loadStartupAddressFocusMode(): StartupAddressFocusMode =
-        StartupAddressFocusMode.fromStableId(
-            preferences.getString(KEY_STARTUP_ADDRESS_FOCUS_MODE, null),
-        )
+        when (val stored = preferences.getString(KEY_STARTUP_ADDRESS_FOCUS_MODE, null)) {
+            null, StartupAddressFocusMode.WhenStartupAnimationDisabled.stableId ->
+                StartupAddressFocusMode.Never
+            else -> StartupAddressFocusMode.fromStableId(stored)
+        }
 
     fun saveStartupAddressFocusMode(mode: StartupAddressFocusMode) {
         preferences.edit().putString(KEY_STARTUP_ADDRESS_FOCUS_MODE, mode.stableId).apply()
@@ -1461,15 +1428,9 @@ class BrowserSessionStore internal constructor(
     }
 
     fun loadAndroidBrowserEngineKind(): AndroidBrowserEngineKind =
-        AndroidBrowserEngineRules.persistedKind(
-            stableId = preferences.getString(KEY_ANDROID_BROWSER_ENGINE, null),
-            systemWebViewOnly = BuildConfig.SYSTEM_WEBVIEW_ONLY,
-        )
+        AndroidBrowserEngineKind.GeckoView
 
-    fun saveAndroidBrowserEngineKind(kind: AndroidBrowserEngineKind): Boolean {
-        if (!AndroidBrowserEngineRules.canSelect(kind, BuildConfig.SYSTEM_WEBVIEW_ONLY)) return false
-        return preferences.edit().putString(KEY_ANDROID_BROWSER_ENGINE, kind.stableId).commit()
-    }
+    fun saveAndroidBrowserEngineKind(kind: AndroidBrowserEngineKind): Boolean = true
 
     fun loadAppearanceSettings(): AppearanceSettings {
         val frostedTransparencyPercent = loadBoundedInt(
@@ -1673,24 +1634,6 @@ class BrowserSessionStore internal constructor(
     internal companion object {
         private val HISTORY_TRAIL_JOURNAL_LOCK = Any()
         const val PREFERENCES_NAME = "browser_session"
-
-        internal fun capsulePreferencesName(capsuleId: String): String {
-            require(SiteCapsuleRules.opaqueId(capsuleId) != null)
-            return "${PREFERENCES_NAME}_capsule_$capsuleId"
-        }
-
-        internal fun clearCapsuleSession(context: Context, capsuleId: String): Boolean =
-            context.getSharedPreferences(capsulePreferencesName(capsuleId), Context.MODE_PRIVATE)
-                .edit().clear().commit()
-
-        internal fun allPersistentTabIds(context: Context): Set<String> = buildSet {
-            addAll(BrowserSessionStore(context).loadTabs().first.map(BrowserTab::id))
-            addAll(SnoozedTabStore(context).load().map { it.tab.id })
-            SiteCapsuleStore(context).load().forEach { capsule ->
-                addAll(BrowserSessionStore(context, capsule.id).loadTabs().first.map(BrowserTab::id))
-            }
-        }
-
         const val KEY_TABS = "tabs"
         const val KEY_SELECTED_TAB = "selected_tab"
         const val KEY_TAB_STACKS = "tab_stacks"
@@ -1725,8 +1668,6 @@ class BrowserSessionStore internal constructor(
         const val KEY_STATUS_BAR_SCROLL_PAGE_ALLOWED = "status_bar_scroll_page_allowed"
         const val KEY_STATUS_BAR_SCROLL_TARGET_WIDTH_PERCENT = "status_bar_scroll_target_width_percent"
         const val KEY_STATUS_BAR_SCROLL_DISABLED_DOMAINS = "status_bar_scroll_disabled_domains"
-
-        const val KEY_FORM_DRAFT_SAVING_ENABLED = "form_draft_saving_enabled"
         const val KEY_RECALL_ENABLED = "recall_enabled"
         const val KEY_SEARCH_SUGGESTION_PROVIDER = "search_suggestion_provider"
         const val KEY_HISTORY_SUGGESTIONS_ENABLED = "history_suggestions_enabled"
@@ -1743,11 +1684,9 @@ class BrowserSessionStore internal constructor(
         const val KEY_ADDRESS_BAR_DOCKING_ENABLED = "address_bar_docking_enabled"
         const val KEY_ADDRESS_BAR_SWIPE_MODE_ENABLED = "address_bar_swipe_mode_enabled"
         const val KEY_EXTERNAL_LINK_PREVIEW_ENABLED = "external_link_preview_enabled"
-        const val KEY_EXTERNAL_LINK_PREVIEW_PROFILE_ID = "external_link_preview_profile_id"
         const val KEY_EXTERNAL_APP_LINK_HANDLING = "external_app_link_handling"
         const val KEY_EXTERNAL_APP_SITE_EXCEPTIONS = "external_app_site_exceptions"
         const val KEY_LINK_LONG_PRESS_ACTION = "link_long_press_action"
-        const val KEY_LINK_PEEK_SWIPE_ACTION = "link_peek_swipe_action"
         const val KEY_ADDRESS_BAR_LONG_PRESS_ACTION = "address_bar_long_press_action"
         const val KEY_LINK_PEEK_ACTION_LAYOUT = "link_peek_action_layout"
         const val KEY_ADDRESS_BAR_ACTION_LAYOUT = "address_bar_action_layout"

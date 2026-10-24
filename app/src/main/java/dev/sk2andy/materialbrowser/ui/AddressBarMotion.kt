@@ -29,11 +29,12 @@ internal data class AddressBarMotionState(
     val width: Dp,
     val height: Dp,
     val dockOffset: DpOffset,
+    val isAnimating: Boolean = false,
 )
 
 internal object AddressBarMotion {
     val OVERVIEW_WIDTH = 112.dp
-    val EXPANDED_HEIGHT = 56.dp
+    val EXPANDED_HEIGHT = 60.dp
     const val DOCK_REPOSITION_FEEDBACK_MILLIS = 260
 
     fun containerAnimationSpec(motionScheme: CandyMotionScheme): SpringSpec<Dp> =
@@ -90,10 +91,10 @@ internal object AddressBarMotion {
     ): Dp = when (presentation) {
         AddressBarPresentation.Docked,
         AddressBarPresentation.Compact,
-        -> 48.dp
+        -> 52.dp
         AddressBarPresentation.Expanded -> expandedHeight
-        AddressBarPresentation.Overview -> 56.dp
-        AddressBarPresentation.CommandFeedback -> 46.dp
+        AddressBarPresentation.Overview -> 60.dp
+        AddressBarPresentation.CommandFeedback -> 50.dp
     }
 
     fun dockOffsetForPosition(
@@ -102,13 +103,23 @@ internal object AddressBarMotion {
         barWidth: Dp,
         verticalTravel: Dp,
     ): DpOffset {
-        val offset = AddressBarDockingRules.offsetForPosition(
-            position = position,
-            maxWidth = maxWidth.value,
-            barWidth = barWidth.value,
-            verticalTravel = verticalTravel.value,
+        val horizontalPosition = position.x
+            .takeIf(Float::isFinite)
+            ?.coerceIn(-1f, 1f)
+            ?: 0f
+        val verticalPosition = position.y
+            .takeIf(Float::isFinite)
+            ?.coerceIn(0f, 1f)
+            ?: 0f
+        val horizontalTravel = ((maxWidth - barWidth) / 2f + 12.dp).coerceAtLeast(0.dp)
+        return DpOffset(
+            x = horizontalTravel * horizontalPosition,
+            y = if (verticalPosition == 0f) {
+                0.dp
+            } else {
+                -verticalTravel.coerceAtLeast(0.dp) * verticalPosition
+            },
         )
-        return DpOffset(offset.x.dp, offset.y.dp)
     }
 
     fun usesFadeThrough(
@@ -153,22 +164,24 @@ internal fun rememberAddressBarMotionState(
     dockPosition: Offset,
 ): AddressBarMotionState {
     val motionScheme = LocalCandyMotionScheme.current
+    val targetWidth = AddressBarMotion.widthTarget(
+        presentation = presentation,
+        compactWidth = compactWidth,
+        maxWidth = maxWidth,
+        feedbackWidth = feedbackWidth,
+        edgeTabWidth = edgeTabWidth,
+    )
     val width by animateDpAsState(
-        targetValue = AddressBarMotion.widthTarget(
-            presentation = presentation,
-            compactWidth = compactWidth,
-            maxWidth = maxWidth,
-            feedbackWidth = feedbackWidth,
-            edgeTabWidth = edgeTabWidth,
-        ),
+        targetValue = targetWidth,
         animationSpec = AddressBarMotion.containerAnimationSpec(motionScheme),
         label = "Adressleistenbreite beim Scrollen und Parken",
     )
+    val targetHeight = AddressBarMotion.heightTarget(
+        presentation = presentation,
+        expandedHeight = expandedHeight,
+    )
     val height by animateDpAsState(
-        targetValue = AddressBarMotion.heightTarget(
-            presentation = presentation,
-            expandedHeight = expandedHeight,
-        ),
+        targetValue = targetHeight,
         animationSpec = AddressBarMotion.containerAnimationSpec(motionScheme),
         label = "Adressleistenhöhe beim Parken",
     )
@@ -178,7 +191,14 @@ internal fun rememberAddressBarMotionState(
         barWidth = width,
         verticalTravel = verticalTravel,
     )
-    return AddressBarMotionState(width = width, height = height, dockOffset = dockOffset)
+    val isAnimating = kotlin.math.abs(width.value - targetWidth.value) > 0.5f ||
+        kotlin.math.abs(height.value - targetHeight.value) > 0.5f
+    return AddressBarMotionState(
+        width = width,
+        height = height,
+        dockOffset = dockOffset,
+        isAnimating = isAnimating,
+    )
 }
 
 @Composable

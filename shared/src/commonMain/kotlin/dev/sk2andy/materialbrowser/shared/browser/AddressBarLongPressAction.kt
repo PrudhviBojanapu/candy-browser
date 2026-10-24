@@ -43,10 +43,20 @@ enum class AddressBarLongPressAction(
     ;
 
     companion object {
-        val Default = OpenReader
+        val DebloatedActions = setOf(
+            OpenReader,
+            SaveReaderOffline,
+            Print,
+            SendToAssistant,
+            SnoozeTab,
+            OpenCandyTrail,
+            CreateSiteCapsule,
+        )
+
+        val Default = Reload
 
         fun fromStableId(value: String?): AddressBarLongPressAction =
-            entries.firstOrNull { action -> action.stableId == value } ?: Default
+            entries.firstOrNull { action -> action.stableId == value && action !in DebloatedActions } ?: Default
     }
 }
 

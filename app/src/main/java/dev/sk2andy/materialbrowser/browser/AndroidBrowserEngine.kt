@@ -52,7 +52,11 @@ internal object AndroidBrowserEngineRules {
     fun canSelect(
         kind: AndroidBrowserEngineKind,
         systemWebViewOnly: Boolean,
-    ): Boolean = !systemWebViewOnly || kind == AndroidBrowserEngineKind.SystemWebView
+    ): Boolean = if (systemWebViewOnly) {
+        kind == AndroidBrowserEngineKind.SystemWebView
+    } else {
+        true
+    }
 
     fun capabilities(kind: AndroidBrowserEngineKind): AndroidBrowserEngineCapabilities =
         when (kind) {

@@ -46,9 +46,6 @@ enum class BrowserMenuEntry(
     CloseTab("close_tab", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
     DuplicateTab("duplicate_tab", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
     Reader("reader", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
-    DiscoverFeeds("discover_feeds", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
-    OpenFeeds("open_feeds", BrowserMenuConfigurationSection.Browser, BrowserMenuLocation.Tab, true, false),
-    OpenLibrary("open_library", BrowserMenuConfigurationSection.Browser, BrowserMenuLocation.Tab, true, false),
     WebAnnotations("web_annotations", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
     Translate("translate", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
     FindInPage("find_in_page", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
@@ -83,6 +80,13 @@ enum class BrowserMenuEntry(
         true,
         false,
     ),
+    AllAdBlockers(
+        "all_ad_blockers",
+        BrowserMenuConfigurationSection.Page,
+        BrowserMenuLocation.Tab,
+        true,
+        false,
+    ),
     AlwaysBlockPopups(
         "always_block_popups",
         BrowserMenuConfigurationSection.Page,
@@ -93,6 +97,7 @@ enum class BrowserMenuEntry(
     DesktopView("desktop_view", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
     DomainMute("domain_mute", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Both, true, true),
     StatusBarScroll("status_bar_scroll", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
+    VideoDetectionRedirect("video_detection_redirect", BrowserMenuConfigurationSection.Page, BrowserMenuLocation.Tab, true, false),
 
     ToppingCommands(
         "topping_commands",
@@ -110,20 +115,12 @@ enum class BrowserMenuEntry(
     ),
 
     CandyTrail("candy_trail", BrowserMenuConfigurationSection.Candy, BrowserMenuLocation.Both, true, true),
-    Constellations("constellations", BrowserMenuConfigurationSection.Candy, BrowserMenuLocation.Tab, true, false),
     AddSiteCapsule(
         "add_site_capsule",
         BrowserMenuConfigurationSection.Candy,
         BrowserMenuLocation.Both,
         true,
         true,
-    ),
-    CreateSiteWidget(
-        "create_site_widget",
-        BrowserMenuConfigurationSection.Candy,
-        BrowserMenuLocation.Tab,
-        true,
-        false,
     ),
     Summarize("summarize", BrowserMenuConfigurationSection.Candy, BrowserMenuLocation.Both, true, true),
     Snooze("snooze", BrowserMenuConfigurationSection.Candy, BrowserMenuLocation.Both, true, true),
@@ -275,15 +272,29 @@ object BrowserMenuLayoutRules {
         bottomSheetToolbarEntries = BrowserMenuBottomSheetToolbarRules.normalize(layout.bottomSheetToolbarEntries),
     )
 
+    val DebloatedEntries = setOf(
+        BrowserMenuEntry.CandyTrail,
+        BrowserMenuEntry.AddSiteCapsule,
+        BrowserMenuEntry.Summarize,
+        BrowserMenuEntry.Snooze,
+        BrowserMenuEntry.OpenSnoozedTabs,
+        BrowserMenuEntry.Reader,
+        BrowserMenuEntry.Print,
+        BrowserMenuEntry.OpenFirefoxExtensions,
+    )
+
     fun isVisible(
         layout: BrowserMenuLayout,
         entry: BrowserMenuEntry,
         surface: BrowserMenuSurface,
-    ): Boolean = when (location(layout, entry)) {
-        BrowserMenuLocation.Nowhere -> false
-        BrowserMenuLocation.Tab -> surface == BrowserMenuSurface.Tab
-        BrowserMenuLocation.TabSwitcher -> surface == BrowserMenuSurface.TabSwitcher
-        BrowserMenuLocation.Both -> true
+    ): Boolean {
+        if (entry in DebloatedEntries) return false
+        return when (location(layout, entry)) {
+            BrowserMenuLocation.Nowhere -> false
+            BrowserMenuLocation.Tab -> surface == BrowserMenuSurface.Tab
+            BrowserMenuLocation.TabSwitcher -> surface == BrowserMenuSurface.TabSwitcher
+            BrowserMenuLocation.Both -> true
+        }
     }
 
     fun fromWireValues(values: Map<String, String>): BrowserMenuLayout = normalize(
@@ -329,10 +340,8 @@ object BrowserMenuLayoutRules {
         BrowserFeatureMenuAction.ParkAddressBarRight,
         BrowserFeatureMenuAction.DockAddressBar,
         -> BrowserMenuEntry.AddressBarDocking
-        BrowserFeatureMenuAction.OpenFeeds -> BrowserMenuEntry.OpenFeeds
-        BrowserFeatureMenuAction.OpenLibrary -> BrowserMenuEntry.OpenLibrary
-        BrowserFeatureMenuAction.DiscoverFeeds -> BrowserMenuEntry.DiscoverFeeds
         BrowserFeatureMenuAction.OpenReader -> BrowserMenuEntry.Reader
+        BrowserFeatureMenuAction.OpenWebAnnotations -> BrowserMenuEntry.WebAnnotations
         BrowserFeatureMenuAction.TranslatePage -> BrowserMenuEntry.Translate
         BrowserFeatureMenuAction.FindInPage -> BrowserMenuEntry.FindInPage
         BrowserFeatureMenuAction.Share -> BrowserMenuEntry.Share
@@ -342,15 +351,14 @@ object BrowserMenuLayoutRules {
         BrowserFeatureMenuAction.ToggleForceVerticalScrolling -> BrowserMenuEntry.ForceVerticalScrolling
         BrowserFeatureMenuAction.ToggleForcePageZooming -> BrowserMenuEntry.ForcePageZooming
         BrowserFeatureMenuAction.ToggleForceSafeArea -> BrowserMenuEntry.ForceSafeArea
+        BrowserFeatureMenuAction.ToggleAllAdBlockers -> BrowserMenuEntry.AllAdBlockers
         BrowserFeatureMenuAction.ToggleAlwaysBlockPopups -> BrowserMenuEntry.AlwaysBlockPopups
         BrowserFeatureMenuAction.ToggleDesktopView -> BrowserMenuEntry.DesktopView
         BrowserFeatureMenuAction.ToggleDomainMute -> BrowserMenuEntry.DomainMute
         BrowserFeatureMenuAction.ToggleStatusBarScroll -> BrowserMenuEntry.StatusBarScroll
+        BrowserFeatureMenuAction.ToggleVideoDetectionRedirect -> BrowserMenuEntry.VideoDetectionRedirect
         BrowserFeatureMenuAction.OpenCandyTrail -> BrowserMenuEntry.CandyTrail
-        BrowserFeatureMenuAction.OpenConstellations -> BrowserMenuEntry.Constellations
-        BrowserFeatureMenuAction.OpenWebAnnotations -> BrowserMenuEntry.WebAnnotations
         BrowserFeatureMenuAction.AddSiteCapsule -> BrowserMenuEntry.AddSiteCapsule
-        BrowserFeatureMenuAction.CreateSiteWidget -> BrowserMenuEntry.CreateSiteWidget
         BrowserFeatureMenuAction.Summarize -> BrowserMenuEntry.Summarize
         BrowserFeatureMenuAction.SnoozeTab -> BrowserMenuEntry.Snooze
         BrowserFeatureMenuAction.OpenSnoozedTabs -> BrowserMenuEntry.OpenSnoozedTabs

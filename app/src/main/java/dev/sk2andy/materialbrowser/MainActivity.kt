@@ -1,18 +1,9 @@
 package dev.sk2andy.materialbrowser
 
-import dev.sk2andy.materialbrowser.feeds.FeedLaunchContract
-import dev.sk2andy.materialbrowser.feeds.FeedPlaybackManager
-import dev.sk2andy.materialbrowser.reader.rss.RssReaderLaunchRequest
-import dev.sk2andy.materialbrowser.reader.rss.RssReaderNavigation
-import dev.sk2andy.materialbrowser.reader.rss.RssFeedNotifier
-import dev.sk2andy.materialbrowser.reader.rss.RssFeedRules
-
 import android.Manifest
 import android.app.Activity
 import android.app.PictureInPictureUiState
-import android.content.BroadcastReceiver
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Rect
@@ -21,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.provider.DocumentsContract
+import android.util.Log
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
@@ -53,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.ViewCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -62,7 +53,6 @@ import dev.sk2andy.materialbrowser.browser.BLANK_URL
 import dev.sk2andy.materialbrowser.browser.AndroidBrowserEngineKind
 import dev.sk2andy.materialbrowser.browser.BrowserActivityResultIdentity
 import dev.sk2andy.materialbrowser.browser.BrowserController
-import dev.sk2andy.materialbrowser.browser.TabPreviewViewportRules
 import dev.sk2andy.materialbrowser.browser.BrowserGestureHapticFeedback
 import dev.sk2andy.materialbrowser.browser.BrowserHardwareInputAction
 import dev.sk2andy.materialbrowser.browser.BrowserHardwareInputRules
@@ -75,8 +65,6 @@ import dev.sk2andy.materialbrowser.browser.BrowserMediaLifecycleTrace
 import dev.sk2andy.materialbrowser.browser.BrowserMouseButton
 import dev.sk2andy.materialbrowser.browser.FullscreenVideoRules
 import dev.sk2andy.materialbrowser.browser.ProfileBiometricAuthenticator
-import dev.sk2andy.materialbrowser.browser.guest.GuestBubbleGate
-import dev.sk2andy.materialbrowser.browser.guest.GuestBubbleSessionStore
 import dev.sk2andy.materialbrowser.browser.PrivateTabsNotifier
 import dev.sk2andy.materialbrowser.browser.ReleaseNotesPresentationRules
 import dev.sk2andy.materialbrowser.browser.StartupPresentationRules
@@ -87,18 +75,12 @@ import dev.sk2andy.materialbrowser.browser.gecko.GeckoActivityIntegration
 import dev.sk2andy.materialbrowser.browser.gecko.GeckoExtensionManagementContext
 import dev.sk2andy.materialbrowser.browser.gecko.GeckoExtensionManagerCoordinator
 import dev.sk2andy.materialbrowser.browser.engine.BrowserEngineProcessRestart
-import dev.sk2andy.materialbrowser.browser.integration.CandySearchWidgetRules
 import dev.sk2andy.materialbrowser.browser.integration.FavoritesActivityContract
-import dev.sk2andy.materialbrowser.browser.integration.ConstellationActivityContract
 import dev.sk2andy.materialbrowser.browser.integration.HistoryActivityContract
 import dev.sk2andy.materialbrowser.browser.integration.IncomingBrowserIntent
 import dev.sk2andy.materialbrowser.browser.integration.IncomingBrowserRequestKind
 import dev.sk2andy.materialbrowser.browser.integration.LauncherShortcutPublisher
 import dev.sk2andy.materialbrowser.browser.integration.LauncherShortcutRules
-import dev.sk2andy.materialbrowser.browser.sitewidget.SiteWidgetIntentHandler
-import dev.sk2andy.materialbrowser.browser.integration.devicesearch.DeviceSearchContract
-import dev.sk2andy.materialbrowser.capsule.CapsuleWindowRules
-import dev.sk2andy.materialbrowser.capsule.CapsuleWindowLauncher
 import dev.sk2andy.materialbrowser.capsule.CapsuleIntentRules
 import dev.sk2andy.materialbrowser.capsule.CapsuleLaunchResolution
 import dev.sk2andy.materialbrowser.data.AppDataArchiveEnvironment
@@ -122,6 +104,10 @@ import dev.sk2andy.materialbrowser.ui.CandyAnimationRules
 import dev.sk2andy.materialbrowser.ui.CandySplashScreen
 import dev.sk2andy.materialbrowser.ui.FirefoxExtensionManagerOverlay
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoOverlay
+import android.content.ComponentName
+import dev.sk2andy.materialbrowser.browser.MediaStreamDetectorBridge
+import dev.sk2andy.materialbrowser.browser.YouTubeStreamPreloader
+import androidx.compose.runtime.collectAsState
 import dev.sk2andy.materialbrowser.ui.FullscreenVideoSystemControls
 import dev.sk2andy.materialbrowser.ui.GestureOnboardingScreen
 import dev.sk2andy.materialbrowser.ui.ProfileLockedOverlay
@@ -141,20 +127,9 @@ import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-open class MainActivity : AppCompatActivity() {
-    private val issue323ScrollTopReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context, intent: Intent) {
-            if (
-                intent.action == StatusBarScrollAccessibilityContract.ACTION_SCROLL_TO_TOP &&
-                ::browserController.isInitialized
-            ) {
-                browserController.scrollSelectedBrowserEngineToVerticalOffset(0)
-            }
-        }
-    }
-    private var issue323ScrollTopReceiverRegistered = false
-    protected open val capsuleWindowId: String? = null
+class MainActivity : AppCompatActivity() {
     private lateinit var browserController: BrowserController
+    private var statusBarScrollManager: dev.sk2andy.materialbrowser.browser.StatusBarScrollManager? = null
     private lateinit var browserMediaSystemSession: BrowserMediaSystemSession
     private lateinit var castSessionController: CastSessionController
     private lateinit var releaseNotesStore: ReleaseNotesStore
@@ -162,7 +137,6 @@ open class MainActivity : AppCompatActivity() {
     private lateinit var userScriptImporter: UserScriptImporter
     private lateinit var favoriteBookmarksImporter: FavoriteBookmarksImporter
     private lateinit var launcherShortcutIntentHandler: LauncherShortcutIntentHandler
-    private lateinit var siteWidgetIntentHandler: SiteWidgetIntentHandler
     private var geckoActivityIntegration: GeckoActivityIntegration? = null
     private lateinit var profileBiometricAuthenticator: ProfileBiometricAuthenticator
     private val profileProcessLifecycleObserver = object : DefaultLifecycleObserver {
@@ -182,15 +156,10 @@ open class MainActivity : AppCompatActivity() {
     private var pictureInPictureReturnRestorationPending by mutableStateOf(false)
     private var isTabOverviewPortraitLocked = false
     private var incomingBrowserNavigationRequestId by mutableIntStateOf(0)
-    private var rssReaderLaunchRequest by mutableStateOf<RssReaderLaunchRequest?>(null)
-    private var rssReaderLaunchSequence = 0
-    private var openFeedsRequestId by mutableIntStateOf(0)
-    private var openFeedQueue by mutableStateOf(false)
-    private var openFeedCatalog by mutableStateOf(false)
-    private var openFeedArticleId by mutableStateOf<String?>(null)
     private var launcherAddressEditorRequestId by mutableIntStateOf(0)
     private var hardwareTabChangeRequestId by mutableIntStateOf(0)
     private var onboardingVisible by mutableStateOf(false)
+    private var setupWizardVisible by mutableStateOf(false)
     private var initialOnboardingRequired = false
     private var releaseNotesVisible by mutableStateOf(false)
     private var externalLaunchTabId by mutableStateOf<String?>(null)
@@ -211,26 +180,22 @@ open class MainActivity : AppCompatActivity() {
     }
     private val privateTabsNotifier by lazy { PrivateTabsNotifier(this) }
     private var appliedNightConfiguration = Configuration.UI_MODE_NIGHT_UNDEFINED
-    private var appliedPreviewViewportSize: Pair<Int, Int>? = null
     private val webPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { results ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (::browserController.isInitialized) browserController.onRuntimePermissionResult(results)
     }
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         CandyDownloadNotifier(this).onPermissionResult(granted)
-        if (::browserController.isInitialized && capsuleWindowId == null) {
+        if (::browserController.isInitialized) {
             privateTabsNotifier.update(browserController.tabs.count { it.isIncognito })
         }
     }
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (::browserController.isInitialized) {
             browserController.onFileChooserResult(result.resultCode, result.data)
         }
@@ -238,19 +203,16 @@ open class MainActivity : AppCompatActivity() {
     private val geckoWebAuthnLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         geckoActivityIntegration?.onActivityResult(result.resultCode, result.data)
     }
     private val userScriptImportLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (uri != null && ::userScriptImporter.isInitialized) userScriptImporter.import(uri)
     }
     private val favoriteBookmarksImportLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (uri != null && ::favoriteBookmarksImporter.isInitialized) {
             favoriteBookmarksImporter.import(uri)
         }
@@ -258,7 +220,6 @@ open class MainActivity : AppCompatActivity() {
     private val appLogsExportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (uri == null || !::browserController.isInitialized) return@registerForActivityResult
         val diagnostics = browserController.developerDiagnostics() +
             "\nDevice: ${Build.MANUFACTURER} ${Build.MODEL}"
@@ -277,7 +238,6 @@ open class MainActivity : AppCompatActivity() {
     private val geckoLogsExportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (uri == null || !::browserController.isInitialized) return@registerForActivityResult
         val diagnostics = browserController.developerDiagnostics() +
             "\nDevice: ${Build.MANUFACTURER} ${Build.MODEL}"
@@ -294,7 +254,6 @@ open class MainActivity : AppCompatActivity() {
     private val appDataExportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (uri == null || !::browserController.isInitialized) return@registerForActivityResult
         browserController.authenticateProtectedProfilesForExport { authenticated ->
             if (authenticated) {
@@ -307,25 +266,11 @@ open class MainActivity : AppCompatActivity() {
     private val appDataImportLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (uri != null && ::browserController.isInitialized) stageAppDataImport(uri)
-    }
-    private val constellationLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK || !::browserController.isInitialized) {
-            return@registerForActivityResult
-        }
-        val profileId = ConstellationActivityContract.profileId(result.data)
-            ?: return@registerForActivityResult
-        val url = ConstellationActivityContract.navigationUrl(result.data)
-            ?: return@registerForActivityResult
-        if (browserController.openConstellationPage(url, profileId)) incomingBrowserNavigationRequestId++
     }
     private val historyLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (!::browserController.isInitialized) return@registerForActivityResult
         browserController.reloadHistory()
         browserController.applyHistoryClearRequests(
@@ -341,7 +286,6 @@ open class MainActivity : AppCompatActivity() {
     private val favoritesLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
-        if (GuestBubbleSessionStore(this).isLocked()) return@registerForActivityResult
         if (!::browserController.isInitialized) return@registerForActivityResult
         browserController.reloadFavorites()
         if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
@@ -355,68 +299,32 @@ open class MainActivity : AppCompatActivity() {
             BrowserSessionStore(this).loadAppearanceSettings().appearanceMode,
         )
         super.onCreate(savedInstanceState)
-        if (GuestBubbleGate.redirectIfLocked(this)) return
         appliedNightConfiguration = resources.configuration.uiMode and
             Configuration.UI_MODE_NIGHT_MASK
-        appliedPreviewViewportSize = resources.configuration.previewViewportSize()
-        if (AppDataArchiveRestore.hasInterruptedRestore(appDataRestoreRecoveryMarker())) {
-            val lockToken = AppDataTransferLock.activate(this, Process.myPid())
-            if (lockToken != null) {
-                appDataTransferActive = true
-                FeedPlaybackManager.get(applicationContext).invalidate()
-                BrowserMediaPlaybackService.clearForAppDataTransfer(applicationContext)
-                val started = runCatching {
-                    startActivity(
-                        AppDataTransferContract.recoveryIntent(
-                            context = this,
-                            mainProcessId = Process.myPid(),
-                            lockToken = lockToken,
-                        ),
-                    )
-                }.isSuccess
-                if (!started) AppDataTransferLock.release(this, lockToken)
-            }
-            finish()
-            return
-        }
-        if (AppDataTransferLock.isActive(this)) {
-            finish()
-            return
-        }
-        AppDataArchiveRestore.cleanupOrphanedWorkDirectories(
-            stateDirectory = appDataTransferStateDirectory(),
-            recoveryMarker = appDataRestoreRecoveryMarker(),
-        )
         enableEdgeToEdge()
+        MediaStreamDetectorBridge.init(applicationContext)
+        MediaStreamDetectorBridge.isDetectionEnabled = {
+            if (::browserController.isInitialized) browserController.isVideoDetectionRedirectEnabled else true
+        }
+        YouTubeStreamPreloader.init(applicationContext)
+        YouTubeStreamPreloader.isPreloadEnabled = {
+            if (::browserController.isInitialized) browserController.isVideoDetectionRedirectEnabled else true
+        }
         val isColdStart = savedInstanceState == null
         val hasIncomingBrowserRequest = IncomingBrowserIntent.from(intent) != null
         val isColdExternalLinkLaunch = isColdStart && hasIncomingBrowserRequest
         val onboardingStore = GestureOnboardingStore(this)
-        val hadCompletedOnboarding = onboardingStore.hasCompletedAnyVersion()
-        val onboardingRequired = onboardingStore.shouldShow()
-        initialOnboardingRequired = onboardingRequired && !hadCompletedOnboarding
-        onboardingVisible = savedInstanceState
-            ?.getBoolean(STATE_ONBOARDING_VISIBLE)
-            ?: onboardingRequired
+        onboardingStore.markCompleted()
+        initialOnboardingRequired = false
+        onboardingVisible = false
+        setupWizardVisible = !dev.sk2andy.materialbrowser.ui.SetupWizardHelper.isSetupCompleted(this)
         releaseNotesStore = ReleaseNotesStore(this)
-        if (
-            intent.action == Intent.ACTION_MAIN ||
-            savedInstanceState?.getBoolean(STATE_RELEASE_NOTES_VISIBLE) == true
-        ) {
-            loadReleaseNotesContent()
-        }
-        val releaseNotesRequired = shouldPresentReleaseNotes(
-            isNewLaunch = savedInstanceState == null,
-            intentAction = intent.action,
-            isInitialOnboardingRequired = initialOnboardingRequired,
-        )
-        releaseNotesVisible = savedInstanceState
-            ?.getBoolean(STATE_RELEASE_NOTES_VISIBLE)
-            ?: releaseNotesRequired
+        releaseNotesStore.markHandled(BuildConfig.VERSION_CODE.toLong())
+        releaseNotesVisible = false
         BrowsingHistoryLifecycle.install(application)
         val snoozeWakeNotifier = SnoozeWakeNotifier(this).also { it.ensureChannel() }
         privateTabsNotifier.ensureChannel()
-        if (isColdStart && capsuleWindowId == null) privateTabsNotifier.cancel()
+        if (isColdStart) privateTabsNotifier.cancel()
         val downloadNotifier = CandyDownloadNotifier(this).also {
             it.ensureChannel()
             it.reconcileOrphanedActiveNotifications()
@@ -461,11 +369,7 @@ open class MainActivity : AppCompatActivity() {
         }
         profileBiometricAuthenticator = ProfileBiometricAuthenticator(this)
         browserController = BrowserController(
-            onOpenConstellations = { profileId ->
-                constellationLauncher.launch(ConstellationActivityContract.launchIntent(this, profileId))
-            },
             activity = this,
-            capsuleWindowId = capsuleWindowId,
             requestRuntimePermissions = { permissions ->
                 webPermissionLauncher.launch(permissions.toTypedArray())
             },
@@ -481,9 +385,6 @@ open class MainActivity : AppCompatActivity() {
                         val publication = browserController.media3Publication(
                             traceSource = "MainActivity.onMediaStateChanged",
                         )
-                        if (publication?.snapshot?.isPlaying == true) {
-                            FeedPlaybackManager.get(applicationContext).pause()
-                        }
                         if (browserController.consumeMedia3PictureInPictureRestore()) {
                             BrowserMediaLifecycleTrace.record(
                                 source = "MainActivity.onMediaStateChanged",
@@ -548,7 +449,6 @@ open class MainActivity : AppCompatActivity() {
             isRestoredTask = savedInstanceState != null,
         )
         lifecycleScope.launch {
-            if (capsuleWindowId != null) return@launch
             snapshotFlow { browserController.tabs.count { it.isIncognito } }
                 .distinctUntilChanged()
                 .collect { privateTabCount ->
@@ -560,6 +460,11 @@ open class MainActivity : AppCompatActivity() {
                     }
                     privateTabsNotifier.update(privateTabCount)
                 }
+        }
+        statusBarScrollManager = dev.sk2andy.materialbrowser.browser.StatusBarScrollManager(this, browserController).also { manager ->
+            browserController.onStatusBarScrollPageContextChanged = { allowed ->
+                manager.onPageContextChanged(allowed)
+            }
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(profileProcessLifecycleObserver)
         pictureInPictureController = MainActivityPictureInPictureController(
@@ -588,12 +493,6 @@ open class MainActivity : AppCompatActivity() {
             publisher = launcherShortcutPublisher,
             onNavigationRequested = { incomingBrowserNavigationRequestId++ },
             onAddressEditorRequested = { launcherAddressEditorRequestId++ },
-        )
-        siteWidgetIntentHandler = SiteWidgetIntentHandler(
-            context = this,
-            controller = browserController,
-            scope = lifecycleScope,
-            onNavigate = ::showIncomingBrowserNavigation,
         )
         if (!isColdExternalLinkLaunch) ensureMediaControllers()
         applyBrowserSystemUi()
@@ -638,13 +537,10 @@ open class MainActivity : AppCompatActivity() {
         val startupPresentation = StartupPresentationRules.resolve(
             isColdStart = savedInstanceState == null,
             isLauncherLaunch = intent.action == Intent.ACTION_MAIN,
-            isStartupAnimationEnabled = CandyAnimationRules.startupAnimationEnabled(
-                animationsEnabled = browserController.appearanceSettings.animationsEnabled,
-                startupAnimationEnabled = browserController.isStartupAnimationEnabled,
-            ),
+            isStartupAnimationEnabled = false,
             startupAddressFocusMode = browserController.startupAddressFocusMode,
-            isOnboardingRequired = onboardingRequired,
-            isReleaseNotesRequired = releaseNotesRequired,
+            isOnboardingRequired = false,
+            isReleaseNotesRequired = false,
         )
         setCandyContent(
             animationsEnabled = browserController.appearanceSettings.animationsEnabled,
@@ -661,9 +557,7 @@ open class MainActivity : AppCompatActivity() {
                 val visibleProfileProtected = browserController.localBrowserProfiles
                     .firstOrNull { profile -> profile.id == visibleProfileId }
                     ?.protection != null
-                setRecentsScreenshotEnabled(
-                    !visibleProfileProtected && !GuestBubbleSessionStore(this).isLocked(),
-                )
+                setRecentsScreenshotEnabled(!visibleProfileProtected)
             }
             CandyTheme(settings = appearanceSettings) {
                 val launcherShortcutState = LauncherShortcutRules.state(
@@ -672,12 +566,8 @@ open class MainActivity : AppCompatActivity() {
                     activeProfileId = browserController.activeProfileId,
                     profilesEnabled = browserController.profilesEnabled,
                 )
-                val candySearchWidgetState = CandySearchWidgetRules.state(
-                    profiles = browserController.localBrowserProfiles,
-                    profilesEnabled = browserController.profilesEnabled,
-                )
                 var splashVisible by remember {
-                    mutableStateOf(startupPresentation.showSplash)
+                    mutableStateOf(false)
                 }
                 val fullscreenVideoState = browserController.fullscreenVideoState
                 val webContentFullscreen = browserController.isSelectedWebContentFullscreen
@@ -719,12 +609,6 @@ open class MainActivity : AppCompatActivity() {
                 LaunchedEffect(launcherShortcutState) {
                     launcherShortcutPublisher.publishSerially(launcherShortcutState)
                 }
-                LaunchedEffect(candySearchWidgetState) {
-                    CandySearchWidgetProvider.updateAll(
-                        context = applicationContext,
-                        state = candySearchWidgetState,
-                    )
-                }
                 LaunchedEffect(showReleaseNotes) {
                     if (showReleaseNotes) {
                         releaseNotesStore.markHandled(BuildConfig.VERSION_CODE.toLong())
@@ -753,6 +637,10 @@ open class MainActivity : AppCompatActivity() {
                     )
                     fullscreenVideoGestureState.setEnabled(fullscreenVideoGesturesActive)
                 }
+                val activeTabUrl = if (::browserController.isInitialized) browserController.selectedTab.url else null
+                LaunchedEffect(activeTabUrl) {
+                    YouTubeStreamPreloader.onUrlChanged(applicationContext, activeTabUrl)
+                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     val castController = if (::castSessionController.isInitialized) {
                         castSessionController
@@ -772,14 +660,6 @@ open class MainActivity : AppCompatActivity() {
                             .takeIf { fullscreenVideoGesturesActive },
                         incomingBrowserNavigationRequestId =
                             incomingBrowserNavigationRequestId,
-                        rssReaderLaunchRequest = rssReaderLaunchRequest,
-                        onRssReaderLaunchConsumed = { requestId ->
-                            if (rssReaderLaunchRequest?.id == requestId) rssReaderLaunchRequest = null
-                        },
-                        openFeedsRequestId = openFeedsRequestId,
-                        openFeedQueue = openFeedQueue,
-                        openFeedCatalog = openFeedCatalog,
-                        openFeedArticleId = openFeedArticleId,
                         externalLaunchTabId = externalLaunchTabId,
                         onReturnToExternalApp = {
                             browserController.dismissExternalLinkPreview()
@@ -796,15 +676,20 @@ open class MainActivity : AppCompatActivity() {
                             )
                         },
                         onOpenDownloads = {
-                            startActivity(Intent(this@MainActivity, DownloadsActivity::class.java))
+                            try {
+                                val intent = Intent().apply {
+                                    component = ComponentName(packageName, "com.linroid.ketch.app.android.MainActivity")
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                Log.w("MainActivity", "Could not start Ketch: ${e.message}")
+                            }
                         },
                         onOpenHistory = {
                             historyLauncher.launch(
                                 HistoryActivityContract.launchIntent(this@MainActivity),
                             )
-                        },
-                        onOpenRssFeeds = { pageUrl, isPrivate ->
-                            startActivity(RssFeedsActivity.intent(this@MainActivity, pageUrl, isPrivate))
                         },
                         onImportUserScript = {
                             userScriptImportLauncher.launch(
@@ -885,6 +770,46 @@ open class MainActivity : AppCompatActivity() {
                             !startupPresentation.showSplash,
                         launcherAddressEditorRequestId = launcherAddressEditorRequestId,
                         hardwareTabChangeRequestId = hardwareTabChangeRequestId,
+                        onOpenMpvRx = { url, title ->
+                            val preloaded = YouTubeStreamPreloader.preloadedStream.value?.takeIf {
+                                !YouTubeStreamPreloader.isAdOrAuxiliaryMedia(it.videoUrl)
+                            }
+                            val mediaKey = YouTubeStreamPreloader.extractMediaKey(url)
+                            if (preloaded != null && (preloaded.isDirectMedia || preloaded.pageUrl == url || preloaded.videoId == mediaKey || preloaded.videoId == url || YouTubeStreamPreloader.isCandidateVideoPage(url))) {
+                                val launched = YouTubeStreamPreloader.launchPreloadedStream(this@MainActivity, preloaded) {
+                                    browserController.stopWebVideoPlaybackForExternalPlayer()
+                                    browserController.pauseActiveMedia()
+                                    browserController.exitSelectedWebContentFullscreen()
+                                }
+                                if (launched) return@BrowserScreen
+                            }
+                            val streamPayload = MediaStreamDetectorBridge.activeStreamPayload.value?.takeIf {
+                                !YouTubeStreamPreloader.isAdOrAuxiliaryMedia(it.url)
+                            }
+                            val isYt = YouTubeStreamPreloader.isYouTubeUrl(url) || (mediaKey != null && YouTubeStreamPreloader.isYouTubeUrl(mediaKey))
+                            val directUrl = if (!isYt) streamPayload?.url?.takeIf { it.isNotBlank() && !it.startsWith("blob:") } else null
+                            val cleanUrl = if (isYt) {
+                                val vid = YouTubeStreamPreloader.extractVideoId(url) ?: mediaKey
+                                if (vid != null) "https://www.youtube.com/watch?v=$vid" else url
+                            } else url
+
+                            if (directUrl != null || isYt || YouTubeStreamPreloader.isCandidateVideoPage(url)) {
+                                val launched = launchMpvRx(
+                                    url = directUrl ?: cleanUrl,
+                                    title = streamPayload?.title ?: title,
+                                    referer = streamPayload?.referer ?: cleanUrl,
+                                    userAgent = streamPayload?.userAgent,
+                                    headers = streamPayload?.headers ?: emptyMap(),
+                                    isDirectMedia = directUrl != null,
+                                    fallbackUrl = cleanUrl,
+                                )
+                                if (launched) {
+                                    browserController.stopWebVideoPlaybackForExternalPlayer()
+                                    browserController.pauseActiveMedia()
+                                    browserController.exitSelectedWebContentFullscreen()
+                                }
+                            }
+                        },
                     )
                     if (firefoxExtensionsVisible) {
                         firefoxExtensionManager?.let { manager ->
@@ -918,26 +843,12 @@ open class MainActivity : AppCompatActivity() {
                             .takeIf { fullscreenVideoGesturesActive },
                         onBoundsChanged = ::onFullscreenVideoBoundsChanged,
                     )
+
                     if (
                         pictureInPictureReturnRestorationPending ||
                         browserController.isMediaLayoutRestorationPending
                     ) {
                         Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-                    }
-                    if (!videoOnlyPresentation && onboardingVisible) {
-                        GestureOnboardingScreen(
-                            onCompleted = {
-                                onboardingStore.markCompleted()
-                                if (initialOnboardingRequired) {
-                                    releaseNotesStore.markHandled(
-                                        BuildConfig.VERSION_CODE.toLong(),
-                                    )
-                                    releaseNotesVisible = false
-                                }
-                                initialOnboardingRequired = false
-                                onboardingVisible = false
-                            },
-                        )
                     }
                     AnimatedVisibility(
                         visible = splashVisible && !videoOnlyPresentation,
@@ -957,6 +868,13 @@ open class MainActivity : AppCompatActivity() {
                             },
                         )
                     }
+                    if (setupWizardVisible) {
+                        dev.sk2andy.materialbrowser.ui.SetupWizardScreen(
+                            onComplete = {
+                                setupWizardVisible = false
+                            },
+                        )
+                    }
                 }
                 AppUpdatePrompt(
                     context = this,
@@ -968,36 +886,6 @@ open class MainActivity : AppCompatActivity() {
                         browserController.openUrl(url, inNewTab = true)
                     },
                 )
-                if (appDataExportWarningVisible) {
-                    AppDataExportWarningDialog(
-                        hasProtectedProfiles = browserController.hasProtectedProfiles,
-                        onDismiss = { appDataExportWarningVisible = false },
-                        onConfirm = {
-                            appDataExportWarningVisible = false
-                            appDataExportLauncher.launch(defaultAppDataArchiveFileName())
-                        },
-                    )
-                }
-                pendingAppDataImport?.let { pending ->
-                    AppDataImportConfirmationDialog(
-                        pending = pending,
-                        onDismiss = {
-                            deleteStagedAppDataArchive(pending.staged.fileName)
-                            pendingAppDataImport = null
-                        },
-                        onConfirm = {
-                            pendingAppDataImport = null
-                            startAppDataTransfer(R.string.data_archive_import_failed) { lockToken ->
-                                AppDataTransferContract.importIntent(
-                                    context = this,
-                                    stagedFileName = pending.staged.fileName,
-                                    mainProcessId = Process.myPid(),
-                                    lockToken = lockToken,
-                                )
-                            }
-                        },
-                    )
-                }
                 if (browserController.isActiveProfileLocked) {
                     ProfileLockedOverlay(
                         profileEmoji = browserController.localBrowserProfiles
@@ -1014,16 +902,12 @@ open class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        showAppDataTransferResult(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (GuestBubbleGate.redirectIfLocked(this, finishOwner = false)) return
-        GuestBubbleGate.restoreIfUnlocked(this)
         if (appDataTransferActive) return
         setIntent(intent)
-        showAppDataTransferResult(intent)
         openIntent(intent)
         openHomePageForLauncherLaunch(intent)
         if (intent.action == Intent.ACTION_MAIN) loadReleaseNotesContent()
@@ -1054,6 +938,9 @@ open class MainActivity : AppCompatActivity() {
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (appDataTransferActive) return true
+        if (statusBarScrollManager?.handleInWindowTouchEvent(event) == true) {
+            return true
+        }
         val hadWindowFocus = window.decorView.hasWindowFocus()
         val focusedView = currentFocus
         val handled = super.dispatchTouchEvent(event)
@@ -1258,11 +1145,6 @@ open class MainActivity : AppCompatActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        sendBroadcast(
-            Intent(StatusBarScrollAccessibilityContract.ACTION_APP_VISIBILITY)
-                .setPackage(packageName)
-                .putExtra(StatusBarScrollAccessibilityContract.EXTRA_APP_VISIBLE, hasFocus),
-        )
         BrowserInputDiagnostics.activityWindowFocus(hasFocus, currentFocus)
         if (hasFocus &&
             ::browserController.isInitialized &&
@@ -1274,11 +1156,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        sendBroadcast(
-            Intent(StatusBarScrollAccessibilityContract.ACTION_APP_VISIBILITY)
-                .setPackage(packageName)
-                .putExtra(StatusBarScrollAccessibilityContract.EXTRA_APP_VISIBLE, false),
-        )
+        statusBarScrollManager?.onPause()
         window.decorView.stopRubberbandHaptic()
         if (!::browserController.isInitialized || appDataTransferActive) {
             super.onPause()
@@ -1291,7 +1169,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
     override fun onUserLeaveHint() {
-        if (!appDataTransferActive && !GuestBubbleSessionStore(this).isLocked()) {
+        if (!appDataTransferActive) {
             if (
                 ::pictureInPictureController.isInitialized &&
                 pictureInPictureController.prepareAutomaticEntry()
@@ -1312,20 +1190,7 @@ open class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (!issue323ScrollTopReceiverRegistered) {
-            ContextCompat.registerReceiver(
-                this,
-                issue323ScrollTopReceiver,
-                IntentFilter(StatusBarScrollAccessibilityContract.ACTION_SCROLL_TO_TOP),
-                StatusBarScrollAccessibilityContract.STATUS_BAR_SCROLL_CONTROL_PERMISSION,
-                null,
-                ContextCompat.RECEIVER_EXPORTED,
-            )
-            issue323ScrollTopReceiverRegistered = true
-        }
-        if (::browserController.isInitialized && !appDataTransferActive &&
-            !GuestBubbleSessionStore(this).isLocked()
-        ) {
+        if (::browserController.isInitialized && !appDataTransferActive) {
             reconcileAppearanceConfiguration()
             browserController.onStart()
         }
@@ -1336,13 +1201,10 @@ open class MainActivity : AppCompatActivity() {
         if (::browserController.isInitialized && !appDataTransferActive) {
             browserController.onTrimMemory(level)
         }
+        dev.sk2andy.materialbrowser.browser.gecko.GeckoRuntimeOwner.onTrimMemory(level)
     }
 
     override fun onStop() {
-        if (issue323ScrollTopReceiverRegistered) {
-            unregisterReceiver(issue323ScrollTopReceiver)
-            issue323ScrollTopReceiverRegistered = false
-        }
         if (::browserController.isInitialized && !appDataTransferActive) {
             browserController.onStop(
                 isInPictureInPictureMode = isInPictureInPictureMode,
@@ -1353,9 +1215,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
     override fun onPictureInPictureRequested(): Boolean {
-        if (appDataTransferActive || GuestBubbleSessionStore(this).isLocked() ||
-            !::pictureInPictureController.isInitialized
-        ) return false
+        if (appDataTransferActive || !::pictureInPictureController.isInitialized) return false
         return pictureInPictureController.requestPictureInPicture()
     }
 
@@ -1377,20 +1237,6 @@ open class MainActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         if (appDataTransferActive) return
-        val newPreviewViewportSize = newConfig.previewViewportSize()
-        val previousPreviewViewportSize = appliedPreviewViewportSize
-        appliedPreviewViewportSize = newPreviewViewportSize
-        if (
-            previousPreviewViewportSize != null &&
-            TabPreviewViewportRules.hasAspectRatioChanged(
-                previousWidthDp = previousPreviewViewportSize.first,
-                previousHeightDp = previousPreviewViewportSize.second,
-                currentWidthDp = newPreviewViewportSize.first,
-                currentHeightDp = newPreviewViewportSize.second,
-            ) && ::browserController.isInitialized
-        ) {
-            browserController.onViewportAspectRatioChanged()
-        }
         synchronizeAppearanceConfiguration()
         window.decorView.dispatchConfigurationChanged(Configuration(resources.configuration))
         applyBrowserSystemUi()
@@ -1398,9 +1244,6 @@ open class MainActivity : AppCompatActivity() {
             pictureInPictureController.onConfigurationChanged()
         }
     }
-
-    private fun Configuration.previewViewportSize(): Pair<Int, Int> =
-        screenWidthDp to screenHeightDp
 
     private fun synchronizeAppearanceConfiguration() {
         val previousNightConfiguration = appliedNightConfiguration
@@ -1418,13 +1261,7 @@ open class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        sendBroadcast(
-            Intent(StatusBarScrollAccessibilityContract.ACTION_APP_VISIBILITY)
-                .setPackage(packageName)
-                .putExtra(StatusBarScrollAccessibilityContract.EXTRA_APP_VISIBLE, true),
-        )
-        if (GuestBubbleGate.redirectIfLocked(this, finishOwner = !::browserController.isInitialized)) return
-        GuestBubbleGate.restoreIfUnlocked(this)
+        statusBarScrollManager?.onResume()
         if (appDataTransferActive) return
         if (::browserController.isInitialized) {
             reconcileAppearanceConfiguration()
@@ -1434,17 +1271,11 @@ open class MainActivity : AppCompatActivity() {
             pictureInPictureController.reconcileStateOnResume()
         }
         if (::browserController.isInitialized) browserController.onResume()
-        if (::browserController.isInitialized && capsuleWindowId == null) {
+        if (::browserController.isInitialized) {
             privateTabsNotifier.update(browserController.tabs.count { it.isIncognito })
         }
         geckoActivityIntegration?.onHostResumed()
         updatePictureInPictureParams()
-    }
-
-    internal fun prepareForGuestBubble() {
-        FeedPlaybackManager.get(applicationContext).invalidate()
-        if (::browserController.isInitialized) browserController.pauseActiveMedia()
-        if (::browserMediaSystemSession.isInitialized) browserMediaSystemSession.stopAndClear()
     }
 
     private fun reconcileAppearanceConfiguration() {
@@ -1456,10 +1287,12 @@ open class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        statusBarScrollManager?.destroy()
+        statusBarScrollManager = null
         activityDestroyed = true
         window.decorView.stopRubberbandHaptic()
         if (::browserController.isInitialized) fullscreenVideoSystemControls.close()
-        if (!isChangingConfigurations && capsuleWindowId == null) privateTabsNotifier.cancel()
+        if (!isChangingConfigurations) privateTabsNotifier.cancel()
         if (!BuildConfig.SYSTEM_WEBVIEW_ONLY) firefoxExtensionManager?.close()
         firefoxExtensionManager = null
         geckoActivityIntegration?.close()
@@ -1480,9 +1313,7 @@ open class MainActivity : AppCompatActivity() {
                     protectedTabIds = setOfNotNull(geckoWebAuthnActivityIdentity?.tabId),
                 )
             }
-            browserController.destroy(
-                lockClosedProfiles = !isChangingConfigurations && capsuleWindowId == null,
-            )
+            browserController.destroy(lockClosedProfiles = !isChangingConfigurations)
         }
         if (::browserMediaSystemSession.isInitialized) browserMediaSystemSession.release()
         super.onDestroy()
@@ -1533,26 +1364,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
     private fun startAppDataExport(destination: Uri) {
-        if (!browserController.canExportAppData()) {
-            Toast.makeText(
-                this,
-                R.string.data_archive_private_tabs_error,
-                Toast.LENGTH_SHORT,
-            ).show()
-            return
-        }
-        startAppDataTransfer(
-            failureMessage = R.string.data_archive_export_failed,
-            canStartFailureMessage = R.string.data_archive_private_tabs_error,
-            canStart = browserController::canExportAppData,
-        ) { lockToken ->
-            AppDataTransferContract.exportIntent(
-                context = this,
-                destination = destination,
-                mainProcessId = Process.myPid(),
-                lockToken = lockToken,
-            )
-        }
+        // Debloated
     }
 
     private fun startAppDataTransfer(
@@ -1561,197 +1373,26 @@ open class MainActivity : AppCompatActivity() {
         canStart: () -> Boolean = { true },
         intent: (String) -> Intent,
     ) {
-        if (GuestBubbleSessionStore(this).isLocked()) return
-        val lockToken = AppDataTransferLock.activate(this, Process.myPid())
-        if (lockToken == null) {
-            Toast.makeText(this, failureMessage, Toast.LENGTH_SHORT).show()
-            return
-        }
-        appDataTransferActive = true
-        FeedPlaybackManager.get(applicationContext).invalidate()
-        if (::browserMediaSystemSession.isInitialized) {
-            browserMediaSystemSession.clearForAppDataTransfer()
-        } else {
-            BrowserMediaPlaybackService.clearForAppDataTransfer(applicationContext)
-        }
-        val preparing = runCatching {
-            browserController.prepareForAppDataTransfer { ready ->
-                val canStartNow = ready && !GuestBubbleSessionStore(this).isLocked() && canStart()
-                val started = canStartNow && runCatching {
-                    startActivity(intent(lockToken))
-                }.isSuccess
-                if (!started) {
-                    appDataTransferActive = false
-                    AppDataTransferLock.release(this, lockToken)
-                    Toast.makeText(
-                        this,
-                        if (ready && !canStartNow) canStartFailureMessage else failureMessage,
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            }
-        }.isSuccess
-        if (!preparing) {
-            appDataTransferActive = false
-            AppDataTransferLock.release(this, lockToken)
-            Toast.makeText(this, failureMessage, Toast.LENGTH_SHORT).show()
-        }
+        // Debloated
     }
 
     private fun stageAppDataImport(uri: Uri) {
-        if (appDataImportLoading) return
-        appDataImportLoading = true
-        Toast.makeText(this, R.string.data_archive_preparing, Toast.LENGTH_SHORT).show()
-        lifecycleScope.launch {
-            val staged = withContext(Dispatchers.IO) {
-                runCatching {
-                    val input = checkNotNull(contentResolver.openInputStream(uri))
-                    input.use { stream ->
-                        AppDataArchiveStaging.stage(stream, appDataArchiveStagingDirectory())
-                    }
-                }.getOrNull()
-            }
-            appDataImportLoading = false
-            if (staged == null) {
-                Toast.makeText(
-                    this@MainActivity,
-                    R.string.data_archive_import_invalid,
-                    Toast.LENGTH_SHORT,
-                ).show()
-                return@launch
-            }
-            pendingAppDataImport = AppDataImportPreview(
-                staged = staged,
-                compatibility = AppDataArchiveRules.compatibility(
-                    current = currentAppDataArchiveEnvironment(),
-                    archive = staged.inspection.manifest,
-                ),
-            )
-        }
-    }
-
-    private fun currentAppDataArchiveEnvironment() = AppDataArchiveEnvironment(
-        packageName = packageName,
-        appVersionName = BuildConfig.VERSION_NAME,
-        appVersionCode = BuildConfig.VERSION_CODE.toLong(),
-        webViewVersion = currentBrowserEngineIdentity(),
-        sdkInt = Build.VERSION.SDK_INT,
-    )
-
-    private fun appDataArchiveStagingDirectory() =
-        File(cacheDir, AppDataTransferContract.STAGING_DIRECTORY_NAME)
-
-    private fun deleteStagedAppDataArchive(fileName: String) {
-        AppDataArchiveStaging.resolve(appDataArchiveStagingDirectory(), fileName)?.delete()
+        // Debloated
     }
 
     private fun showAppDataTransferResult(intent: Intent) {
-        val message = when (
-            intent.getStringExtra(AppDataTransferContract.RESULT_EXTRA)
-        ) {
-            AppDataTransferContract.RESULT_EXPORTED -> R.string.data_archive_export_success
-            AppDataTransferContract.RESULT_IMPORTED -> R.string.data_archive_import_restored
-            AppDataTransferContract.RESULT_EXPORT_FAILED -> R.string.data_archive_export_failed
-            AppDataTransferContract.RESULT_IMPORT_FAILED -> R.string.data_archive_import_failed
-            AppDataTransferContract.RESULT_IMPORT_RECOVERED ->
-                R.string.data_archive_import_recovered
-            else -> return
-        }
-        intent.removeExtra(AppDataTransferContract.RESULT_EXTRA)
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        // Debloated
     }
 
-    private fun defaultAppDataArchiveFileName(): String =
-        "candy-browser-${LocalDate.now().format(DateTimeFormatter.ISO_DATE)}.zip"
-
-    private fun appDataRestoreRecoveryMarker() =
-        File(
-            appDataTransferStateDirectory(),
-            AppDataTransferContract.RESTORE_MARKER_FILE_NAME,
-        )
-
-    private fun appDataTransferStateDirectory() =
-        File(applicationInfo.dataDir, AppDataArchiveRules.TRANSFER_STATE_DIRECTORY_NAME)
-
     private fun openIntent(intent: Intent) {
-        if (intent.action == FeedLaunchContract.ACTION_OPEN) {
-            val openCatalog = intent.getBooleanExtra(FeedLaunchContract.EXTRA_CATALOG, false)
-            val profileId = intent.getStringExtra(FeedLaunchContract.EXTRA_PROFILE)
-                ?: browserController.activeProfileId.takeIf { openCatalog }
-            val profile = browserController.localBrowserProfiles.firstOrNull { it.id == profileId }
-            if (dev.sk2andy.materialbrowser.browser.ProfileProtectionSession.isAccessible(profile) &&
-                profileId != null &&
-                (profileId == browserController.activeProfileId || browserController.selectProfile(profileId))
-            ) {
-                if (browserController.selectedTab.isIncognito) {
-                    browserController.createTab(isIncognito = false)
-                }
-                browserController.cancelDeviceSearchNavigation()
-                browserController.dismissExternalLinkPreview()
-                browserController.leaveSiteCapsule()
-                rssReaderLaunchRequest = null
-                showIncomingBrowserNavigation()
-                openFeedQueue = intent.getBooleanExtra(FeedLaunchContract.EXTRA_QUEUE, false)
-                openFeedCatalog = openCatalog
-                openFeedArticleId = intent.getStringExtra(FeedLaunchContract.EXTRA_ARTICLE)
-                    ?.takeIf { it.length == 64 && it.all { char -> char in "0123456789abcdef" } }
-                openFeedsRequestId++
-            }
-            return
-        }
-        browserController.cancelDeviceSearchNavigation()
-        if (intent.action == RssFeedNotifier.ACTION_OPEN_ARTICLE ||
-            intent.action == RssReaderNavigation.ACTION_OPEN_FEEDS
-        ) {
-            val incomingArticleUrl = intent.getStringExtra(
-                RssFeedNotifier.EXTRA_ARTICLE_URL,
-            ) ?: intent.dataString
-            val articleUrl = if (intent.action ==
-                RssFeedNotifier.ACTION_OPEN_ARTICLE
-            ) {
-                RssFeedRules.safeHttpUrl(incomingArticleUrl)
-                    ?: return
-            } else {
-                null
-            }
-            browserController.dismissExternalLinkPreview()
-            browserController.leaveSiteCapsule()
-            showIncomingBrowserNavigation()
-            rssReaderLaunchRequest = RssReaderLaunchRequest(
-                id = ++rssReaderLaunchSequence,
-                articleUrl = articleUrl,
-            )
-            return
-        }
-        if (intent.action == DeviceSearchContract.ACTION_OPEN) {
-            browserController.openDeviceSearchItem(
-                intent.getStringExtra(DeviceSearchContract.EXTRA_ITEM_ID),
-                ::showIncomingBrowserNavigation,
-            )
-            return
-        }
         val previousExternalLaunchTabId = externalLaunchTabId
         externalLaunchTabId = null
-        browserController.incomingLinkRouter.clearReaderRequest()
         val incomingRequest = IncomingBrowserIntent.from(intent)
         if (incomingRequest == null) browserController.dismissExternalLinkPreview()
-        if (ProcessTextResearchIntentHandler.open(this, browserController, intent)) {
-            showIncomingBrowserNavigation()
-            return
-        }
-        if (siteWidgetIntentHandler.open(intent)) return
         if (launcherShortcutIntentHandler.open(intent)) return
         if (intent.action == SnoozeWakeNotifier.ACTION_OPEN_RESTORED_TAB) {
             intent.getStringExtra(SnoozeWakeNotifier.EXTRA_TAB_ID)?.let { tabId ->
                 browserController.openSnoozedWakeTab(tabId)
-            }
-            return
-        }
-        if (intent.action == CapsuleWindowLauncher.ACTION_OPEN_IN_BROWSER) {
-            val capsuleId = intent.getStringExtra(CapsuleIntentRules.EXTRA_CAPSULE_ID)
-            val targetUrl = intent.getStringExtra(CapsuleWindowLauncher.EXTRA_TARGET_URL)
-            if (capsuleId != null && targetUrl != null) {
-                browserController.openSiteCapsuleTargetInBrowser(capsuleId, targetUrl)
             }
             return
         }
@@ -1762,18 +1403,8 @@ open class MainActivity : AppCompatActivity() {
             )
         ) {
             is CapsuleLaunchResolution.Open -> {
-                if (capsuleWindowId == null &&
-                    CapsuleWindowRules.canOpen(resolution.capsule, browserController.profiles)
-                ) {
-                    startActivity(CapsuleWindowLauncher.intent(this, resolution.capsule))
-                } else {
-                    val targetUrl = intent.getStringExtra(CapsuleWindowLauncher.EXTRA_TARGET_URL)
-                    val opened = if (targetUrl != null) {
-                        browserController.openRoutedSiteCapsule(resolution.capsule.id, targetUrl)
-                    } else {
-                        browserController.openSiteCapsule(resolution.capsule.id)
-                    }
-                    if (!opened) browserController.openNormalHomeFromInvalidCapsule()
+                if (!browserController.openSiteCapsule(resolution.capsule.id)) {
+                    browserController.openNormalHomeFromInvalidCapsule()
                 }
                 return
             }
@@ -1791,14 +1422,6 @@ open class MainActivity : AppCompatActivity() {
             ) {
                 externalLaunchTabId = previousExternalLaunchTabId
                     ?.takeIf { it == browserController.selectedTabId }
-                showIncomingBrowserNavigation()
-                return
-            }
-            if (
-                request.kind == IncomingBrowserRequestKind.View &&
-                browserController.incomingLinkRouter.open(request.url)
-            ) {
-                externalLaunchTabId = browserController.selectedTabId
                 showIncomingBrowserNavigation()
                 return
             }
@@ -1952,14 +1575,6 @@ open class MainActivity : AppCompatActivity() {
         isBrowserHardwareInputAvailable() && browserController.requestSelectedBrowserEngineFocus()
 
     @VisibleForTesting
-    protected fun discardCapsuleWindowSession() {
-        if (::browserController.isInitialized) browserController.discardCapsuleWindowSession()
-    }
-
-    protected fun refreshCapsuleWindowFilterRules() {
-        if (::browserController.isInitialized) browserController.refreshCapsuleWindowFilterRules()
-    }
-
     fun browserControllerForTesting(): BrowserController = browserController
 
     @VisibleForTesting
@@ -2097,9 +1712,218 @@ open class MainActivity : AppCompatActivity() {
         if (requestedOrientation != orientation) requestedOrientation = orientation
     }
 
+    private fun launchMpvRx(
+        url: String,
+        audioUrl: String? = null,
+        title: String? = null,
+        referer: String? = null,
+        userAgent: String? = null,
+        headers: Map<String, String> = emptyMap(),
+        isDirectMedia: Boolean = false,
+        fallbackUrl: String? = null,
+    ): Boolean {
+        if (url.isBlank()) return false
+        val isYt = YouTubeStreamPreloader.isYouTubeUrl(url) || YouTubeStreamPreloader.isYouTubeUrl(fallbackUrl) ||
+            url.contains("googlevideo.com")
+        val cleanUrl = if (isYt) {
+            val vid = YouTubeStreamPreloader.extractVideoId(url) ?: YouTubeStreamPreloader.extractVideoId(fallbackUrl)
+            if (vid != null) "https://www.youtube.com/watch?v=$vid" else url
+        } else {
+            url
+        }
+        val isDirect = !isYt && isDirectMedia
+        val uri = Uri.parse(cleanUrl)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "video/*")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (isDirect) {
+                audioUrl?.takeIf { it.isNotBlank() }?.let { putExtra("audio_url", it) }
+            }
+            title?.takeIf { it.isNotBlank() }?.let { putExtra("title", it) }
+            val cleanFallback = fallbackUrl?.takeIf { it.isNotBlank() && it != cleanUrl } ?: cleanUrl
+            putExtra("fallback_url", cleanFallback)
+            val headerPairs = mutableListOf<String>()
+            headers.forEach { (k, v) ->
+                val lower = k.lowercase()
+                if (lower != "accept-encoding" && lower != "connection" && lower != "host" && lower != "content-length" && !lower.startsWith("sec-")) {
+                    headerPairs.add(k)
+                    headerPairs.add(v)
+                }
+            }
+            val ref = referer?.takeIf { it.isNotBlank() }
+                ?: headers.entries.firstOrNull { it.key.equals("Referer", ignoreCase = true) }?.value
+            if (ref?.isNotBlank() == true) {
+                if (!headers.keys.any { it.equals("Referer", ignoreCase = true) }) {
+                    headerPairs.add("Referer")
+                    headerPairs.add(ref)
+                }
+                putExtra("referer", ref)
+            }
+            val ua = userAgent?.takeIf { it.isNotBlank() }
+                ?: headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
+                ?: "Mozilla/5.0 (Android 15; Mobile; rv:157.0) Gecko/157.0 Firefox/157.0"
+            if (!headers.keys.any { it.equals("User-Agent", ignoreCase = true) }) {
+                headerPairs.add("User-Agent")
+                headerPairs.add(ua)
+            }
+            val hasOrigin = headers.keys.any { it.equals("Origin", ignoreCase = true) }
+            if (!hasOrigin && ref?.isNotBlank() == true) {
+                val origin = runCatching {
+                    val u = Uri.parse(ref)
+                    if (u.scheme != null && u.host != null) "${u.scheme}://${u.host}" else null
+                }.getOrNull()
+                if (origin != null) {
+                    headerPairs.add("Origin")
+                    headerPairs.add(origin)
+                }
+            }
+            putExtra("user_agent", ua)
+            putExtra("headers", headerPairs.toTypedArray())
+            putExtra("format_sort", "res,fps,br")
+            putExtra("ytdl_format", "bestvideo+bestaudio/best")
+            if (isDirect) {
+                putExtra("direct_media", true)
+                putExtra("ytdl", "no")
+            } else {
+                putExtra("direct_media", false)
+                putExtra("ytdl", "yes")
+            }
+        }
+        val pm = packageManager
+        val candidatePackages = listOf("app.myaioapp", packageName, "app.gyrolet.mpvrx.debug", "app.gyrolet.mpvrx")
+        val mpvPackage = candidatePackages.firstOrNull { pkg ->
+            runCatching { pm.getPackageInfo(pkg, 0) }.isSuccess
+        } ?: "app.myaioapp"
+
+        intent.component = ComponentName(mpvPackage, "app.gyrolet.mpvrx.ui.player.PlayerActivity")
+        val started = runCatching {
+            startActivity(intent)
+            true
+        }.getOrElse {
+            runCatching {
+                intent.component = null
+                intent.setPackage("app.myaioapp")
+                startActivity(intent)
+                true
+            }.getOrDefault(false)
+        }
+        if (started && ::browserController.isInitialized) {
+            browserController.stopWebVideoPlaybackForExternalPlayer()
+            browserController.exitSelectedWebContentFullscreen()
+        }
+        return started
+    }
+
+    private fun isKnownYtdlpSite(url: String): Boolean {
+        return YouTubeStreamPreloader.isCandidateVideoPage(url)
+    }
+
     private fun onWebContentFullscreenChanged(fullscreen: Boolean) {
         applyBrowserSystemUi()
-        if (!fullscreen) {
+        if (fullscreen && (if (::browserController.isInitialized) browserController.isVideoDetectionRedirectEnabled else true)) {
+            val streamPayload = MediaStreamDetectorBridge.activeStreamPayload.value
+            val currentTab = if (::browserController.isInitialized) browserController.selectedTab else null
+            val pageUrl = currentTab?.url.orEmpty()
+            val isYouTube = pageUrl.contains("youtube.com/") || pageUrl.contains("youtu.be/")
+
+            val preloaded = YouTubeStreamPreloader.preloadedStream.value
+            val mediaKey = YouTubeStreamPreloader.extractMediaKey(pageUrl)
+            if (preloaded != null && (preloaded.isDirectMedia || preloaded.videoId == mediaKey || preloaded.pageUrl == pageUrl || YouTubeStreamPreloader.isCandidateVideoPage(pageUrl))) {
+                val launched = YouTubeStreamPreloader.launchPreloadedStream(this, preloaded) {
+                    browserController.stopWebVideoPlaybackForExternalPlayer()
+                    browserController.exitSelectedWebContentFullscreen()
+                }
+                if (launched) return
+            }
+
+            // Fullscreen playback handoff:
+            // 1) YouTube -> Always use YouTube page URL so mpvRx yt-dlp extracts highest quality 4K/1080p.
+            // 2) Other sites -> Use intercepted direct media stream (.m3u8, .mpd, .mp4) if available.
+            val directStreamUrl = if (!isYouTube) {
+                streamPayload?.url?.takeIf {
+                    it.isNotBlank() && !it.startsWith("blob:") &&
+                        (it.startsWith("http://") || it.startsWith("https://")) &&
+                        !it.contains(".ts", ignoreCase = true) &&
+                        !it.contains(".m4s", ignoreCase = true)
+                } ?: browserController.systemMediaState?.sourceUrl?.takeIf {
+                    it.isNotBlank() && !it.startsWith("blob:") &&
+                        (it.startsWith("http://") || it.startsWith("https://")) &&
+                        !it.contains(".ts", ignoreCase = true) &&
+                        !it.contains(".m4s", ignoreCase = true)
+                }
+            } else null
+
+            val isMediaDirectUrl = pageUrl.endsWith(".mp4", ignoreCase = true) ||
+                pageUrl.endsWith(".m3u8", ignoreCase = true) ||
+                pageUrl.endsWith(".mpd", ignoreCase = true) ||
+                pageUrl.endsWith(".webm", ignoreCase = true) ||
+                pageUrl.endsWith(".mkv", ignoreCase = true)
+
+            // Fullscreen playback handoff:
+            // 1) YouTube -> Always use YouTube page URL (mpvRx yt-dlp plays highest quality 4K/1080p).
+            // 2) Direct stream detected (.m3u8, .mpd, .mp4) -> Open directly in mpvRx, with pageUrl fallback.
+            // 3) Page itself is a direct media URL -> Open directly in mpvRx.
+            // 4) Known yt-dlp supported extractor sites -> Send pageUrl to mpvRx.
+            // 5) Other sites without direct stream -> Do NOT blindly send webpage URL to mpvRx!
+            val (videoUrl, isDirectMedia, fallbackUrl) = when {
+                isYouTube -> Triple(pageUrl, false, null)
+                directStreamUrl != null -> Triple(directStreamUrl, true, pageUrl.takeIf { it.isNotBlank() })
+                isMediaDirectUrl -> Triple(pageUrl, true, null)
+                isKnownYtdlpSite(pageUrl) -> Triple(pageUrl, false, null)
+                else -> Triple(null, false, null)
+            }
+
+            if (videoUrl != null) {
+                val videoTitle = streamPayload?.title ?: currentTab?.title
+                val referer = streamPayload?.referer ?: pageUrl
+                val userAgent = streamPayload?.userAgent
+                val headers = streamPayload?.headers ?: emptyMap()
+                val launched = launchMpvRx(
+                    url = videoUrl,
+                    title = videoTitle,
+                    referer = referer,
+                    userAgent = userAgent,
+                    headers = headers,
+                    isDirectMedia = isDirectMedia,
+                    fallbackUrl = fallbackUrl,
+                )
+                if (launched) {
+                    browserController.stopWebVideoPlaybackForExternalPlayer()
+                    browserController.exitSelectedWebContentFullscreen()
+                }
+            } else if (!isYouTube && !isKnownYtdlpSite(pageUrl)) {
+                // If the stream request was still in-flight when fullscreen was clicked, probe after 400ms
+                window.decorView.postDelayed({
+                    if (activityDestroyed) return@postDelayed
+                    val delayedPayload = MediaStreamDetectorBridge.activeStreamPayload.value
+                    val delayedUrl = delayedPayload?.url?.takeIf {
+                        it.isNotBlank() && !it.startsWith("blob:") &&
+                            (it.startsWith("http://") || it.startsWith("https://")) &&
+                            !it.contains(".ts", ignoreCase = true) &&
+                            !it.contains(".m4s", ignoreCase = true)
+                    }
+                    if (delayedUrl != null) {
+                        val videoTitle = delayedPayload.title ?: currentTab?.title
+                        val referer = delayedPayload.referer ?: pageUrl
+                        val userAgent = delayedPayload.userAgent
+                        val headers = delayedPayload.headers
+                        val launched = launchMpvRx(
+                            url = delayedUrl,
+                            title = videoTitle,
+                            referer = referer,
+                            userAgent = userAgent,
+                            headers = headers,
+                            isDirectMedia = true,
+                            fallbackUrl = pageUrl.takeIf { it.isNotBlank() },
+                        )
+                        if (launched) {
+                            browserController.stopWebVideoPlaybackForExternalPlayer()
+                            browserController.exitSelectedWebContentFullscreen()
+                        }
+                    }
+                }, 400)
+            }
+        } else {
             window.decorView.postOnAnimation {
                 if (!activityDestroyed) applyBrowserSystemUi()
             }

@@ -11,14 +11,13 @@ internal data class AppDataArchiveManifest(
     val webViewVersion: String?,
     val sdkInt: Int,
     val exportedAtEpochMillis: Long,
-    val websiteState: AppDataArchiveWebsiteState = AppDataArchiveWebsiteState.EngineStateIncluded,
+    val websiteState: AppDataArchiveWebsiteState = AppDataArchiveWebsiteState.CandyOwnedOnly,
 )
 
 /** Archive contract for browser-engine bytes; Candy-owned records stay portable across engines. */
 internal enum class AppDataArchiveWebsiteState {
     CandyOwnedOnly,
     LegacyWebsiteStateExcluded,
-    EngineStateIncluded,
 }
 
 internal data class AppDataArchiveEnvironment(
@@ -38,8 +37,7 @@ internal enum class AppDataArchiveCompatibility {
 
 internal object AppDataArchiveRules {
     const val TRANSFER_STATE_DIRECTORY_NAME = "app_data_transfer"
-    const val FORMAT_VERSION = 3
-    const val PREVIOUS_FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 2
     const val LEGACY_FORMAT_VERSION = 1
     const val MANIFEST_ENTRY_NAME = "manifest.json"
     const val DATA_ENTRY_PREFIX = "data/"
@@ -63,46 +61,15 @@ internal object AppDataArchiveRules {
         name.isNotEmpty() && name !in excludedTopLevelNames
 
     fun shouldExportRelativePath(path: String): Boolean =
-        isAllowedArchiveRelativePath(path) &&
-            (!isEngineSpecificWebsiteState(path) || isSupportedEngineDataPath(path))
-
-    /** Includes regular Gecko/WebView profiles and tab snapshots; guest WebView stays local. */
-    fun isSupportedEngineDataPath(path: String): Boolean =
-        path == "files/mozilla" || path.startsWith("files/mozilla/") ||
-            path == "app_webview" || path.startsWith("app_webview/") ||
-            path == "no_backup/tab_webview_states" ||
-            path.startsWith("no_backup/tab_webview_states/") ||
-            path == "no_backup/gecko_session_states" ||
-            path.startsWith("no_backup/gecko_session_states/")
+        isAllowedArchiveRelativePath(path) && !isEngineSpecificWebsiteState(path)
 
     fun isAllowedArchiveRelativePath(path: String): Boolean =
-        path != GUEST_BUBBLE_SESSION_RELATIVE_PATH &&
-            !path.startsWith("$GUEST_BUBBLE_SESSION_RELATIVE_PATH/") &&
-        path != "no_backup/web_annotations.json" &&
-            path != "no_backup/web_annotations.json.bak" &&
-            path != "no_backup/web_annotations.json.new" &&
-            path != GUEST_BUBBLE_SESSION_RELATIVE_PATH &&
-            !path.startsWith("$GUEST_BUBBLE_SESSION_RELATIVE_PATH/") &&
-            path != "no_backup/candy_constellations.db" &&
-            !path.startsWith("no_backup/candy_constellations.db-") &&
-            path != "no_backup/constellation_model" &&
-            !path.startsWith("no_backup/constellation_model/") &&
-            path != "no_backup/form_drafts" &&
-            !path.startsWith("no_backup/form_drafts/") &&
-            path != RECALL_DATABASE_RELATIVE_PATH &&
+        path != RECALL_DATABASE_RELATIVE_PATH &&
             !path.startsWith("$RECALL_DATABASE_RELATIVE_PATH-") &&
             path != APP_LOGS_RELATIVE_PATH &&
             !path.startsWith("$APP_LOGS_RELATIVE_PATH/") &&
             path != GECKO_LOGS_RELATIVE_PATH &&
             !path.startsWith("$GECKO_LOGS_RELATIVE_PATH/") &&
-            path != SITE_WIDGET_SNAPSHOTS_RELATIVE_PATH &&
-            !path.startsWith("$SITE_WIDGET_SNAPSHOTS_RELATIVE_PATH/") &&
-            path != DOWNLOAD_DOCUMENT_SOURCES_RELATIVE_PATH &&
-            path != "$DOWNLOAD_DOCUMENT_SOURCES_RELATIVE_PATH.bak" &&
-            path != SYNC_VAULT_RELATIVE_PATH &&
-            path != "$SYNC_VAULT_RELATIVE_PATH.bak" &&
-            path != SYNC_CACHE_RELATIVE_PATH &&
-            path != "$SYNC_CACHE_RELATIVE_PATH.bak" &&
             path != APP_LOG_CAPTURE_RELATIVE_PATH &&
             path != "$APP_LOG_CAPTURE_RELATIVE_PATH.bak"
 
@@ -125,10 +92,9 @@ internal object AppDataArchiveRules {
         formatVersion: Int,
         entries: List<AppDataArchiveEntry>,
     ): AppDataArchiveWebsiteState = when {
-        formatVersion < FORMAT_VERSION && entries.any { entry ->
+        formatVersion == LEGACY_FORMAT_VERSION && entries.any { entry ->
             isEngineSpecificWebsiteState(entry.relativePath)
         } -> AppDataArchiveWebsiteState.LegacyWebsiteStateExcluded
-        formatVersion >= FORMAT_VERSION -> AppDataArchiveWebsiteState.EngineStateIncluded
         else -> AppDataArchiveWebsiteState.CandyOwnedOnly
     }
 
@@ -188,7 +154,7 @@ internal object AppDataArchiveRules {
         current.packageName != archive.packageName ||
             current.appVersionName != archive.appVersionName ||
             current.appVersionCode != archive.appVersionCode -> AppDataArchiveCompatibility.AppMismatch
-        archive.websiteState == AppDataArchiveWebsiteState.EngineStateIncluded &&
+        archive.websiteState != AppDataArchiveWebsiteState.CandyOwnedOnly &&
             current.webViewVersion != archive.webViewVersion ->
             AppDataArchiveCompatibility.BrowserEngineMismatch
         current.sdkInt != archive.sdkInt -> AppDataArchiveCompatibility.PlatformMismatch
@@ -197,12 +163,7 @@ internal object AppDataArchiveRules {
 
     private val WINDOWS_ABSOLUTE_PATH_PATTERN = Regex("[A-Za-z]:($|/.*)")
     private const val RECALL_DATABASE_RELATIVE_PATH = "no_backup/candy_recall.db"
-    private const val GUEST_BUBBLE_SESSION_RELATIVE_PATH = "no_backup/guest_bubble"
     private const val APP_LOGS_RELATIVE_PATH = "no_backup/app_logs"
     private const val GECKO_LOGS_RELATIVE_PATH = "no_backup/gecko_logs"
-    private const val SITE_WIDGET_SNAPSHOTS_RELATIVE_PATH = "no_backup/site_widget_snapshots_v1"
-    private const val DOWNLOAD_DOCUMENT_SOURCES_RELATIVE_PATH = "no_backup/download_document_sources_v1.json"
-    private const val SYNC_VAULT_RELATIVE_PATH = "no_backup/candy_sync_vault_v1"
-    private const val SYNC_CACHE_RELATIVE_PATH = "no_backup/candy_sync_cache_v1"
     private const val APP_LOG_CAPTURE_RELATIVE_PATH = "shared_prefs/app_logging_capture.xml"
 }

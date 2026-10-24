@@ -29,6 +29,7 @@ class BrowserMainMenuIconRulesTest {
                 R.drawable.ic_symbol_vertical_scroll,
             BrowserFeatureMenuAction.ToggleForcePageZooming to R.drawable.ic_symbol_zoom_in,
             BrowserFeatureMenuAction.ToggleForceSafeArea to R.drawable.ic_symbol_fit_screen,
+            BrowserFeatureMenuAction.ToggleAllAdBlockers to R.drawable.ic_symbol_shield,
             BrowserFeatureMenuAction.ToggleAlwaysBlockPopups to R.drawable.ic_symbol_block,
             BrowserFeatureMenuAction.ToggleDesktopView to R.drawable.ic_symbol_desktop,
         )

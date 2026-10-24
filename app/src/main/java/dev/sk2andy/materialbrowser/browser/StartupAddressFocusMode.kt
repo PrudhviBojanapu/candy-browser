@@ -7,7 +7,7 @@ enum class StartupAddressFocusMode(val stableId: String) {
     ;
 
     companion object {
-        val Default = WhenStartupAnimationDisabled
+        val Default = Never
 
         fun fromStableId(value: String?): StartupAddressFocusMode =
             entries.firstOrNull { mode -> mode.stableId == value } ?: Default

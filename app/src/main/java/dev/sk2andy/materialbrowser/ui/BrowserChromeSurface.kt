@@ -131,6 +131,31 @@ internal object AndroidCandyChromeSurfaceRenderer : CandyChromeSurfaceRenderer {
         backdropBlurEnabled: Boolean,
         content: @Composable () -> Unit,
     ) {
+        render(
+            backdropSource = backdropSource,
+            tokens = tokens,
+            modifier = modifier,
+            shape = shape,
+            blurCornerRadius = blurCornerRadius,
+            containerColor = containerColor,
+            backdropBlurEnabled = backdropBlurEnabled,
+            autoUpdateBlur = true,
+            content = content,
+        )
+    }
+
+    @Composable
+    override fun render(
+        backdropSource: CandyChromeBackdropSource?,
+        tokens: BrowserChromeSurfaceTokens,
+        modifier: Modifier,
+        shape: Shape,
+        blurCornerRadius: Dp,
+        containerColor: Color,
+        backdropBlurEnabled: Boolean,
+        autoUpdateBlur: Boolean,
+        content: @Composable () -> Unit,
+    ) {
         val blurTarget = (backdropSource as? AndroidCandyChromeBackdropSource)?.blurTarget
         val requestsBackdropBlur = tokens.treatment == CandyChromeTreatment.Backdrop && backdropBlurEnabled
         TraceChromeBlurConfiguration(requestsBackdropBlur)
@@ -173,6 +198,10 @@ internal object AndroidCandyChromeSurfaceRenderer : CandyChromeSurfaceRenderer {
                                     cornerRadiusPx = blurCornerRadiusPx,
                                     overlayColor = containerColor.toArgb(),
                                 )
+                                blurView.setBlurAutoUpdate(autoUpdateBlur)
+                                if (autoUpdateBlur) {
+                                    blurView.invalidate()
+                                }
                             },
                             onRelease = { blurView ->
                                 BrowserPerformanceTrace.section(

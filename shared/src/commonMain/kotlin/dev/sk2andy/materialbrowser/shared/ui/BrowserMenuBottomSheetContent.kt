@@ -1,5 +1,6 @@
 package dev.sk2andy.materialbrowser.shared.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,11 +22,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,9 +63,6 @@ fun BrowserMenuBottomSheetContent(
     quickActionsTitle: String,
     pageActionsTitle: String,
     pageControlsTitle: String,
-    emptySectionMessage: String,
-    emptySectionActionLabel: String,
-    onOpenMenuSettings: () -> Unit,
     handleDescription: String,
     addressBar: @Composable () -> Unit,
     onCommand: (BrowserFeatureMenuItem) -> Unit,
@@ -79,17 +75,8 @@ fun BrowserMenuBottomSheetContent(
     addressBarHorizontalPadding: Dp = 16.dp,
     toolbarEntries: List<BrowserMenuEntry?> = BrowserMenuBottomSheetToolbarRules.DefaultEntries,
     extensionContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit = {},
-    customShortcutSlots: Map<Int, BrowserCustomAction?> = emptyMap(),
-    customFooterSlots: Map<Int, BrowserCustomAction?> = emptyMap(),
-    onCustomAction: (String) -> Unit = {},
-    customContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit = {},
 ) {
     val sections = BrowserMenuBottomSheetRules.sections(items, toolbarEntries)
-    val primaryActions = sections.pageActions.filterNot {
-        it.section == BrowserFeatureMenuSection.Reading || it.section == BrowserFeatureMenuSection.Toppings
-    }
-    val readingActions = sections.pageActions.filter { it.section == BrowserFeatureMenuSection.Reading }
-    val workflows = sections.pageActions.filter { it.section == BrowserFeatureMenuSection.Toppings }
     val scrollState = rememberScrollState()
     val pagerState = rememberPagerState { 2 }
     val scope = rememberCoroutineScope()
@@ -110,7 +97,14 @@ fun BrowserMenuBottomSheetContent(
                 .testTag(BrowserMenuBottomSheetTestTags.Handle),
             contentAlignment = Alignment.Center,
         ) {
-            CandySheetDragIndicator()
+            Box(
+                Modifier
+                    .size(36.dp, 4.dp)
+                    .background(
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        CircleShape,
+                    ),
+            )
         }
         Box(
             modifier = Modifier
@@ -120,7 +114,7 @@ fun BrowserMenuBottomSheetContent(
         ) {
             addressBar()
         }
-        if (sections.shortcuts.isNotEmpty() || customShortcutSlots.isNotEmpty()) {
+        if (sections.shortcuts.isNotEmpty()) {
             Column(
                 Modifier
                     .then(fadingContent)
@@ -129,34 +123,9 @@ fun BrowserMenuBottomSheetContent(
                     .testTag(BrowserMenuBottomSheetTestTags.Shortcuts),
             ) {
                 if (!compactHeight) SheetSectionTitle(quickActionsTitle)
-                Row(
-                    Modifier.fillMaxWidth()
-                        .heightIn(min = if (compactHeight) 48.dp else 80.dp)
-                        .height(IntrinsicSize.Min),
-                ) {
-                    sections.shortcutSlots.forEachIndexed { index, item ->
-                        if (customShortcutSlots.containsKey(index)) {
-                            val action = customShortcutSlots[index]
-                            if (action == null) {
-                                Spacer(Modifier.weight(1f))
-                            } else {
-                                BrowserMenuToolbarAction(
-                                    label = action.label,
-                                    icon = { Icon(action.icon, null, Modifier.size(24.dp)) },
-                                    onClick = { onCustomAction(action.id) },
-                                    enabled = action.enabled,
-                                    accessibilityLabel = action.label,
-                                    showLabel = !compactHeight,
-                                    minHeight = if (compactHeight) 48.dp else 80.dp,
-                                    shape = CircleShape,
-                                    containerColor = effects.containerColor(
-                                        MaterialTheme.colorScheme.surfaceContainerLowest,
-                                    ),
-                                    modifier = Modifier.weight(1f).fillMaxHeight()
-                                        .testTag("custom_workflow_shortcut:$index"),
-                                )
-                            }
-                        } else if (item == null) {
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                    sections.shortcutSlots.forEach { item ->
+                        if (item == null) {
                             Spacer(Modifier.weight(1f))
                         } else if (compactHeight) {
                             BrowserMenuToolbarAction(
@@ -240,23 +209,12 @@ fun BrowserMenuBottomSheetContent(
                         ),
                 ) {
                     if (page == 0) {
-                        if (primaryActions.isEmpty()) {
-                            EmptyMenuSection(emptySectionMessage, emptySectionActionLabel, onOpenMenuSettings)
-                        } else {
-                            SheetActionGroups(
-                                primaryActions, resources, effects, snoozedTabCount, onCommand, onToggle,
-                            )
-                        }
+                        SheetActionGroups(
+                            sections.pageActions, resources, effects, snoozedTabCount, onCommand, onToggle,
+                        )
                         extensionContent(onExtensionCommit)
-                        SheetActionGroups(readingActions, resources, effects, snoozedTabCount, onCommand, onToggle)
-                        customContent(onExtensionCommit)
-                        BrowserMainMenuWorkflows(workflows, resources, effects, snoozedTabCount, onCommand, onToggle)
                     } else {
-                        if (sections.pageControls.isEmpty()) {
-                            EmptyMenuSection(emptySectionMessage, emptySectionActionLabel, onOpenMenuSettings)
-                        } else {
-                            SheetControlGrid(sections.pageControls, resources, effects, onToggle)
-                        }
+                        SheetControlGrid(sections.pageControls, resources, effects, onToggle)
                     }
                 }
             }
@@ -270,35 +228,21 @@ fun BrowserMenuBottomSheetContent(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .testTag(BrowserMenuBottomSheetTestTags.Content),
             ) {
-                val bothPageSectionsEmpty =
-                    primaryActions.isEmpty() && sections.pageControls.isEmpty()
-                if (bothPageSectionsEmpty) {
-                    EmptyMenuSection(emptySectionMessage, emptySectionActionLabel, onOpenMenuSettings)
-                } else if (primaryActions.isEmpty()) {
-                    EmptyMenuSection(emptySectionMessage, emptySectionActionLabel, onOpenMenuSettings)
-                } else {
+                if (sections.pageActions.isNotEmpty()) {
                     SheetSectionTitle(pageActionsTitle)
                     SheetActionGroups(
-                        primaryActions, resources, effects, snoozedTabCount, onCommand, onToggle,
+                        sections.pageActions, resources, effects, snoozedTabCount, onCommand, onToggle,
                     )
                 }
                 extensionContent(onExtensionCommit)
-                if (!bothPageSectionsEmpty) {
-                    if (sections.pageControls.isNotEmpty()) {
-                        Spacer(Modifier.height(16.dp))
-                        SheetSectionTitle(pageControlsTitle)
-                        SheetControlGrid(sections.pageControls, resources, effects, onToggle)
-                    } else {
-                        Spacer(Modifier.height(16.dp))
-                        EmptyMenuSection(emptySectionMessage, emptySectionActionLabel, onOpenMenuSettings)
-                    }
+                if (sections.pageControls.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    SheetSectionTitle(pageControlsTitle)
+                    SheetControlGrid(sections.pageControls, resources, effects, onToggle)
                 }
-                SheetActionGroups(readingActions, resources, effects, snoozedTabCount, onCommand, onToggle)
-                customContent(onExtensionCommit)
-                BrowserMainMenuWorkflows(workflows, resources, effects, snoozedTabCount, onCommand, onToggle)
             }
         }
-        if (sections.footer.isNotEmpty() || customFooterSlots.isNotEmpty()) {
+        if (sections.footer.isNotEmpty()) {
             Box(
                 Modifier
                     .then(fadingContent)
@@ -307,16 +251,9 @@ fun BrowserMenuBottomSheetContent(
                     .testTag(BrowserMenuBottomSheetTestTags.Footer),
             ) {
                 Row(Modifier.fillMaxWidth().testTag(BrowserMainMenuTestTags.Toolbar)) {
-                    sections.footerSlots.forEachIndexed { index, item ->
+                    sections.footerSlots.forEach { item ->
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            if (customFooterSlots.containsKey(index)) {
-                                BrowserCustomActionButton(
-                                    action = customFooterSlots[index],
-                                    onAction = onCustomAction,
-                                    modifier = Modifier.size(effects.style.toolbarButtonSize)
-                                        .testTag("custom_workflow_footer:$index"),
-                                )
-                            } else if (item != null) {
+                            if (item != null) {
                                 BrowserMainMenuToolbarItem(
                                     item = item,
                                     resources = resources,
@@ -337,22 +274,6 @@ fun BrowserMenuBottomSheetContent(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyMenuSection(
-    message: String,
-    actionLabel: String,
-    onOpenSettings: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        TextButton(onClick = onOpenSettings) { Text(actionLabel) }
     }
 }
 
@@ -486,7 +407,7 @@ private fun SheetControlGrid(
                         ),
                         contentColor = when {
                             !item.enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                            item.checked == true -> effects.selectedToggleContentColor()
+                            item.checked == true -> MaterialTheme.colorScheme.onSecondary
                             else -> MaterialTheme.colorScheme.onSurface
                         },
                     ) {

@@ -5,7 +5,6 @@ data class ReaderStudioSession(
     val sourceUrl: String,
     val isPrivate: Boolean,
     val requestId: Int,
-    val sourceProfileId: String? = null,
 )
 
 object ReaderStudioSessionRules {
