@@ -3,20 +3,14 @@ package dev.sk2andy.materialbrowser.ui
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -117,7 +111,6 @@ class BrowserRootBackInstrumentedTest {
     @Test
     fun tabOverviewRequestsPortraitUntilClosed() {
         val browserController = createController()
-        browserController.createTab()
         val portraitLocked = AtomicBoolean(false)
         setBrowserContent(
             browserController = browserController,
@@ -143,37 +136,8 @@ class BrowserRootBackInstrumentedTest {
     }
 
     @Test
-    fun readerEdgeActionOpensHomeOverTabOverviewAndBackReturnsToOverview() {
-        val browserController = createController()
-        browserController.createTab()
-        setBrowserContent(browserController)
-
-        composeRule.activityRule.scenario.onActivity { activity ->
-            activity.onBackPressedDispatcher.onBackPressed()
-        }
-        composeRule.onNodeWithTag(TabOverviewChromeTestTags.Root).assertExists()
-        composeRule.onNodeWithTag(TabOverviewChromeTestTags.ReaderStudio)
-            .assertIsDisplayed()
-            .performClick()
-
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.reader_home_title),
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(TabOverviewChromeTestTags.Root).assertExists()
-
-        composeRule.activityRule.scenario.onActivity { activity ->
-            activity.onBackPressedDispatcher.onBackPressed()
-        }
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.reader_home_title),
-        ).assertDoesNotExist()
-        composeRule.onNodeWithTag(TabOverviewChromeTestTags.Root).assertExists()
-    }
-
-    @Test
     fun frostedTabOverviewKeepsClearSystemBarSpacing() {
         val browserController = createController()
-        browserController.createTab()
         val surfaceStyle = mutableStateOf(BrowserSurfaceStyle.Clear)
         val safeInsets = AtomicReference<Insets?>()
         val windowHeight = AtomicInteger()
@@ -193,7 +157,6 @@ class BrowserRootBackInstrumentedTest {
                 BrowserScreen(controller = browserController)
             }
         }
-        composeRule.waitForIdle()
 
         composeRule.activityRule.scenario.onActivity { activity ->
             activity.onBackPressedDispatcher.onBackPressed()
@@ -246,38 +209,8 @@ class BrowserRootBackInstrumentedTest {
     }
 
     @Test
-    fun settingsFeedDiscoveryReturnsToRssSettingsForToolbarAndSystemBack() {
-        val browserController = createController()
-        browserController.createTab()
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val restoration = StateRestorationTester(composeRule)
-        setBrowserContent(browserController, restoration = restoration)
-        composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
-        composeRule.onNodeWithTag(TabOverviewChromeTestTags.Settings).performClick()
-        composeRule
-            .onNode(hasText(context.getString(R.string.rss_settings_title)) and hasClickAction())
-            .performScrollTo()
-            .performClick()
-        repeat(2) { attempt ->
-            composeRule.onNodeWithTag("rss_settings_discover").performScrollTo().performClick()
-            composeRule.onNodeWithTag("feed_catalog_screen").assertIsDisplayed()
-            if (attempt == 0) {
-                composeRule.onNodeWithTag("feed_catalog_back").performClick()
-            } else {
-                restoration.emulateSavedInstanceStateRestore()
-                composeRule.onNodeWithTag("feed_catalog_screen").assertIsDisplayed()
-                composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
-            }
-            composeRule.onNodeWithTag("feed_catalog_screen").assertDoesNotExist()
-            composeRule.onNodeWithTag("rss_settings_discover").assertIsDisplayed()
-            composeRule.onNodeWithText(context.getString(R.string.rss_refresh_interval)).assertExists()
-        }
-    }
-
-    @Test
     fun settingsFromOverviewReturnsToOverviewOnBack() {
         val browserController = createController()
-        browserController.createTab()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         setBrowserContent(browserController)
 
@@ -292,10 +225,9 @@ class BrowserRootBackInstrumentedTest {
         composeRule.onRoot().performTouchInput { click(settingsBounds.center) }
         composeRule.onNodeWithText(context.getString(R.string.settings_title)).assertIsDisplayed()
         composeRule
-            .onNode(hasText(context.getString(R.string.settings_home_tabs_title)) and hasClickAction())
-            .performScrollTo()
+            .onNodeWithText(context.getString(R.string.settings_tabs_gestures_title))
             .performTouchInput { click(center) }
-        composeRule.onNodeWithTag(TabSettingsTestTags.StackFolderMode).assertExists()
+        composeRule.onNodeWithTag(TabSettingsTestTags.ResidentTabLimit).assertExists()
 
         composeRule.activityRule.scenario.onActivity { activity ->
             activity.onBackPressedDispatcher.onBackPressed()
@@ -315,7 +247,6 @@ class BrowserRootBackInstrumentedTest {
     @Test
     fun incomingBrowserNavigationOpensNewTabAndClosesOverview() {
         val browserController = createController()
-        browserController.createTab()
         setBrowserContent(browserController)
 
         composeRule.activityRule.scenario.onActivity { activity ->
@@ -359,9 +290,8 @@ class BrowserRootBackInstrumentedTest {
         externalLaunchTabId: String? = null,
         onReturnToExternalApp: () -> Unit = {},
         onTabOverviewPortraitLockChanged: (Boolean) -> Unit = {},
-        restoration: StateRestorationTester? = null,
     ) {
-        val content: @Composable () -> Unit = {
+        composeRule.setContent {
             MaterialBrowserTheme {
                 BrowserScreen(
                     controller = browserController,
@@ -373,7 +303,6 @@ class BrowserRootBackInstrumentedTest {
                 )
             }
         }
-        if (restoration != null) restoration.setContent(content) else composeRule.setContent(content)
         composeRule.waitForIdle()
     }
 

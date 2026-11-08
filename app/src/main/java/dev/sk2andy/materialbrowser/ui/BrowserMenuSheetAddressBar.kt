@@ -1,10 +1,8 @@
 package dev.sk2andy.materialbrowser.ui
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -21,8 +19,6 @@ import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.SiteConnectionKind
 import dev.sk2andy.materialbrowser.data.AddressBarActionLayout
 import dev.sk2andy.materialbrowser.shared.ui.AddressBarFieldContent
-import dev.sk2andy.materialbrowser.shared.ui.BrowserCustomAction
-import dev.sk2andy.materialbrowser.shared.ui.BrowserCustomActionButton
 import dev.sk2andy.materialbrowser.ui.theme.BrowserChromeSurfaceRole
 import dev.sk2andy.materialbrowser.ui.theme.browserChromeSurfaceTokens
 
@@ -47,13 +43,9 @@ internal fun BrowserMenuSheetAddressBar(
     onAddress: () -> Unit,
     onDismissRequest: () -> Unit,
     connectionContent: @Composable () -> Unit,
-    customSlots: Map<Int, BrowserCustomAction?> = emptyMap(),
-    reservedSlots: Int = 0,
-    onCustomAction: (String) -> Unit = {},
 ) {
     val tokens = browserChromeSurfaceTokens(BrowserChromeSurfaceRole.AddressBar)
     val callbacks = actionCallbacks.committingWith(commit)
-    val slots = CustomWorkflowAddressSlotRules.slots(actionLayout, customSlots.keys, reservedSlots)
     Surface(
         shape = RoundedCornerShape(tokens.cornerRadius),
         color = tokens.fieldContainerColor,
@@ -63,14 +55,8 @@ internal fun BrowserMenuSheetAddressBar(
             modifier = Modifier.fillMaxWidth().padding(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            slots.beforeAddress.forEach { slot ->
-                if (slot.overridden) {
-                    BrowserCustomActionButton(customSlots[slot.index], { id -> commit { onCustomAction(id) } })
-                } else if (slot.builtinAction != null) {
-                    AddressBarActionButton(slot.builtinAction, actionState, callbacks)
-                } else {
-                    Box(Modifier.size(48.dp))
-                }
+            actionLayout.beforeAddress.forEach { action ->
+                AddressBarActionButton(action, actionState, callbacks)
             }
             AddressBarFieldContent(
                 editing = false,
@@ -92,14 +78,8 @@ internal fun BrowserMenuSheetAddressBar(
                 secondaryContentColor = tokens.fieldSecondaryContentColor,
                 cursorColor = tokens.accentColor,
             )
-            slots.afterAddress.forEach { slot ->
-                if (slot.overridden) {
-                    BrowserCustomActionButton(customSlots[slot.index], { id -> commit { onCustomAction(id) } })
-                } else if (slot.builtinAction != null) {
-                    AddressBarActionButton(slot.builtinAction, actionState, callbacks)
-                } else {
-                    Box(Modifier.size(48.dp))
-                }
+            actionLayout.afterAddress.forEach { action ->
+                AddressBarActionButton(action, actionState, callbacks)
             }
             IconButton(onClick = onDismissRequest) {
                 Icon(

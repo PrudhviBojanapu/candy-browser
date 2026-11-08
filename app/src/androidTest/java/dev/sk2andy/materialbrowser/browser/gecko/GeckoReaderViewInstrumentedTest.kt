@@ -5,7 +5,6 @@ import android.view.View
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.sk2andy.materialbrowser.browser.engine.BrowserEngineContentKind
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionParser
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionResult
 import java.net.InetAddress
@@ -16,7 +15,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,54 +36,11 @@ class GeckoReaderViewInstrumentedTest {
         assertTrue(background.contains("{ frameId: 0 }"))
         assertTrue(background.contains("policy.revision !== message.revision"))
         assertTrue(background.contains("Number.isSafeInteger(message.requestId)"))
-        assertTrue(content.contains("self === top && message.type === \"reader-extract\""))
+        assertTrue(content.contains("self !== top"))
         assertTrue(content.contains("content, 500"))
         assertTrue(content.contains("content, 200"))
         assertTrue(content.contains("textContent, 300"))
         assertTrue(content.contains("slice(0, 2048)"))
-    }
-
-    @Test
-    fun savedHighlightAndInlineTranslationUseDocumentBoundGeckoBridge() {
-        withLoadedSession(isPrivate = false, profileSuffix = "annotations") { session, server ->
-            InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                session.bindToppingSession("annotations", BrowserEngineContentKind.RegularTab)
-            }
-            fun apply(payload: JSONObject): Boolean {
-                val finished = CountDownLatch(1)
-                val result = AtomicReference(false)
-                InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                    session.executeWebTextOperation(payload.toString()) {
-                        result.set(it)
-                        finished.countDown()
-                    }
-                }
-                assertTrue("Web text operation did not complete", finished.await(10, TimeUnit.SECONDS))
-                return result.get()
-            }
-            val quote = "Readable article text from GeckoView with enough detail to pass the bounded Reader Studio extraction contract."
-            assertTrue(apply(JSONObject().put("operation", "highlights").put("url", server.url)
-                .put("annotations", org.json.JSONArray().put(JSONObject().put("id", "saved-quote").put("quote", quote)))))
-            assertTrue(apply(JSONObject().put("operation", "scroll-to-annotation").put("url", server.url)
-                .put("id", "saved-quote").put("quote", quote)))
-            assertTrue(!apply(JSONObject().put("operation", "scroll-to-annotation").put("url", server.url)
-                .put("id", "missing").put("quote", "Changed quote")))
-            assertTrue(!apply(JSONObject().put("operation", "translate").put("url", server.url)
-                .put("original", "Private draft must disappear").put("replacement", "Changed")))
-            assertTrue(apply(JSONObject().put("operation", "translate").put("url", server.url)
-                .put("original", quote).put("replacement", "Translated article text from GeckoView remains readable and can be switched back to the original quotation.")))
-            val finished = CountDownLatch(1)
-            val extracted = AtomicReference<String?>()
-            InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                session.extractPageText {
-                    extracted.set(it)
-                    finished.countDown()
-                }
-            }
-            assertTrue(finished.await(10, TimeUnit.SECONDS))
-            assertTrue(JSONObject(requireNotNull(extracted.get())).getString("text")
-                .contains("Translated article text from GeckoView"))
-        }
     }
 
     @Test
@@ -132,55 +87,6 @@ class GeckoReaderViewInstrumentedTest {
                 ReaderExtractionParser.parseJson(secondResult.get()) is
                     ReaderExtractionResult.Success,
             )
-        }
-    }
-
-    @Test
-    fun visiblePageTextExtractsRawBoundedJsonWithoutNavigationOrFormContent() {
-        withLoadedSession(isPrivate = false, profileSuffix = "page-text") { session, server ->
-            val finished = CountDownLatch(1)
-            val result = AtomicReference<String?>()
-            InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                session.bindToppingSession("page-text", BrowserEngineContentKind.RegularTab)
-                session.extractPageText {
-                    result.set(it)
-                    finished.countDown()
-                }
-            }
-            assertTrue("Visible page text did not finish", finished.await(20, TimeUnit.SECONDS))
-            val payload = JSONObject(requireNotNull(result.get()))
-            assertEquals(server.url, payload.getString("sourceUrl"))
-            assertEquals("Gecko Reader Story", payload.getString("title"))
-            assertTrue(payload.getString("text").contains("Readable article text"))
-            assertTrue(!payload.getString("text").contains("Navigation must disappear"))
-            assertTrue(!payload.getString("text").contains("Private draft must disappear"))
-            assertTrue(!payload.getString("text").contains("Hidden ancestor must disappear"))
-            assertTrue(!payload.getString("text").contains("Hidden content must disappear"))
-            assertTrue(!payload.getString("text").contains("Editable descendant must disappear"))
-            assertTrue(payload.getString("text").length <= 64_000)
-        }
-    }
-
-    @Test
-    fun visiblePageTextRejectsPrivateAndPreviewSessions() {
-        for ((isPrivate, kind) in listOf(
-            true to BrowserEngineContentKind.RegularTab,
-            false to BrowserEngineContentKind.LinkPeek,
-            false to BrowserEngineContentKind.ExternalPreview,
-        )) {
-            withLoadedSession(isPrivate, "page-text-rejected-${kind.name}") { session, _ ->
-                val finished = CountDownLatch(1)
-                val result = AtomicReference<String?>("not-completed")
-                InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                    session.bindToppingSession("page-text-rejected", kind)
-                    session.extractPageText {
-                        result.set(it)
-                        finished.countDown()
-                    }
-                }
-                assertTrue(finished.await(5, TimeUnit.SECONDS))
-                assertNull(result.get())
-            }
         }
     }
 
@@ -267,10 +173,6 @@ private class ReaderFixtureServer : AutoCloseable {
                           </head>
                           <body>
                             <nav>Navigation must disappear</nav>
-                            <form><textarea>Private draft must disappear</textarea></form>
-                            <div style="opacity:0"><span>Hidden ancestor must disappear</span></div>
-                            <div style="content-visibility:hidden"><span>Hidden content must disappear</span></div>
-                            <div contenteditable="true"><span contenteditable="false">Editable descendant must disappear</span></div>
                             <article>
                               <h1>Gecko Reader Story</h1>
                               <p>Readable article text from GeckoView with enough detail to pass the bounded Reader Studio extraction contract.</p>

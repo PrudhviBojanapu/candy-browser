@@ -1,6 +1,5 @@
 package dev.sk2andy.materialbrowser.ui
 
-import android.content.Context
 import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -28,8 +27,6 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -38,11 +35,9 @@ import dev.sk2andy.materialbrowser.browser.BrowserProfile
 import dev.sk2andy.materialbrowser.browser.BrowserTab
 import dev.sk2andy.materialbrowser.browser.BrowserController
 import dev.sk2andy.materialbrowser.data.AppearanceSettings
-import dev.sk2andy.materialbrowser.data.BrowserSessionStore
 import dev.sk2andy.materialbrowser.data.BrowserSurfaceStyle
 import dev.sk2andy.materialbrowser.data.SnoozedTab
 import dev.sk2andy.materialbrowser.data.TabOverviewMode
-import dev.sk2andy.materialbrowser.data.TabPreviewRepository
 import dev.sk2andy.materialbrowser.shared.ui.TabOverviewChromeTestTags
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuEntry
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuLayout
@@ -57,7 +52,6 @@ import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.After
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,34 +64,26 @@ class SnoozeScreensInstrumentedTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private var controller: BrowserController? = null
 
-    @Before
-    fun setUp() {
-        composeRule.runOnIdle { clearSession() }
-    }
-
     @After
     fun tearDown() {
         composeRule.mainClock.autoAdvance = true
         composeRule.runOnIdle {
             controller?.destroy()
             controller = null
-            clearSession()
         }
     }
 
     @Test
     fun regularTabPresetSubmitsFutureTimeExactlyOnce() {
         val submitted = AtomicLong(0L)
-        val submittedPurpose = AtomicReference<String>("")
         val calls = AtomicInteger()
         composeRule.setContent {
             MaterialBrowserTheme {
                 SnoozeTabDialog(
                     tab = BrowserTab("tab", 1L, title = "Example"),
-                    onSnooze = { wakeAt, purpose ->
+                    onSnooze = { wakeAt ->
                         calls.incrementAndGet()
                         submitted.set(wakeAt)
-                        submittedPurpose.set(purpose)
                         true
                     },
                     onDismiss = {},
@@ -107,13 +93,10 @@ class SnoozeScreensInstrumentedTest {
 
         composeRule.onNode(isDialog()).assertExists()
         composeRule.onNodeWithTag(SnoozeTestTags.PresetGroup).assertIsDisplayed()
-        composeRule.onNodeWithTag(SnoozeTestTags.PurposeInput).performTextInput("Check returns")
         composeRule.onNodeWithTag(SnoozeTestTags.Tomorrow)
-            .performScrollTo()
             .assertIsEnabled()
             .performClick()
 
-        assertEquals("Check returns", submittedPurpose.get())
         assertEquals(1, calls.get())
         assertTrue(submitted.get() > System.currentTimeMillis())
     }
@@ -124,7 +107,7 @@ class SnoozeScreensInstrumentedTest {
             MaterialBrowserTheme {
                 SnoozeTabDialog(
                     tab = BrowserTab("private", 1L, isIncognito = true),
-                    onSnooze = { _, _ -> false },
+                    onSnooze = { false },
                     onDismiss = {},
                 )
             }
@@ -132,7 +115,6 @@ class SnoozeScreensInstrumentedTest {
 
         composeRule.onNodeWithText(context.getString(R.string.snooze_unavailable_private))
             .assertIsDisplayed()
-        composeRule.onNodeWithTag(SnoozeTestTags.PurposeInput).assertIsNotEnabled()
         composeRule.onNodeWithTag(SnoozeTestTags.LaterToday).assertIsNotEnabled()
         composeRule.onNodeWithTag(SnoozeTestTags.Custom).assertIsNotEnabled()
     }
@@ -424,41 +406,6 @@ class SnoozeScreensInstrumentedTest {
     }
 
     @Test
-    fun managementEditsPurposeWithoutChangingSchedule() {
-        val submitted = AtomicReference<String?>(null)
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                SnoozedTabsScreen(
-                    snoozedTabs = listOf(
-                        SnoozedTab(
-                            tab = BrowserTab("saved", 1L, snoozePurpose = "Check returns"),
-                            wakeAtMillis = System.currentTimeMillis() + 60_000L,
-                            createdAtMillis = 1L,
-                        ),
-                    ),
-                    profiles = listOf(BrowserProfile("default", "🍬")),
-                    onBack = {},
-                    onReschedule = { _, _ -> error("Purpose edit must not reschedule") },
-                    onOpenNow = { false },
-                    onDelete = { false },
-                    onUpdatePurpose = { id, purpose ->
-                        assertEquals("saved", id)
-                        submitted.set(purpose)
-                        true
-                    },
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag(SnoozeTestTags.purpose("saved")).performClick()
-        composeRule.onNodeWithTag(SnoozeTestTags.PurposeInput)
-            .performTextReplacement("Discuss with Lisa")
-        composeRule.onNodeWithText(context.getString(R.string.action_save)).performClick()
-        assertEquals("Discuss with Lisa", submitted.get())
-        composeRule.onNodeWithTag(SnoozeTestTags.PurposeInput).assertDoesNotExist()
-    }
-
-    @Test
     fun snoozeFeedbackShowsUndoAndRunsActionOnce() {
         val hostState = SnackbarHostState()
         val undoCalls = AtomicInteger()
@@ -543,7 +490,7 @@ class SnoozeScreensInstrumentedTest {
                         tab = snoozeTabId?.let { id ->
                             browserController.tabs.firstOrNull { it.id == id }
                         },
-                        onSnooze = { _, _ -> true },
+                        onSnooze = { true },
                         onDismiss = { snoozeTabId = null },
                     )
                 }
@@ -572,19 +519,11 @@ class SnoozeScreensInstrumentedTest {
         }
         composeRule.onNodeWithTag(TabOverviewChromeTestTags.More).performClick()
         composeRule.onNodeWithText(context.getString(R.string.action_remove_pin)).assertExists()
-        composeRule.onNodeWithTag(DomainMuteMenuTestTags.Item)
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
+        composeRule.onNodeWithTag(DomainMuteMenuTestTags.Item).performClick()
         composeRule.runOnIdle {
             assertTrue(browserController.isDomainMuted(tabId))
         }
-        composeRule.onNodeWithTag(TabActionsMenuTestTags.Favorite)
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
+        composeRule.onNodeWithTag(TabActionsMenuTestTags.Favorite).performClick()
         composeRule.runOnIdle {
             assertEquals(tabId, favoriteTarget.get())
             assertTrue(browserController.isFavorite(backgroundUrl))
@@ -594,11 +533,7 @@ class SnoozeScreensInstrumentedTest {
         composeRule.onNodeWithTag(TabOverviewChromeTestTags.More).performClick()
         composeRule.onNodeWithTag(SnoozeTestTags.TabActionsSnooze).assertExists()
         composeRule.onNodeWithTag(SnoozeTestTags.Dialog).assertDoesNotExist()
-        composeRule.onNodeWithTag(SnoozeTestTags.TabActionsSnooze)
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
+        composeRule.onNodeWithTag(SnoozeTestTags.TabActionsSnooze).performClick()
         assertEquals(tabId, snoozeTarget.get())
         composeRule.onNodeWithTag(SnoozeTestTags.TabActionsSnooze).assertDoesNotExist()
         composeRule.onNodeWithTag(SnoozeTestTags.Dialog).assertExists()
@@ -632,15 +567,6 @@ class SnoozeScreensInstrumentedTest {
         composeRule.onNodeWithTag(TabActionsMenuTestTags.Pin).assertExists()
         composeRule.onNodeWithTag(TabActionsMenuTestTags.Trail).assertDoesNotExist()
         composeRule.onNodeWithTag(TabActionsMenuTestTags.CloseAllTabs).assertDoesNotExist()
-    }
-
-    private fun clearSession() {
-        context.getSharedPreferences(BrowserSessionStore.PREFERENCES_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .clear()
-            .commit()
-        TabPreviewRepository.get(context).clear()
-        check(TabPreviewRepository.get(context).flush())
     }
 
     @Composable

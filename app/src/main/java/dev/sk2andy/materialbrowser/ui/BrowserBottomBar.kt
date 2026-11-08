@@ -89,11 +89,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.sk2andy.materialbrowser.data.BrowserAddressLoadStyle
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.AddressResolver
@@ -159,6 +163,8 @@ internal fun BrowserBottomBar(
     onActivateAddressSuggestion: () -> Unit,
     onDismissEditor: () -> Unit,
     onSubmitAddress: (String) -> Unit,
+    onToggleMultilineEditor: () -> Unit = {},
+    isMultilineExpanded: Boolean = false,
     showAiModeToggle: Boolean,
     aiModeSelected: Boolean,
     onAiModeSelectedChange: (Boolean) -> Unit,
@@ -188,15 +194,14 @@ internal fun BrowserBottomBar(
     canToggleDomainMute: Boolean,
     isDomainMuted: Boolean,
     onDomainMutedChange: (Boolean) -> Unit,
-    canToggleStatusBarScroll: Boolean = false,
-    isStatusBarScrollEnabled: Boolean = false,
-    onStatusBarScrollEnabledChange: (Boolean) -> Unit = {},
     canToggleAlwaysBlockPopups: Boolean,
     isAlwaysBlockPopupsEnabled: Boolean,
     onAlwaysBlockPopupsChange: (Boolean) -> Unit,
     canToggleDesktopView: Boolean,
     isDesktopView: Boolean,
     onDesktopViewChange: (Boolean) -> Unit,
+    isVideoDetectionRedirectEnabled: Boolean = true,
+    onVideoDetectionRedirectEnabledChange: (Boolean) -> Unit = {},
     canToggleCookieBannerRemoval: Boolean,
     isCookieBannerRemovalEnabled: Boolean,
     canToggleForceVerticalScrolling: Boolean,
@@ -205,29 +210,23 @@ internal fun BrowserBottomBar(
     isForcePageZoomingEnabled: Boolean,
     canToggleForceSafeArea: Boolean,
     isForceSafeAreaEnabled: Boolean,
+    canToggleAllAdBlockers: Boolean = true,
+    isAllAdBlockersEnabled: Boolean = true,
+    onAllAdBlockersChange: (Boolean) -> Unit = {},
     onCookieBannerRemovalEnabledChange: (Boolean) -> Unit,
     onForceVerticalScrollingChange: (Boolean) -> Unit,
     onForcePageZoomingChange: (Boolean) -> Unit,
     onForceSafeAreaChange: (Boolean) -> Unit,
     snoozedTabCount: Int,
     onSnoozedTabs: () -> Unit,
-    onOpenFeeds: (() -> Unit)? = null,
-    onOpenLibrary: (() -> Unit)? = null,
-    onDiscoverFeeds: (() -> Unit)? = null,
-    unreadFeedCount: Int = 0,
-    canDiscoverFeeds: Boolean = false,
     onFavorites: () -> Unit,
     onDownloads: () -> Unit,
     onHistory: () -> Unit,
-    onOpenRssFeeds: (() -> Unit)? = null,
-    workflowActions: CustomWorkflowSurfaceActions = CustomWorkflowSurfaceActions.Empty,
-    onWorkflow: (String) -> Unit = {},
-    onManageWorkflows: (() -> Unit)? = null,
     firefoxExtensionActions: List<GeckoExtensionActionState>,
     menuLayout: BrowserMenuLayout,
     onFirefoxExtensionAction: (GeckoExtensionActionKey) -> Unit,
+    onManageFirefoxExtensions: () -> Unit = {},
     onSettings: () -> Unit,
-    onOpenMenuSettings: () -> Unit = onSettings,
     onPrivacyXRay: () -> Unit,
     permissionActivityVisible: Boolean,
     addressBarPulseNonce: Int,
@@ -242,12 +241,8 @@ internal fun BrowserBottomBar(
     onOpenCandyTrail: () -> Unit,
     canOpenWebAnnotations: Boolean = false,
     onWebAnnotations: (() -> Unit)? = null,
-    canOpenConstellations: Boolean = false,
-    onOpenConstellations: (() -> Unit)? = null,
     onSnooze: () -> Unit,
     onAddSiteCapsule: () -> Unit,
-    canCreateSiteWidget: Boolean = false,
-    onCreateSiteWidget: () -> Unit = {},
     supportsPageContentActions: Boolean = true,
     overviewGestureEnabled: Boolean,
     overviewGestureProgress: FloatState,
@@ -428,6 +423,41 @@ internal fun BrowserBottomBar(
             },
             label = "Adresspille Widerstand",
         )
+        val editingDynamicHeight = remember(editValue.text, maxWidth, density) {
+            val textToMeasure = editValue.text.ifEmpty { " " }
+            val availableWidthPx = with(density) { (maxWidth - 64.dp).roundToPx().coerceAtLeast(100) }
+            val measureResult = textMeasurer.measure(
+                text = AnnotatedString(textToMeasure),
+                style = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
+                constraints = Constraints(maxWidth = availableWidthPx),
+            )
+            val textHeightDp = with(density) { measureResult.size.height.toDp() }
+            val totalNeeded = textHeightDp + 76.dp
+            val maxAllowed = minOf(260.dp, (maxHeight - 16.dp).coerceAtLeast(110.dp))
+            totalNeeded.coerceIn(110.dp, maxAllowed)
+        }
+        val motion = rememberAddressBarMotionState(
+            presentation = presentation,
+            compactWidth = compactWidth,
+            maxWidth = maxWidth,
+            feedbackWidth = feedbackWidth,
+            edgeTabWidth = edgeTabWidth,
+            expandedHeight = if (editing) {
+                editingDynamicHeight
+            } else if (addressBarStyle == BrowserAddressBarStyle.Segmented) {
+                SegmentedAddressBarGeometry.EXPANDED_HEIGHT
+            } else {
+                AddressBarMotion.EXPANDED_HEIGHT
+            },
+            verticalTravel = verticalTravel,
+            dockPosition = dockInteraction.position,
+        )
+        val animatedBarWidth = motion.width
+        val animatedBarHeight = motion.height
+        val dockOffset = motion.dockOffset
+
+        val isBarAnimating = motion.isAnimating
+
         val backdropBlurRegion = barBoundsInWindow
             ?.takeIf {
                 tab.url != BLANK_URL &&
@@ -437,6 +467,7 @@ internal fun BrowserBottomBar(
                     !visualOnly &&
                     commandFeedback == null &&
                     chromeTokens.backdropBlurEnabled &&
+                    !isBarAnimating &&
                     (pulseScale.value - 1f).absoluteValue < 0.001f &&
                     dockStretchProgress.absoluteValue < 0.001f &&
                     (dockRepositionFeedbackScale.x - 1f).absoluteValue < 0.001f &&
@@ -458,23 +489,6 @@ internal fun BrowserBottomBar(
         DisposableEffect(Unit) {
             onDispose { currentOnBackdropBlurRegionChanged(null) }
         }
-        val motion = rememberAddressBarMotionState(
-            presentation = presentation,
-            compactWidth = compactWidth,
-            maxWidth = maxWidth,
-            feedbackWidth = feedbackWidth,
-            edgeTabWidth = edgeTabWidth,
-            expandedHeight = if (addressBarStyle == BrowserAddressBarStyle.Segmented) {
-                SegmentedAddressBarGeometry.EXPANDED_HEIGHT
-            } else {
-                AddressBarMotion.EXPANDED_HEIGHT
-            },
-            verticalTravel = verticalTravel,
-            dockPosition = dockInteraction.position,
-        )
-        val animatedBarWidth = motion.width
-        val animatedBarHeight = motion.height
-        val dockOffset = motion.dockOffset
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter,
@@ -484,8 +498,11 @@ internal fun BrowserBottomBar(
                 tokens = chromeTokens,
                 shape = RoundedCornerShape(barCornerRadius),
                 blurCornerRadius = barCornerRadius,
+                autoUpdateBlur = !isBarAnimating,
                 modifier = Modifier
-                    .offset(x = dockOffset.x, y = dockOffset.y)
+                    .offset {
+                        IntOffset(dockOffset.x.roundToPx(), dockOffset.y.roundToPx())
+                    }
                     .width(animatedBarWidth)
                     .height(animatedBarHeight)
                     .then(
@@ -512,10 +529,13 @@ internal fun BrowserBottomBar(
                     )
                     .onGloballyPositioned { coordinates ->
                         val boundsInRoot = coordinates.boundsInRoot()
-                        barBoundsInWindow = coordinates.boundsInWindow()
+                        val windowBounds = coordinates.boundsInWindow()
+                        if (barBoundsInWindow != windowBounds) {
+                            barBoundsInWindow = windowBounds
+                        }
                         onBarPositioned(
                             boundsInRoot,
-                            barBoundsInWindow?.top?.roundToInt() ?: 0,
+                            windowBounds.top.roundToInt(),
                         )
                     }
                     .graphicsLayer {
@@ -637,6 +657,8 @@ internal fun BrowserBottomBar(
                                 onActivateAddressSuggestion = onActivateAddressSuggestion,
                                 onDismissEditor = onDismissEditor,
                                 onSubmitAddress = onSubmitAddress,
+                                onToggleMultilineEditor = onToggleMultilineEditor,
+                                isMultilineExpanded = isMultilineExpanded,
                                 showAiModeToggle = showAiModeToggle,
                                 aiModeSelected = aiModeSelected,
                                 onAiModeSelectedChange = onAiModeSelectedChange,
@@ -664,15 +686,14 @@ internal fun BrowserBottomBar(
                                 canToggleDomainMute = canToggleDomainMute,
                                 isDomainMuted = isDomainMuted,
                                 onDomainMutedChange = onDomainMutedChange,
-                                canToggleStatusBarScroll = canToggleStatusBarScroll,
-                                isStatusBarScrollEnabled = isStatusBarScrollEnabled,
-                                onStatusBarScrollEnabledChange = onStatusBarScrollEnabledChange,
                                 canToggleAlwaysBlockPopups = canToggleAlwaysBlockPopups,
                                 isAlwaysBlockPopupsEnabled = isAlwaysBlockPopupsEnabled,
                                 onAlwaysBlockPopupsChange = onAlwaysBlockPopupsChange,
                                 canToggleDesktopView = canToggleDesktopView,
                                 isDesktopView = isDesktopView,
                                 onDesktopViewChange = onDesktopViewChange,
+                                isVideoDetectionRedirectEnabled = isVideoDetectionRedirectEnabled,
+                                onVideoDetectionRedirectEnabledChange = onVideoDetectionRedirectEnabledChange,
                                 canToggleCookieBannerRemoval =
                                     canToggleCookieBannerRemoval,
                                 isCookieBannerRemovalEnabled =
@@ -685,6 +706,9 @@ internal fun BrowserBottomBar(
                                 isForcePageZoomingEnabled = isForcePageZoomingEnabled,
                                 canToggleForceSafeArea = canToggleForceSafeArea,
                                 isForceSafeAreaEnabled = isForceSafeAreaEnabled,
+                                canToggleAllAdBlockers = canToggleAllAdBlockers,
+                                isAllAdBlockersEnabled = isAllAdBlockersEnabled,
+                                onAllAdBlockersChange = onAllAdBlockersChange,
                                 onCookieBannerRemovalEnabledChange =
                                     onCookieBannerRemovalEnabledChange,
                                 onForceVerticalScrollingChange =
@@ -693,23 +717,14 @@ internal fun BrowserBottomBar(
                                 onForceSafeAreaChange = onForceSafeAreaChange,
                                 snoozedTabCount = snoozedTabCount,
                                 onSnoozedTabs = onSnoozedTabs,
-                                onOpenFeeds = onOpenFeeds,
-                                onOpenLibrary = onOpenLibrary,
-                                onDiscoverFeeds = onDiscoverFeeds,
-                                unreadFeedCount = unreadFeedCount,
-                                canDiscoverFeeds = canDiscoverFeeds,
                                 onFavorites = onFavorites,
                                 onDownloads = onDownloads,
                                 onHistory = onHistory,
-                                onOpenRssFeeds = onOpenRssFeeds,
-                                workflowActions = workflowActions,
-                                onWorkflow = onWorkflow,
-                                onManageWorkflows = onManageWorkflows,
                                 firefoxExtensionActions = firefoxExtensionActions,
                                 menuLayout = menuLayout,
                                 onFirefoxExtensionAction = onFirefoxExtensionAction,
+                                onManageFirefoxExtensions = onManageFirefoxExtensions,
                                 onSettings = onSettings,
-                                onOpenMenuSettings = onOpenMenuSettings,
                                 onPrivacyXRay = onPrivacyXRay,
                                 permissionActivityVisible = permissionActivityVisible,
                                 onOpenExternal = onOpenExternal,
@@ -721,12 +736,8 @@ internal fun BrowserBottomBar(
                                 onOpenCandyTrail = onOpenCandyTrail,
                                 canOpenWebAnnotations = canOpenWebAnnotations,
                                 onWebAnnotations = onWebAnnotations,
-                                canOpenConstellations = canOpenConstellations,
-                                onOpenConstellations = onOpenConstellations,
                                 onSnooze = onSnooze,
                                 onAddSiteCapsule = onAddSiteCapsule,
-                                canCreateSiteWidget = canCreateSiteWidget,
-                                onCreateSiteWidget = onCreateSiteWidget,
                                 supportsPageContentActions = supportsPageContentActions,
                                 canDock = dockingEnabled,
                                 onDock = onDock,

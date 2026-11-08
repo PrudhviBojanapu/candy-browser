@@ -46,17 +46,21 @@ internal fun AddressBarLongPressSettingsPage(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
-        AddressBarLongPressActionSection.entries.forEachIndexed { sectionIndex, section ->
+        val allowedSections = AddressBarLongPressActionSection.entries.filter { section ->
+            section != AddressBarLongPressActionSection.Reading && section != AddressBarLongPressActionSection.Candy
+        }
+        allowedSections.forEachIndexed { sectionIndex, section ->
+            val actions = AddressBarLongPressAction.entries.filter { action ->
+                action.section == section && action !in AddressBarLongPressAction.DebloatedActions
+            }
+            if (actions.isEmpty()) return@forEachIndexed
             SettingsSectionTitle(stringResource(section.labelRes()))
             Spacer(Modifier.height(8.dp))
             Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+                shape = MaterialTheme.shapes.large,
+                color = browserChromeColor(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 Column {
-                    val actions = AddressBarLongPressAction.entries.filter { action ->
-                        action.section == section
-                    }
                     actions.forEachIndexed { actionIndex, action ->
                         Row(
                             modifier = Modifier
@@ -80,11 +84,11 @@ internal fun AddressBarLongPressSettingsPage(
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }
-                        if (actionIndex != actions.lastIndex) SettingsPreferenceDivider()
+                        if (actionIndex != actions.lastIndex) HorizontalDivider()
                     }
                 }
             }
-            if (sectionIndex != AddressBarLongPressActionSection.entries.lastIndex) {
+            if (sectionIndex != allowedSections.lastIndex) {
                 Spacer(Modifier.height(16.dp))
             }
         }

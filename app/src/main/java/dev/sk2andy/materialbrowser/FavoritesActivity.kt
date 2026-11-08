@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
-import dev.sk2andy.materialbrowser.browser.guest.GuestBubbleGate
 import dev.sk2andy.materialbrowser.browser.integration.FavoritesActivityContract
 import dev.sk2andy.materialbrowser.data.AppDataTransferLock
 import dev.sk2andy.materialbrowser.data.BrowserSessionStore
@@ -50,14 +48,7 @@ class FavoritesActivity : ComponentActivity() {
     private var favoriteRevision = 0L
     private var undoLibrary: FavoriteLibrary? = null
     private var isFullImmersiveModeEnabled = false
-    private val mutationBackBlocker = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = Unit
-    }
     private var isFavoriteMutationInFlight = false
-        set(value) {
-            field = value
-            mutationBackBlocker.isEnabled = value
-        }
     private var pendingIconFolderId: String? = null
     private val chooseFolderIcon = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         val folderId = pendingIconFolderId
@@ -114,8 +105,6 @@ class FavoritesActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        onBackPressedDispatcher.addCallback(this, mutationBackBlocker)
-        if (GuestBubbleGate.redirectIfLocked(this)) return
         if (AppDataTransferLock.isActive(this)) {
             finish()
             return

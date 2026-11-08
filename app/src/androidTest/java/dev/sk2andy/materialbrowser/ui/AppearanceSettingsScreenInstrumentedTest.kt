@@ -1,9 +1,5 @@
 package dev.sk2andy.materialbrowser.ui
 
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assertContentDescriptionEquals
-import androidx.compose.ui.test.assert
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -57,10 +53,11 @@ class AppearanceSettingsScreenInstrumentedTest {
         try {
             composeRule.setContent {
                 MaterialBrowserTheme(settings = AppearanceSettings()) {
-                    SettingsPage(
-                        title = context.getString(R.string.settings_app_icon),
+                    AppearanceSettingsPage(
+                        settings = AppearanceSettings(),
+                        onSettingsChanged = {},
                         onBack = {},
-                    ) { AppIconSettings() }
+                    )
                 }
             }
 
@@ -149,13 +146,14 @@ class AppearanceSettingsScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.appearance_mode_dark)).performScrollTo().performClick()
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.AppearanceMode).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.appearance_mode_dark)).performClick()
         assertEquals(BrowserAppearanceMode.Dark, settings.appearanceMode)
 
-        composeRule.onNodeWithTag(AppearanceSettingsTestTags.Animations).performScrollTo().performClick()
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.Animations).performClick()
         assertFalse(settings.animationsEnabled)
 
-        composeRule.onNodeWithTag(AppearanceSettingsTestTags.ForceDarkWebsites).performScrollTo().performClick()
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.ForceDarkWebsites).performClick()
         assertTrue(settings.forceDarkWebsites)
 
         composeRule.onNodeWithTag(AppearanceSettingsTestTags.WebContentFontSize)
@@ -164,21 +162,14 @@ class AppearanceSettingsScreenInstrumentedTest {
             }
         assertEquals(150, settings.webContentFontSizePercent)
 
-        composeRule.onNodeWithText(context.getString(R.string.color_palette_candy)).performScrollTo().performClick()
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.ColorPalette).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.color_palette_candy)).performClick()
         assertEquals(BrowserColorPalette.Candy, settings.colorPalette)
 
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.SurfaceStyle).performClick()
         composeRule.onNodeWithTag(AppearanceSettingsTestTags.FrostedTransparency)
-            .assertContentDescriptionEquals(context.getString(R.string.settings_frosted_transparency))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "40 %"))
-            .assertExists()
-            .assertIsNotEnabled()
-        composeRule.onNodeWithTag(AppearanceSettingsTestTags.FrostedAddressBarTransparency)
-            .assertExists()
-            .assertIsNotEnabled()
-        composeRule.onNodeWithTag(AppearanceSettingsTestTags.FrostedBlur)
-            .assertExists()
-            .assertIsNotEnabled()
-        composeRule.onNodeWithText(context.getString(R.string.surface_style_frosted)).performScrollTo().performClick()
+            .assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.surface_style_frosted)).performClick()
         assertEquals(BrowserSurfaceStyle.Frosted, settings.surfaceStyle)
         composeRule.onNodeWithTag(AppearanceSettingsTestTags.FrostedTransparency)
             .assertExists()
@@ -199,10 +190,16 @@ class AppearanceSettingsScreenInstrumentedTest {
             context.getString(R.string.settings_frosted_blur_summary_gecko),
         ).assertExists()
 
-        composeRule.onNodeWithText(context.getString(R.string.shape_style_angular)).performScrollTo().performClick()
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.ShapeStyle)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.shape_style_angular)).performClick()
 
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressBarStyle)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText(context.getString(R.string.address_bar_style_segmented))
-            .performScrollTo().performClick()
+            .performClick()
         assertEquals(
             AppearanceSettings(
                 appearanceMode = BrowserAppearanceMode.Dark,
@@ -235,13 +232,17 @@ class AppearanceSettingsScreenInstrumentedTest {
         }
 
         assertEquals(BrowserAddressLoadStyle.Rainbow, settings.addressLoadStyle)
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressLoadStyle)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText(context.getString(R.string.address_load_style_tonal))
-            .performScrollTo().performClick()
+            .performClick()
         assertEquals(AppearanceSettings(addressLoadStyle = BrowserAddressLoadStyle.Tonal), settings)
         assertTrue(settings.animationsEnabled)
 
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressLoadStyle).performClick()
         composeRule.onNodeWithText(context.getString(R.string.address_load_style_rainbow))
-            .performScrollTo().performClick()
+            .performClick()
         assertEquals(AppearanceSettings(), settings)
     }
 
@@ -298,12 +299,15 @@ class AppearanceSettingsScreenInstrumentedTest {
             }
         }
 
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressBarColor)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText(context.getString(R.string.address_bar_color_graphite))
-            .performScrollTo().performClick()
+            .performClick()
         assertEquals(BrowserAddressBarColorPreset.Graphite, settings.addressBarColorPreset)
 
         composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressBarColorReset)
-            .performScrollTo().performClick()
+            .performClick()
 
         assertEquals(BrowserAddressBarColorPreset.Theme, settings.addressBarColorPreset)
         assertEquals("", settings.addressBarCustomColorHex)
@@ -324,8 +328,11 @@ class AppearanceSettingsScreenInstrumentedTest {
             }
         }
 
+        composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressBarColor)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText(context.getString(R.string.address_bar_color_custom))
-            .performScrollTo().performClick()
+            .performClick()
         composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressBarCustomColorSave)
             .assertIsNotEnabled()
         composeRule.onNodeWithTag(AppearanceSettingsTestTags.AddressBarCustomColor)

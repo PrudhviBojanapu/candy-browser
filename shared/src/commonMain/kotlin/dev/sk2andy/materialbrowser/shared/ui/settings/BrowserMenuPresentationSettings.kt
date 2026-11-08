@@ -237,11 +237,8 @@ internal fun BrowserMenuSettingsEntryIcon(entry: BrowserMenuEntry) {
         BrowserMenuEntry.NewTab -> Icons.Default.Add
         BrowserMenuEntry.CloseTab -> Icons.Default.Close
         BrowserMenuEntry.DuplicateTab -> Icons.Default.ContentCopy
-        BrowserMenuEntry.OpenFeeds -> Icons.AutoMirrored.Filled.MenuBook
-        BrowserMenuEntry.OpenLibrary -> Icons.AutoMirrored.Filled.MenuBook
-        BrowserMenuEntry.DiscoverFeeds -> Icons.Default.Search
         BrowserMenuEntry.Reader -> Icons.AutoMirrored.Filled.MenuBook
-        BrowserMenuEntry.WebAnnotations -> Icons.Default.Edit
+        BrowserMenuEntry.WebAnnotations -> Icons.AutoMirrored.Filled.MenuBook
         BrowserMenuEntry.Translate -> Icons.Default.Translate
         BrowserMenuEntry.FindInPage -> Icons.Default.Search
         BrowserMenuEntry.Share -> Icons.Default.Share
@@ -251,16 +248,16 @@ internal fun BrowserMenuSettingsEntryIcon(entry: BrowserMenuEntry) {
         BrowserMenuEntry.ForceVerticalScrolling -> Icons.Default.SwapVert
         BrowserMenuEntry.ForcePageZooming -> Icons.Default.ZoomIn
         BrowserMenuEntry.ForceSafeArea -> Icons.Default.CropFree
+        BrowserMenuEntry.AllAdBlockers -> Icons.Default.Block
         BrowserMenuEntry.AlwaysBlockPopups -> Icons.Default.Block
         BrowserMenuEntry.DesktopView -> Icons.Default.DesktopWindows
         BrowserMenuEntry.DomainMute -> Icons.AutoMirrored.Filled.VolumeOff
         BrowserMenuEntry.StatusBarScroll -> Icons.Default.ArrowUpward
+        BrowserMenuEntry.VideoDetectionRedirect -> Icons.AutoMirrored.Filled.OpenInNew
         BrowserMenuEntry.ToppingCommands -> Icons.Default.Extension
         BrowserMenuEntry.FirefoxPageActions -> Icons.Default.Extension
         BrowserMenuEntry.CandyTrail -> Icons.Default.Route
-        BrowserMenuEntry.Constellations -> Icons.Default.Route
         BrowserMenuEntry.AddSiteCapsule -> Icons.AutoMirrored.Filled.AddToHomeScreen
-        BrowserMenuEntry.CreateSiteWidget -> Icons.AutoMirrored.Filled.AddToHomeScreen
         BrowserMenuEntry.Summarize -> Icons.Default.AutoAwesome
         BrowserMenuEntry.Snooze -> Icons.Default.Snooze
         BrowserMenuEntry.AddressBarDocking -> Icons.Default.ChevronRight

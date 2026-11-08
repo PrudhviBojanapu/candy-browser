@@ -38,6 +38,13 @@ object BrowserProfileRules {
         return profile.copy(isolationEnabled = enabled).takeIf { it != profile }
     }
 
+    fun updateVideoDetectionRedirect(
+        profile: BrowserProfile,
+        enabled: Boolean,
+    ): BrowserProfile? {
+        return profile.copy(videoDetectionRedirectEnabled = enabled).takeIf { it != profile }
+    }
+
     fun updateProtection(
         profile: BrowserProfile,
         protection: ProfileProtection?,

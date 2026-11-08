@@ -14,14 +14,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,7 +45,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +55,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -74,15 +72,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.sk2andy.materialbrowser.R
+import dev.sk2andy.materialbrowser.browser.integration.BrowserUriPolicy
 import dev.sk2andy.materialbrowser.browser.LinkPeekAction
 import dev.sk2andy.materialbrowser.browser.LinkPeekActionLayout
+import dev.sk2andy.materialbrowser.browser.LinkPeekActionLayoutRules as LinkPeekActionSelectionRules
 import dev.sk2andy.materialbrowser.browser.LinkPeekActionSlot
-import dev.sk2andy.materialbrowser.browser.LinkPeekSwipeAction
-import dev.sk2andy.materialbrowser.browser.integration.BrowserUriPolicy
-import dev.sk2andy.materialbrowser.shared.ui.BrowserCustomAction
 import java.net.URI
 import kotlin.math.roundToInt
-import dev.sk2andy.materialbrowser.browser.LinkPeekActionLayoutRules as LinkPeekActionSelectionRules
 
 internal object LinkPeekTestTags {
     const val Root = "link_peek"
@@ -123,18 +119,11 @@ internal fun <T : View> LinkPeekOverlay(
     onSnooze: (String, String?) -> Unit = { _, _ -> },
     onOpenForeground: (String) -> Unit = {},
     actionLayout: LinkPeekActionLayout = LinkPeekActionLayout.Default,
-    rightSwipeAction: LinkPeekSwipeAction = LinkPeekSwipeAction.OpenBackground,
-    customActionSlots: Map<Int, BrowserCustomAction?> = emptyMap(),
-    hasCustomSwipeAction: Boolean = false,
-    customSwipeAction: BrowserCustomAction? = null,
-    onCustomAction: (String, String, T?) -> Unit = { _, _, _ -> },
-    onOpenNewStack: (String) -> Unit = {},
     isFavorite: (String) -> Boolean = { false },
     canSaveReaderOffline: Boolean = true,
     canFavorite: Boolean = true,
     canSnooze: Boolean = true,
     canOpenInPrivate: Boolean = true,
-    canOpenNewStack: Boolean = true,
     onDownloadLink: (() -> Unit)? = null,
     onDownloadImage: (() -> Unit)? = null,
     onDismiss: () -> Unit,
@@ -149,8 +138,6 @@ internal fun <T : View> LinkPeekOverlay(
     var previewView by remember(url) { mutableStateOf<T?>(null) }
     var cardBounds by remember(url) { mutableStateOf<Rect?>(null) }
     var commitStartBounds by remember(url) { mutableStateOf<Rect?>(null) }
-    var swipeOffset by remember(url) { mutableFloatStateOf(0f) }
-    var swipeHandled by remember(url) { mutableStateOf(false) }
     val commitProgress = remember(url) { Animatable(0f) }
     val openOnce = {
         if (!opened) {
@@ -232,19 +219,6 @@ internal fun <T : View> LinkPeekOverlay(
         openOnce()
     }
 
-    fun customActionEnabled(action: BrowserCustomAction?): Boolean = action != null &&
-        action.enabled && (!action.requiresLoadedPage || (previewProgress >= 100 && previewView != null))
-    val rightSwipeEnabled = if (hasCustomSwipeAction) {
-        customActionEnabled(customSwipeAction)
-    } else when (rightSwipeAction) {
-        LinkPeekSwipeAction.ReaderLater ->
-            canSaveReaderOffline && previewProgress >= 100 && previewView != null
-        LinkPeekSwipeAction.OpenPrivate -> canOpenInPrivate
-        LinkPeekSwipeAction.OpenNewStack -> canOpenNewStack
-        LinkPeekSwipeAction.Favorite -> canFavorite
-        LinkPeekSwipeAction.Snooze -> canSnooze
-        else -> true
-    }
     val flyProgress = commitProgress.value
 
     BoxWithConstraints(
@@ -295,212 +269,140 @@ internal fun <T : View> LinkPeekOverlay(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .linkPeekSwipeGesture(
-                        enabled = !committing,
-                        onDrag = { swipeOffset = it },
-                        onRelease = { outcome ->
-                            when (outcome) {
-                                LinkPeekSwipeOutcome.Cancel -> Unit
-                                LinkPeekSwipeOutcome.Close -> {
-                                    swipeHandled = true
-                                    onDismiss()
-                                }
-                                LinkPeekSwipeOutcome.RightAction -> if (
-                                    rightSwipeEnabled && !commitRequested && !swipeHandled
-                                ) {
-                                    if (hasCustomSwipeAction) {
-                                        customSwipeAction?.let { action ->
-                                            swipeHandled = true
-                                            onCustomAction(action.id, committedUrl, previewView)
-                                        }
-                                    } else when (rightSwipeAction) {
-                                        LinkPeekSwipeAction.OpenBackground -> {
-                                            commitRequested = true
-                                            onCommitRequested()
-                                        }
-                                        LinkPeekSwipeAction.OpenForeground -> {
-                                            swipeHandled = true
-                                            onOpenForeground(committedUrl)
-                                        }
-                                        LinkPeekSwipeAction.OpenNewStack -> {
-                                            swipeHandled = true
-                                            onOpenNewStack(committedUrl)
-                                        }
-                                        LinkPeekSwipeAction.OpenPrivate -> {
-                                            swipeHandled = true
-                                            onOpenInPrivate(committedUrl)
-                                        }
-                                        LinkPeekSwipeAction.Copy -> {
-                                            swipeHandled = true
-                                            onCopyLink(committedUrl)
-                                        }
-                                        LinkPeekSwipeAction.Share -> {
-                                            swipeHandled = true
-                                            onShare(committedUrl)
-                                        }
-                                        LinkPeekSwipeAction.Favorite -> {
-                                            swipeHandled = true
-                                            onFavorite(committedUrl, host)
-                                        }
-                                        LinkPeekSwipeAction.Snooze -> {
-                                            swipeHandled = true
-                                            onSnooze(committedUrl, host)
-                                        }
-                                        LinkPeekSwipeAction.ReaderLater -> previewView?.let { view ->
-                                            swipeHandled = true
-                                            onSaveReaderOffline(committedUrl, view)
-                                        }
-                                    }
-                                }
+                    .onGloballyPositioned { coordinates ->
+                        if (!committing) cardBounds = coordinates.boundsInRoot()
+                    }
+                    .graphicsLayer {
+                        val startBounds = commitStartBounds
+                        val destination = actionTargetBounds
+                        val dragScale = 0.985f - motionProgress * 0.015f
+                        if (startBounds != null && flyProgress > 0f) {
+                            translationX =
+                                (destination.center.x - startBounds.center.x) * flyProgress
+                            translationY = motionProgress * 18.dp.toPx() +
+                                (destination.center.y - startBounds.center.y) * flyProgress
+                            val targetScale = (
+                                destination.width / startBounds.width.coerceAtLeast(1f)
+                                ).coerceIn(0.04f, 0.14f)
+                            val scale = lerp(dragScale, targetScale, flyProgress)
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = if (flyProgress < 0.72f) {
+                                1f
+                            } else {
+                                1f - (flyProgress - 0.72f) / 0.28f
                             }
-                        },
-                    ),
+                        } else {
+                            translationY = motionProgress * 18.dp.toPx() +
+                                flyProgress * 220.dp.toPx()
+                            val scale = lerp(dragScale, 0.08f, flyProgress)
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = 1f - flyProgress
+                        }
+                    }
+                    .testTag(LinkPeekTestTags.Card),
+                shape = RoundedCornerShape(30.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = 8.dp,
+                shadowElevation = 18.dp,
             ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .onGloballyPositioned { coordinates ->
-                            if (!committing) cardBounds = coordinates.boundsInRoot()
-                        }
-                        .graphicsLayer {
-                            val startBounds = commitStartBounds
-                            val destination = actionTargetBounds
-                            val dragScale = 0.985f - motionProgress * 0.015f
-                            if (startBounds != null && flyProgress > 0f) {
-                                translationX =
-                                    (destination.center.x - startBounds.center.x) * flyProgress
-                                translationY = motionProgress * 18.dp.toPx() +
-                                    (destination.center.y - startBounds.center.y) * flyProgress
-                                val targetScale = (
-                                    destination.width / startBounds.width.coerceAtLeast(1f)
-                                    ).coerceIn(0.04f, 0.14f)
-                                val scale = lerp(dragScale, targetScale, flyProgress)
-                                scaleX = scale
-                                scaleY = scale
-                                alpha = if (flyProgress < 0.72f) {
-                                    1f
-                                } else {
-                                    1f - (flyProgress - 0.72f) / 0.28f
-                                }
-                            } else {
-                                translationX = swipeOffset
-                                translationY = motionProgress * 18.dp.toPx() +
-                                    flyProgress * 220.dp.toPx()
-                                val swipeProgress = LinkPeekSwipeRules.progress(
-                                    swipeOffset,
-                                    LinkPeekSwipeRules.COMMIT_DISTANCE_DP.dp.toPx(),
-                                )
-                                rotationZ = (swipeOffset / size.width.coerceAtLeast(1f))
-                                    .coerceIn(-1f, 1f) * 8f
-                                val scale = lerp(dragScale, 0.08f, flyProgress)
-                                scaleX = scale
-                                scaleY = scale
-                                alpha = (1f - flyProgress) * (1f - swipeProgress * 0.18f)
-                            }
-                        }
-                        .testTag(LinkPeekTestTags.Card),
-                    shape = RoundedCornerShape(30.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    tonalElevation = 8.dp,
-                    shadowElevation = 18.dp,
-                ) {
-                    Column(Modifier.fillMaxSize()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 18.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (isSecure) {
-                                Icon(
-                                    Icons.Default.Lock,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(22.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                Text(
-                                    "HTTP",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
-                            Spacer(Modifier.size(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    host,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    committedUrl,
-                                    modifier = Modifier.testTag(LinkPeekTestTags.Url),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                Column(Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (isSecure) {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        } else {
                             Text(
-                                stringResource(R.string.link_peek_title),
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.labelMedium,
+                                "HTTP",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
-                        if (previewProgress < 100) {
-                            LinearProgressIndicator(
-                                progress = { previewProgress / 100f },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        key(url) {
-                            AndroidView(
-                                factory = {
-                                    createPreviewView(
-                                        { loaded -> previewProgress = loaded },
-                                        { committed -> committedUrl = committed },
-                                    ).also { previewView = it }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .testTag(LinkPeekTestTags.Preview),
-                                onRelease = { view ->
-                                    if (previewView === view) previewView = null
-                                    releasePreviewView(view)
-                                },
-                            )
-                        }
-                        if (onDownloadLink != null) {
+                        Spacer(Modifier.size(12.dp))
+                        Column(Modifier.weight(1f)) {
                             Text(
-                                stringResource(R.string.action_download_link),
-                                modifier = Modifier
-                                    .testTag(LinkPeekTestTags.DownloadLink)
-                                    .clickable(onClick = onDownloadLink)
-                                    .padding(horizontal = 18.dp, vertical = 8.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.labelLarge,
+                                host,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                        }
-                        if (onDownloadImage != null) {
                             Text(
-                                stringResource(R.string.action_download_image),
-                                modifier = Modifier
-                                    .testTag(LinkPeekTestTags.DownloadImage)
-                                    .clickable(onClick = onDownloadImage)
-                                    .padding(horizontal = 18.dp, vertical = 8.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.labelLarge,
+                                committedUrl,
+                                modifier = Modifier.testTag(LinkPeekTestTags.Url),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
+                        Text(
+                            stringResource(R.string.link_peek_title),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    if (previewProgress < 100) {
+                        LinearProgressIndicator(
+                            progress = { previewProgress / 100f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    key(url) {
+                        AndroidView(
+                            factory = {
+                                createPreviewView(
+                                    { loaded -> previewProgress = loaded },
+                                    { committed -> committedUrl = committed },
+                                ).also { previewView = it }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .testTag(LinkPeekTestTags.Preview),
+                            onRelease = { view ->
+                                if (previewView === view) previewView = null
+                                releasePreviewView(view)
+                            },
+                        )
+                    }
+                    if (onDownloadLink != null) {
+                        Text(
+                            stringResource(R.string.action_download_link),
+                            modifier = Modifier
+                                .testTag(LinkPeekTestTags.DownloadLink)
+                                .clickable(onClick = onDownloadLink)
+                                .padding(horizontal = 18.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                    if (onDownloadImage != null) {
+                        Text(
+                            stringResource(R.string.action_download_image),
+                            modifier = Modifier
+                                .testTag(LinkPeekTestTags.DownloadImage)
+                                .clickable(onClick = onDownloadImage)
+                                .padding(horizontal = 18.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
                     }
                 }
             }
@@ -525,25 +427,7 @@ internal fun <T : View> LinkPeekOverlay(
             val favoriteSelected = canFavorite && isFavorite(committedUrl)
             runtimeSlots.forEachIndexed { index, slot ->
                 val bounds = visualSlotBounds.getOrNull(index) ?: return@forEachIndexed
-                val customIndex = when (slot) {
-                    is LinkPeekActionSlot.Action -> slot.actionIndex
-                    is LinkPeekActionSlot.Empty -> slot.actionIndex
-                    LinkPeekActionSlot.FixedPlus -> null
-                }
-                if (customIndex != null && customActionSlots.containsKey(customIndex)) {
-                    customActionSlots[customIndex]?.let { action ->
-                        LinkPeekActionTarget(
-                            targetBounds = bounds,
-                            icon = R.drawable.ic_reader_download,
-                            customIcon = action.icon,
-                            contentDescription = action.label,
-                            testTag = "custom_workflow_peek:$customIndex",
-                            enabled = !committing && customActionEnabled(action),
-                            alpha = 1f - flyProgress,
-                            onClick = { onCustomAction(action.id, committedUrl, previewView) },
-                        )
-                    }
-                } else if (slot is LinkPeekActionSlot.Action) {
+                if (slot is LinkPeekActionSlot.Action) {
                     val action = slot.action
                     LinkPeekActionTarget(
                         targetBounds = bounds,
@@ -702,7 +586,6 @@ private fun BoxScope.LinkPeekActionTarget(
     enabled: Boolean,
     alpha: Float,
     onClick: () -> Unit,
-    customIcon: ImageVector? = null,
 ) {
     val density = LocalDensity.current
     val targetWidth = with(density) { targetBounds.width.toDp() }
@@ -733,12 +616,14 @@ private fun BoxScope.LinkPeekActionTarget(
                     .fillMaxSize()
                     .testTag(testTag),
             ) {
-                val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f)
-                if (customIcon != null) {
-                    Icon(customIcon, contentDescription, Modifier.size(24.dp), tint = tint)
-                } else {
-                    Icon(painterResource(icon), contentDescription, Modifier.size(24.dp), tint = tint)
-                }
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = if (enabled) 1f else 0.38f,
+                    ),
+                )
             }
         }
     }

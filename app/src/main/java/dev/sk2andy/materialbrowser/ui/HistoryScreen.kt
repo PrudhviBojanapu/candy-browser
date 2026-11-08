@@ -153,8 +153,7 @@ internal fun HistoryScreen(
             else -> onBack()
         }
     }
-    // Keep activity dismissal with Android so cross-activity predictive back remains native.
-    BackHandler(enabled = selectedEntries.isNotEmpty()) { selectedEntryKeys = arrayListOf() }
+    BackHandler(onBack = ::handleBack)
 
     Scaffold(
         topBar = {

@@ -32,8 +32,7 @@ internal class WebTextActionModeCallback(
             R.id.web_text_share -> WebTextSelectionAction.Share
             R.id.web_annotation_mark -> WebTextSelectionAction.Highlight
             R.id.web_annotation_translate -> WebTextSelectionAction.Translate
-            R.id.web_text_read_aloud -> WebTextSelectionAction.ReadAloud
-            else -> return delegate.onActionItemClicked(mode, item)
+                        else -> return delegate.onActionItemClicked(mode, item)
         }
         if (documentGeneration() != generation) return true
         val url = webView.url
@@ -60,8 +59,7 @@ internal class WebTextActionModeCallback(
             menu.removeItem(R.id.web_text_share)
             menu.removeItem(R.id.web_annotation_mark)
             menu.removeItem(R.id.web_annotation_translate)
-            menu.removeItem(R.id.web_text_read_aloud)
-            return
+                        return
         }
         if (menu.findItem(R.id.web_text_search) == null) {
             menu.add(Menu.NONE, R.id.web_text_search, Menu.NONE, R.string.settings_section_search)
@@ -77,9 +75,7 @@ internal class WebTextActionModeCallback(
         if (menu.findItem(R.id.web_annotation_translate) == null) {
             menu.add(Menu.NONE, R.id.web_annotation_translate, Menu.NONE, R.string.web_annotation_translate)
         }
-        if (menu.findItem(R.id.web_text_read_aloud) == null) {
-            menu.add(Menu.NONE, R.id.web_text_read_aloud, Menu.NONE, R.string.process_text_read_aloud)
-        }
+
     }
 
     private companion object {

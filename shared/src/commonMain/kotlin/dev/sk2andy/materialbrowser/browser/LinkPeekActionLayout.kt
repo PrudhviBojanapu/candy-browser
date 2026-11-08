@@ -48,10 +48,12 @@ object LinkPeekActionLayoutRules {
     const val TOOLBAR_SLOT_COUNT = 4
     const val FIXED_PLUS_SLOT_INDEX = 2
 
+    val DebloatedActions = setOf(LinkPeekAction.ReaderLater, LinkPeekAction.Snooze)
+
     fun normalize(layout: LinkPeekActionLayout): LinkPeekActionLayout {
         val accepted = mutableSetOf<LinkPeekAction>()
         val normalized = List(CONFIGURABLE_ACTION_COUNT) { index ->
-            layout.actions.getOrNull(index)?.takeIf(accepted::add)
+            layout.actions.getOrNull(index)?.takeUnless { it in DebloatedActions }?.takeIf(accepted::add)
         }
         return LinkPeekActionLayout(normalized)
     }
@@ -64,7 +66,7 @@ object LinkPeekActionLayoutRules {
 
     fun available(layout: LinkPeekActionLayout): List<LinkPeekAction> {
         val selected = normalize(layout).actions.toSet()
-        return LinkPeekAction.entries.filterNot(selected::contains)
+        return LinkPeekAction.entries.filterNot { it in selected || it in DebloatedActions }
     }
 
     fun place(

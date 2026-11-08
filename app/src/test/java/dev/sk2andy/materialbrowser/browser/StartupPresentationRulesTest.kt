@@ -27,6 +27,20 @@ class StartupPresentationRulesTest {
                 isColdStart = true,
                 isLauncherLaunch = true,
                 isStartupAnimationEnabled = false,
+                startupAddressFocusMode = StartupAddressFocusMode.WhenStartupAnimationDisabled,
+                isOnboardingRequired = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `default startup presentation does not open address editor`() {
+        assertEquals(
+            StartupPresentation(showSplash = false, openAddressEditor = false),
+            StartupPresentationRules.resolve(
+                isColdStart = true,
+                isLauncherLaunch = true,
+                isStartupAnimationEnabled = false,
                 isOnboardingRequired = false,
             ),
         )
@@ -88,6 +102,7 @@ class StartupPresentationRulesTest {
             StartupPresentationRules.shouldOpenAddressEditor(
                 isLauncherLaunch = true,
                 isStartupAnimationEnabled = false,
+                startupAddressFocusMode = StartupAddressFocusMode.WhenStartupAnimationDisabled,
                 isOnboardingRequired = false,
             ),
         )
@@ -192,6 +207,7 @@ class StartupPresentationRulesTest {
             StartupPresentationRules.shouldOpenHomePage(
                 isLauncherLaunch = true,
                 isOpenHomeOnStartupEnabled = true,
+                startupAddressFocusMode = StartupAddressFocusMode.Always,
             ),
         )
         assertFalse(

@@ -25,6 +25,30 @@ internal fun interface CandyChromeSurfaceRenderer {
         backdropBlurEnabled: Boolean,
         content: @Composable () -> Unit,
     )
+
+    @Composable
+    fun render(
+        backdropSource: CandyChromeBackdropSource?,
+        tokens: BrowserChromeSurfaceTokens,
+        modifier: Modifier,
+        shape: Shape,
+        blurCornerRadius: Dp,
+        containerColor: Color,
+        backdropBlurEnabled: Boolean,
+        autoUpdateBlur: Boolean,
+        content: @Composable () -> Unit,
+    ) {
+        render(
+            backdropSource = backdropSource,
+            tokens = tokens,
+            modifier = modifier,
+            shape = shape,
+            blurCornerRadius = blurCornerRadius,
+            containerColor = containerColor,
+            backdropBlurEnabled = backdropBlurEnabled,
+            content = content,
+        )
+    }
 }
 
 internal val LocalCandyChromeSurfaceRenderer = staticCompositionLocalOf<CandyChromeSurfaceRenderer> {
@@ -43,6 +67,7 @@ internal fun CandyChromeSurface(
     blurCornerRadius: Dp = tokens.cornerRadius,
     containerColor: Color = tokens.containerColor,
     backdropBlurEnabled: Boolean = tokens.backdropBlurEnabled,
+    autoUpdateBlur: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     CompositionLocalProvider(
@@ -57,6 +82,7 @@ internal fun CandyChromeSurface(
             blurCornerRadius = blurCornerRadius,
             containerColor = containerColor,
             backdropBlurEnabled = backdropBlurEnabled,
+            autoUpdateBlur = autoUpdateBlur,
             content = content,
         )
     }

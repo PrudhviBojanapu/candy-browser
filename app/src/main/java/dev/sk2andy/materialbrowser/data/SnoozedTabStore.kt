@@ -43,9 +43,6 @@ class SnoozedTabStore(context: Context) {
                                 isPinned = item.optBoolean("isPinned", false),
                                 title = item.optString("title", ""),
                                 url = item.optString("url", BLANK_URL),
-                                snoozePurpose = SnoozePurposeRules.normalize(
-                                    item.optString("snoozePurpose", ""),
-                                ),
                             ),
                             wakeAtMillis = wakeAtMillis,
                             createdAtMillis = item.optLong("createdAtMillis").coerceAtLeast(0L),
@@ -83,7 +80,6 @@ class SnoozedTabStore(context: Context) {
                         .put("isPinned", tab.isPinned)
                         .put("title", tab.title)
                         .put("url", tab.url)
-                        .put("snoozePurpose", SnoozePurposeRules.normalize(tab.snoozePurpose))
                         .put("wakeAtMillis", snoozed.wakeAtMillis)
                         .put("createdAtMillis", snoozed.createdAtMillis),
                 )

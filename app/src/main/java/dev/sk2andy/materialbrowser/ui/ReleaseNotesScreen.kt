@@ -2,6 +2,7 @@ package dev.sk2andy.materialbrowser.ui
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -81,13 +82,11 @@ internal fun ReleaseNotesScreen(
     onDone: () -> Unit,
     onOpenLink: (String) -> Unit,
 ) {
-    val backState = rememberNativeScreenBackState()
-    NativeScreenBackHandler(state = backState, onBack = onDone)
+    BackHandler(onBack = onDone)
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .testTag(ReleaseNotesTestTags.Screen)
-            .predictiveBackSurface(backState.progress.value, backState.swipeEdgeSign),
+            .testTag(ReleaseNotesTestTags.Screen),
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(

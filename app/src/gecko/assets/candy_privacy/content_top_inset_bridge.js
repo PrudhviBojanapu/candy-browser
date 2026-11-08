@@ -77,22 +77,36 @@ function protectBodyWithUserCss(body, padding, navigationGeneration, revision) {
   }
 }
 
+let lastScrollMetricsPublishTime = 0;
+let cachedRangeCssPx = 0;
+let lastRangeMeasureTime = 0;
+
 function publishScrollMetrics() {
   scrollMetricsFrame = 0;
   if (!policyReady || !state.scrollMetricsEnabled) return;
+  const now = Date.now();
+  if (now - lastScrollMetricsPublishTime < 32) {
+    scrollMetricsFrame = globalThis.requestAnimationFrame(publishScrollMetrics);
+    return;
+  }
+  lastScrollMetricsPublishTime = now;
   const phase = beginCandyPerformancePhase("Candy.ScrollMetrics.Publish");
   try {
     const root = document.documentElement;
     if (!root) return;
-    const body = document.body;
     const scale = Number.isFinite(globalThis.devicePixelRatio) ?
       Math.max(1, globalThis.devicePixelRatio) : 1;
     const extentCssPx = Math.max(0, root.clientHeight || globalThis.innerHeight || 0);
-    const rangeCssPx = Math.max(
-      extentCssPx,
-      root.scrollHeight || 0,
-      body?.scrollHeight || 0,
-    );
+    if (now - lastRangeMeasureTime > 500 || cachedRangeCssPx === 0) {
+      lastRangeMeasureTime = now;
+      const body = document.body;
+      cachedRangeCssPx = Math.max(
+        extentCssPx,
+        root.scrollHeight || 0,
+        body?.scrollHeight || 0,
+      );
+    }
+    const rangeCssPx = cachedRangeCssPx;
     browser.runtime.sendMessage({
       type: "scroll-metrics",
       revision: state.revision,
@@ -279,7 +293,10 @@ browser.runtime.onMessage.addListener((message) => {
   }
 });
 globalThis.addEventListener("scroll", scheduleScrollMetrics, { passive: true });
-globalThis.addEventListener("resize", scheduleScrollMetrics, { passive: true });
+globalThis.addEventListener("resize", () => {
+  cachedRangeCssPx = 0;
+  scheduleScrollMetrics();
+}, { passive: true });
 document.addEventListener("DOMContentLoaded", scheduleScrollMetrics, { once: true });
 globalThis.addEventListener("load", scheduleScrollMetrics, { once: true });
 requestPolicy();

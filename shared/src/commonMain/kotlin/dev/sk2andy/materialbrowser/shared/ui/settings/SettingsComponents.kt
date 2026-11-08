@@ -423,7 +423,7 @@ fun SettingsPageSpacer() {
 
 @Composable
 fun SettingsPreferenceGroup(
-    containerColor: Color,
+    containerColor: Color = settingsRowColor(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (LocalSettingsPreferenceGroup.current) {

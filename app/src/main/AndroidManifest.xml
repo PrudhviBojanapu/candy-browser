@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <uses-permission android:name="dev.sk2andy.materialbrowser.permission.STATUS_BAR_SCROLL_CONTROL" />
-    <permission
-        android:name="dev.sk2andy.materialbrowser.permission.STATUS_BAR_SCROLL_CONTROL"
-        android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -15,12 +15,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS" />
     <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_SET_ORIGIN" />
 
@@ -46,10 +44,6 @@
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.HOME" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
         <intent>
@@ -68,6 +62,10 @@
         <package android:name="com.gianlu.aria2app" />
         <package android:name="com.dv.adm" />
         <package android:name="com.tachibana.downloader" />
+        <package android:name="app.gyrolet.mpvrx.debug" />
+        <package android:name="app.gyrolet.mpvrx" />
+        <provider android:authorities="app.gyrolet.mpvrx.debug.ytdlp" />
+        <provider android:authorities="app.gyrolet.mpvrx.ytdlp" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
@@ -169,48 +167,6 @@
         tools:targetApi="s"
         tools:ignore="CredManMissingDal">
         <profileable android:shell="${performanceDiagnosticsEnabled}" />
-        <service
-            android:name=".StatusBarScrollAccessibilityService"
-            android:description="@string/status_bar_scroll_accessibility_service_description"
-            android:exported="true"
-            android:label="@string/status_bar_scroll_accessibility_service_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/status_bar_scroll_accessibility_service" />
-        </service>
-        <receiver
-            android:name=".browser.guest.GuestBubbleRestoreReceiver"
-            android:exported="false" />
-        <activity
-            android:name=".GuestBubbleActivity"
-            android:configChanges="layoutDirection|locale|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:process=":guestBubble"
-            android:taskAffinity="${applicationId}.guestBubble"
-            android:windowSoftInputMode="adjustResize" />
-        <activity
-            android:name=".GuestBubbleCleanupActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:process=":guestCleanup"
-            android:taskAffinity="${applicationId}.guestCleanup" />
-        <provider
-            android:name=".CandyDocumentsProvider"
-            android:authorities="${applicationId}.documents"
-            android:exported="true"
-            android:grantUriPermissions="true"
-            android:permission="android.permission.MANAGE_DOCUMENTS">
-            <intent-filter>
-                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
-            </intent-filter>
-        </provider>
         <provider
             android:name=".browser.gecko.GeckoPerformanceDiagnosticsProvider"
             android:authorities="${applicationId}.performance"
@@ -218,25 +174,12 @@
             android:exported="true"
             android:permission="android.permission.DUMP" />
         <activity
-            android:name=".RssFeedsActivity"
-            android:exported="false" />
-        <receiver
-            android:name=".RssFeedWidgetProvider"
-            android:exported="true"
-            android:label="@string/rss_widget_title"
-            android:permission="android.permission.BIND_APPWIDGET">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/rss_feed_widget_info" />
-        </receiver>
-        <activity
             android:name=".MainActivity"
+            android:label="Browser"
             android:configChanges="layoutDirection|locale|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
             android:launchMode="singleTask"
+            android:taskAffinity="app.myaioapp.browser"
             android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -286,38 +229,6 @@
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_cookie"
-            android:label="${appLabel}">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.APP_BROWSER" />
-            </intent-filter>
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
-        </activity-alias>
-        <activity-alias
-            android:name=".LauncherIconOutlineLight"
-            android:targetActivity=".MainActivity"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_outline_light"
-            android:label="${appLabel}">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.APP_BROWSER" />
-            </intent-filter>
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
-        </activity-alias>
-        <activity-alias
-            android:name=".LauncherIconOutlineDark"
-            android:targetActivity=".MainActivity"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_outline_dark"
             android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -466,30 +377,6 @@
             android:theme="@android:style/Theme.NoDisplay" />
 
         <activity
-            android:name=".ResearchSelectedTextActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:label="@string/process_text_research">
-            <intent-filter>
-                <action android:name="android.intent.action.PROCESS_TEXT" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".ReadSelectedTextActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:label="@string/process_text_read_aloud">
-            <intent-filter>
-                <action android:name="android.intent.action.PROCESS_TEXT" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-        </activity>
-
-        <activity
             android:name=".BrowserEngineRestartActivity"
             android:excludeFromRecents="true"
             android:exported="false"
@@ -498,21 +385,6 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
-        <activity
-            android:name=".AppDataTransferActivity"
-            android:configChanges="density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:process=":dataTransfer" />
-
-        <service
-            android:name=".feeds.FeedMediaPlaybackService"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
-            <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
-            </intent-filter>
-        </service>
         <service
             android:name=".browser.BrowserMediaPlaybackService"
             android:exported="true"
@@ -523,88 +395,7 @@
         </service>
 
         <activity
-            android:name=".DeviceSearchSettingsActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".DeviceSearchResultActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:noHistory="true"
-            android:taskAffinity=""
-            android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="candy-device-search" android:host="item" />
-            </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".SiteCapsuleActivity"
-            android:configChanges="layoutDirection|locale|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
-            android:documentLaunchMode="intoExisting"
-            android:exported="false"
-            android:supportsPictureInPicture="true"
-            android:taskAffinity=""
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".SiteCapsuleLauncherActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:noHistory="true"
-            android:taskAffinity=""
-            android:theme="@android:style/Theme.NoDisplay" />
-
-        <activity
-            android:name=".SiteWidgetConfigurationActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:noHistory="true"
-            android:taskAffinity=""
-            android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".SiteCapsuleEditorActivity"
-            android:configChanges="density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".CapsuleCustomIconEditorActivity"
-            android:configChanges="density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
-            android:exported="false" />
-
-        <activity
-            android:name=".CapsuleIconPackPickerActivity"
-            android:configChanges="density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".ProfileWallpaperEditorActivity"
-            android:configChanges="density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
-            android:exported="false" />
-
-        <activity
-            android:name=".ConstellationActivity"
-            android:exported="false"
-            android:label="@string/constellations_title" />
-
-        <activity
             android:name=".HistoryActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".DownloadsActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
@@ -612,331 +403,6 @@
             android:name=".FavoritesActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
-
-        <receiver
-            android:name=".CandySearchWidgetProvider"
-            android:exported="false"
-            android:label="@string/widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/candy_search_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidgetProvider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_four_by_three_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SquareSiteWidgetProvider"
-            android:exported="false"
-            android:label="@string/site_widget_name_square">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_four_by_four_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget2x2Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_2x2_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget2x3Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_2x3_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget2x4Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_2x4_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget2x5Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_2x5_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget2x6Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_2x6_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget3x2Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_3x2_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget3x3Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_3x3_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget3x4Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_3x4_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget3x5Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_3x5_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget3x6Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_3x6_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget4x2Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_4x2_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget4x5Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_4x5_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget4x6Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_4x6_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget5x2Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_5x2_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget5x3Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_5x3_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget5x4Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_5x4_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget5x5Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_5x5_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget5x6Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_5x6_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget6x2Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_6x2_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget6x3Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_6x3_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget6x4Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_6x4_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget6x5Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_6x5_info" />
-        </receiver>
-
-        <receiver
-            android:name=".SiteWidget6x6Provider"
-            android:exported="false"
-            android:label="@string/site_widget_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/site_widget_6x6_info" />
-        </receiver>
-
-        <receiver
-            android:name=".data.SnoozeAlarmReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.TIME_SET" />
-                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
-            </intent-filter>
-        </receiver>
 
         <receiver
             android:name=".browser.downloads.CandyDownloadNotificationReceiver"
@@ -949,5 +415,6 @@
         <receiver
             android:name=".browser.gecko.GeckoWebNotificationReceiver"
             android:exported="false" />
+
     </application>
 </manifest>

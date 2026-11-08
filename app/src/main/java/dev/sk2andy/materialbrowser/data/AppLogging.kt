@@ -23,9 +23,6 @@ internal object AppLogging {
     @Volatile
     private var store: AppLogStore? = null
 
-    private var nativeCaptureStore: NativeCrashHistoryStore? = null
-    private var nativeHistory: NativeCrashHistory? = null
-
     @Volatile
     private var privateBrowsingActive = false
 
@@ -37,20 +34,7 @@ internal object AppLogging {
         val appContext = context.applicationContext
         val directory = File(appContext.noBackupFilesDir, "app_logs")
         store = AppLogStore(directory)
-        nativeCaptureStore = NativeCrashHistoryStore(
-            directory,
-            appContext.getSharedPreferences(NativeCrashHistoryStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
-        )
-        nativeHistory = NativeCrashHistory(appContext, requireNotNull(nativeCaptureStore))
-        val previousCapture = requireNotNull(nativeCaptureStore).snapshot()
-        val startedAtMillis = System.currentTimeMillis()
         setEnabled(BrowserSessionStore(appContext).loadDeveloperSettings().appLoggingEnabled)
-        val currentStore = requireNotNull(store)
-        currentStore.captureGeneration()?.let { generation ->
-            writer.execute {
-                collectNativeCrashes(previousCapture, startedAtMillis, currentStore, generation)
-            }
-        }
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         if (previousHandler != null) {
             Thread.setDefaultUncaughtExceptionHandler(
@@ -68,25 +52,14 @@ internal object AppLogging {
         val anyPrivateOwner = privateOwners.isNotEmpty()
         if (anyPrivateOwner == privateBrowsingActive) return
         if (anyPrivateOwner) store?.invalidatePendingWrites()
-        if (store?.captureGeneration() != null) {
-            nativeCaptureStore?.reset(
-                allowed = !anyPrivateOwner,
-                nowMillis = System.currentTimeMillis(),
-            )
-        }
         privateBrowsingActive = anyPrivateOwner
     }
 
     @Synchronized
     fun setEnabled(enabled: Boolean): Boolean {
         val result = store?.setEnabled(enabled) ?: return false
-        val nativeResult = if (enabled) {
-            nativeCaptureStore?.reset(!privateBrowsingActive, System.currentTimeMillis()) ?: true
-        } else {
-            nativeCaptureStore?.reset(allowed = false, nowMillis = System.currentTimeMillis()) ?: true
-        }
         if (enabled) record(AppLogEvent.LoggingEnabled)
-        return result && nativeResult
+        return result
     }
 
     fun record(event: AppLogEvent, error: Throwable? = null, sync: Boolean = false) {
@@ -101,19 +74,6 @@ internal object AppLogging {
             runCatching {
                 writer.execute {
                     if (!privateBrowsingActive) currentStore.append(record, generation)
-                    if (event == AppLogEvent.GeckoRendererCrashed ||
-                        event == AppLogEvent.GeckoRendererKilled ||
-                        event == AppLogEvent.SystemRendererGone
-                    ) {
-                        nativeCaptureStore?.snapshot()?.let { checkpoint ->
-                            collectNativeCrashes(
-                                checkpoint,
-                                System.currentTimeMillis(),
-                                currentStore,
-                                generation,
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -133,43 +93,13 @@ internal object AppLogging {
 
     @Synchronized
     fun clear(): Boolean {
-        val result = store?.clear() ?: true
-        val nativeResult = if (store?.captureGeneration() != null) {
-            nativeCaptureStore?.reset(!privateBrowsingActive, System.currentTimeMillis()) ?: true
-        } else {
-            nativeCaptureStore?.reset(allowed = false, nowMillis = System.currentTimeMillis()) ?: true
-        }
-        return result && nativeResult
-    }
-
-    private fun collectNativeCrashes(
-        checkpoint: NativeCrashCaptureCheckpoint,
-        beforeMillis: Long,
-        currentStore: AppLogStore,
-        generation: Long,
-    ) {
-        if (privateBrowsingActive || currentStore.captureGeneration() != generation) return
-        nativeHistory?.collect(checkpoint, beforeMillis) { record ->
-            !privateBrowsingActive && currentStore.append(record, generation)
-        }
+        return store?.clear() ?: true
     }
 
     /** Caller owns Dispatchers.IO and reports failures; sharing remains an explicit user action. */
     fun export(context: Context, uri: Uri, diagnostics: String): Boolean = runCatching {
         val logs = writer.submit<String> {
-            val currentStore = store
-            val generation = currentStore?.captureGeneration()
-            if (currentStore != null && generation != null) {
-                nativeCaptureStore?.snapshot()?.let { checkpoint ->
-                    collectNativeCrashes(
-                        checkpoint,
-                        System.currentTimeMillis(),
-                        currentStore,
-                        generation,
-                    )
-                }
-            }
-            currentStore?.snapshot().orEmpty()
+            store?.snapshot().orEmpty()
         }
             .get(5L, TimeUnit.SECONDS)
         context.contentResolver.openOutputStream(uri, "wt")?.use { output ->

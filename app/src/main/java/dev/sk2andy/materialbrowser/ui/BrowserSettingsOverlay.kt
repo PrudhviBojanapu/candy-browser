@@ -7,9 +7,6 @@
 package dev.sk2andy.materialbrowser.ui
 
 import android.widget.Toast
-import android.content.Intent
-import dev.sk2andy.materialbrowser.StatusBarScrollAccessibilityContract
-import dev.sk2andy.materialbrowser.DeviceSearchSettingsActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.slideInHorizontally
@@ -27,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -49,7 +45,6 @@ import kotlin.math.roundToInt
 internal fun BrowserSettingsOverlay(
     controller: BrowserController,
     visible: Boolean,
-    backEnabled: Boolean = true,
     destination: SettingsDestination,
     predictiveBackCommitted: Boolean,
     predictiveBackProgress: Float,
@@ -58,7 +53,6 @@ internal fun BrowserSettingsOverlay(
     visibleProfileIds: Set<String>,
     onDestinationChanged: (SettingsDestination) -> Unit,
     onOpenPrivacyXRay: () -> Unit,
-    onDiscoverFeeds: () -> Unit,
     onOpenPermissionRadar: () -> Unit,
     onEditCapsule: (SiteCapsule) -> Unit,
     onDeleteCapsule: (SiteCapsule) -> Unit,
@@ -136,8 +130,7 @@ internal fun BrowserSettingsOverlay(
 
     AnimatedVisibility(
             visible = visible,
-        modifier = Modifier.zIndex(20f)
-            .then(if (backEnabled) Modifier else Modifier.clearAndSetSemantics {}),
+        modifier = Modifier.zIndex(20f),
         enter = slideInHorizontally(
             initialOffsetX = { width ->
                 PredictiveBackMotion.entryTranslation(
@@ -163,11 +156,6 @@ internal fun BrowserSettingsOverlay(
         },
     ) {
         SettingsScreen(
-            backEnabled = backEnabled,
-            onDiscoverFeeds = onDiscoverFeeds,
-            onOpenDeviceSearch = {
-                context.startActivity(Intent(context, DeviceSearchSettingsActivity::class.java))
-            },
             appLanguageTag = appLanguageTag,
             supportedAppLocales = appLanguagePreferences.supportedLocales,
             onAppLanguageChanged = { languageTag ->
@@ -194,13 +182,11 @@ internal fun BrowserSettingsOverlay(
             pageTranslationProvider = controller.pageTranslationProvider,
             addressBarLongPressAction = controller.addressBarLongPressAction,
             linkLongPressAction = controller.linkLongPressAction,
-            linkPeekSwipeAction = controller.linkPeekSwipeAction,
             linkPeekActionLayout = controller.linkPeekActionLayout,
             searxngSettings = controller.searxngSettings,
             isAiModeToggleVisible = controller.isAiModeToggleVisible,
             searchSuggestionProvider = controller.searchSuggestionProvider,
             isHistorySuggestionsEnabled = controller.isHistorySuggestionsEnabled,
-            isFormDraftSavingEnabled = controller.isFormDraftSavingEnabled,
             isRecallEnabled = controller.isRecallEnabled,
             historyRecordingMode = controller.historyRecordingMode,
             tabOverviewMode = controller.tabOverviewMode,
@@ -217,30 +203,10 @@ internal fun BrowserSettingsOverlay(
             browserMenuLayout = controller.browserMenuLayout,
             isStatusBarScrollEnabled = controller.isStatusBarScrollEnabled,
             statusBarScrollTargetWidthPercent = controller.statusBarScrollTargetWidthPercent,
-            onStatusBarScrollEnabledChanged = controller::updateStatusBarScrollEnabled,
-            onStatusBarScrollTargetWidthPercentChanged = controller::updateStatusBarScrollTargetWidthPercent,
-            onStatusBarScrollTargetWidthPreview = { widthPercent, finished ->
-                context.sendBroadcast(
-                    Intent(StatusBarScrollAccessibilityContract.ACTION_PREVIEW_TARGET)
-                        .setPackage(context.packageName)
-                        .putExtra(StatusBarScrollAccessibilityContract.EXTRA_TARGET_WIDTH_PERCENT, widthPercent)
-                        .putExtra(StatusBarScrollAccessibilityContract.EXTRA_PREVIEW_FINISHED, finished),
-                )
-            },
-            onOpenStatusBarScrollAccessibilitySettings = {
-                context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            },
             isAddressBarDockingEnabled = controller.isAddressBarDockingEnabled,
             isAddressBarSwipeModeEnabled = controller.isAddressBarSwipeModeEnabled,
             isExternalLinkPreviewEnabled = controller.isExternalLinkPreviewEnabled,
-            externalLinkPreviewProfileId = controller.externalLinkPreviewProfileId,
-            externalLinkPreviewProfiles = controller.externalLinkPreviewProfiles,
             externalAppLinkHandling = controller.externalAppLinkHandling,
-            externalAppSiteExceptions = controller.externalAppSiteExceptions,
-            onResetExternalAppSiteException = controller::resetExternalAppSiteException,
-            onResetAllExternalAppSiteExceptions = controller::resetAllExternalAppSiteExceptions,
-            linkRoutingRules = controller.incomingLinkRouter.rules,
-            onLinkRoutingRulesChanged = controller.incomingLinkRouter::updateRules,
             isFullImmersiveModeEnabled = controller.isFullImmersiveModeEnabled,
             isStartupAnimationEnabled = controller.isStartupAnimationEnabled,
             startupAddressFocusMode = controller.startupAddressFocusMode,
@@ -308,14 +274,12 @@ internal fun BrowserSettingsOverlay(
             onAddressBarLongPressActionChanged =
                 controller::updateAddressBarLongPressAction,
             onLinkLongPressActionChanged = controller::updateLinkLongPressAction,
-            onLinkPeekSwipeActionChanged = controller::updateLinkPeekSwipeAction,
             onLinkPeekActionLayoutChanged = controller::updateLinkPeekActionLayout,
             onSearxngSettingsChanged = controller::updateSearxngSettings,
             onAiModeToggleVisibleChanged = controller::updateAiModeToggleVisible,
             onSearchSuggestionProviderChanged = controller::updateSearchSuggestionProvider,
             onHistorySuggestionsEnabledChanged =
                 controller::updateHistorySuggestionsEnabled,
-            onFormDraftSavingEnabledChanged = controller::updateFormDraftSavingEnabled,
             onRecallEnabledChanged = controller::updateRecallEnabled,
             onHistoryRecordingModeChanged = controller::updateHistoryRecordingMode,
             onTabOverviewModeChanged = controller::updateTabOverviewMode,
@@ -335,9 +299,10 @@ internal fun BrowserSettingsOverlay(
                 controller::updateAddressBarDockingEnabled,
             onAddressBarSwipeModeEnabledChanged =
                 controller::updateAddressBarSwipeModeEnabled,
+            onStatusBarScrollEnabledChanged = controller::updateStatusBarScrollEnabled,
+            onStatusBarScrollTargetWidthPercentChanged = controller::updateStatusBarScrollTargetWidthPercent,
             onExternalLinkPreviewEnabledChanged =
                 controller::updateExternalLinkPreviewEnabled,
-            onExternalLinkPreviewProfileChanged = controller::updateExternalLinkPreviewProfile,
             onExternalAppLinkHandlingChanged = controller::updateExternalAppLinkHandling,
             onFullImmersiveModeEnabledChanged =
                 controller::updateFullImmersiveModeEnabled,
@@ -454,7 +419,6 @@ internal fun BrowserSettingsOverlay(
             onImportAppData = onImportAppData,
             onClearData = onClearData,
             onOpenLegalUrl = onOpenLegalUrl,
-            onShareSyncExtensionLink = controller::shareLink,
             onDismiss = onDismiss,
             onOpenFirefoxExtensions = onOpenFirefoxExtensions,
             customWorkflowConfiguration = controller.customWorkflowConfiguration,

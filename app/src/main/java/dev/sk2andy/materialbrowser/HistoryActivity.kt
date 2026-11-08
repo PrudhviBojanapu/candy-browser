@@ -3,7 +3,6 @@ package dev.sk2andy.materialbrowser
 import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -12,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
-import dev.sk2andy.materialbrowser.browser.guest.GuestBubbleGate
 import dev.sk2andy.materialbrowser.browser.integration.HistoryActivityContract
 import dev.sk2andy.materialbrowser.browser.ProfileProtectionSession
 import dev.sk2andy.materialbrowser.data.AppDataTransferLock
@@ -40,14 +38,7 @@ class HistoryActivity : ComponentActivity() {
     private var recallMatches by mutableStateOf<List<RecallMatch>>(emptyList())
     private var recallRequestId = 0
     private val clearRequests = mutableListOf<HistoryClearRequest>()
-    private val mutationBackBlocker = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = Unit
-    }
     private var isMutationInProgress = false
-        set(value) {
-            field = value
-            mutationBackBlocker.isEnabled = value
-        }
     private var hasHistoryMutations = false
     private var isFullImmersiveModeEnabled = false
     private var accessibleProfileIds: Set<String> = emptySet()
@@ -55,8 +46,6 @@ class HistoryActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         BrowsingHistoryLifecycle.install(application)
         super.onCreate(savedInstanceState)
-        onBackPressedDispatcher.addCallback(this, mutationBackBlocker)
-        if (GuestBubbleGate.redirectIfLocked(this)) return
         if (AppDataTransferLock.isActive(this)) {
             finish()
             return
@@ -84,7 +73,6 @@ class HistoryActivity : ComponentActivity() {
             profiles.any { profile -> profile.id == candidate }
         } ?: profiles.first().id
         clearRequests += HistoryActivityContract.clearRequestsFrom(savedInstanceState)
-        publishHistoryResult()
         history = accessibleHistory()
         val appearanceSettings = store.loadAppearanceSettings()
         val recallEnabled = store.loadRecallEnabled()
@@ -134,7 +122,6 @@ class HistoryActivity : ComponentActivity() {
                                     ).show()
                                 } else {
                                     hasHistoryMutations = hasHistoryMutations || history != previous
-                                    publishHistoryResult()
                                     val deletedKeys = entries.mapNotNullTo(hashSetOf()) { entry ->
                                         RecallRules.canonicalUrl(entry.url)?.let { url ->
                                             "${entry.profileId}\u0000$url"
@@ -253,16 +240,12 @@ class HistoryActivity : ComponentActivity() {
         filter { entry -> entry.profileId in accessibleProfileIds }
 
     private fun finishWithResult() {
-        publishHistoryResult()
-        finish()
-    }
-
-    private fun publishHistoryResult() {
         if (hasHistoryMutations || clearRequests.isNotEmpty()) {
             setResult(
                 Activity.RESULT_OK,
                 HistoryActivityContract.resultIntent(clearRequests = clearRequests),
             )
         }
+        finish()
     }
 }

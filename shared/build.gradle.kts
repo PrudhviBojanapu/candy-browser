@@ -5,7 +5,7 @@ plugins {
     id("com.android.library")
     kotlin("multiplatform")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.compose") version "1.8.2"
+    id("org.jetbrains.compose")
 }
 
 kotlin {

@@ -1,20 +1,21 @@
 package dev.sk2andy.materialbrowser.browser.downloads
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.text.format.Formatter
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
-import dev.sk2andy.materialbrowser.DownloadsActivity
 import dev.sk2andy.materialbrowser.R
-import dev.sk2andy.materialbrowser.hasNotificationPermission
 import dev.sk2andy.materialbrowser.data.DownloadEntry
 import dev.sk2andy.materialbrowser.data.DownloadRuntimeRegistry
 import dev.sk2andy.materialbrowser.data.DownloadStatus
@@ -64,7 +65,6 @@ internal class CandyDownloadNotifier(
         mimeType: String,
         uri: Uri,
     ) {
-        DownloadCompletionEvents.completed(DownloadCompletion(fileName, mimeType, uri))
         val openIntent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, mimeType)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -138,7 +138,6 @@ internal class CandyDownloadNotifier(
     internal fun active(transferId: Int, entry: DownloadEntry) {
         if (!entry.status.isActive) return
         val progress = progressPercent(entry.bytes, entry.total)
-        val running = entry.status == DownloadStatus.Running
         val progressStyle = NotificationCompat.ProgressStyle()
             .setStyledByProgress(true)
             .setProgressIndeterminate(progress == null)
@@ -158,8 +157,7 @@ internal class CandyDownloadNotifier(
             .setContentIntent(openDownloadsIntent(transferId))
             .setOngoing(true)
             .setAutoCancel(false)
-            .setRequestPromotedOngoing(running)
-            .setShortCriticalText(progress?.takeIf { running }?.let { "$it%" })
+            .setColorized(true)
             .setStyle(progressStyle)
         if (progress == null) {
             builder.setProgress(0, 0, true)
@@ -222,8 +220,10 @@ internal class CandyDownloadNotifier(
     private fun openDownloadsIntent(transferId: Int): PendingIntent = PendingIntent.getActivity(
         appContext,
         notificationId(transferId),
-        Intent(appContext, DownloadsActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        Intent().apply {
+            component = ComponentName(appContext.packageName, "com.linroid.ketch.app.android.MainActivity")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
@@ -257,7 +257,8 @@ internal class CandyDownloadNotifier(
 
     private fun canNotify(): Boolean {
         canNotifyOverride?.let { return it() }
-        return appContext.hasNotificationPermission() && manager.areNotificationsEnabled()
+        return appContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED && manager.areNotificationsEnabled()
     }
 
     internal companion object {

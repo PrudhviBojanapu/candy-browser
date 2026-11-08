@@ -5,7 +5,7 @@ package dev.sk2andy.materialbrowser.shared.browser
  *
  * Android renders these ordered sections with the commonMain menu composable. iOS projects the
  * same state and actions into its native Liquid Glass menu so the Apple chrome can morph without
- * duplicating browser behavior. Capabilities hide platform-specific additions.
+ * duplicating browser behavior. Firefox extensions are the only Android-only addition.
  */
 enum class BrowserFeatureMenuSection {
     Toolbar,
@@ -13,7 +13,6 @@ enum class BrowserFeatureMenuSection {
     Toppings,
     Candy,
     Browser,
-    Reading,
 }
 
 enum class BrowserFeatureMenuItemKind {
@@ -35,9 +34,6 @@ enum class BrowserFeatureMenuAction {
     CloseTab,
     ParkAddressBarRight,
     OpenReader,
-    OpenFeeds,
-    OpenLibrary,
-    DiscoverFeeds,
     OpenWebAnnotations,
     TranslatePage,
     FindInPage,
@@ -53,9 +49,7 @@ enum class BrowserFeatureMenuAction {
     ToggleDomainMute,
     ToggleStatusBarScroll,
     OpenCandyTrail,
-    OpenConstellations,
     AddSiteCapsule,
-    CreateSiteWidget,
     Summarize,
     SnoozeTab,
     DockAddressBar,
@@ -66,6 +60,8 @@ enum class BrowserFeatureMenuAction {
     OpenSettings,
     OpenFirefoxExtensions,
     InvokeToppingCommand,
+    ToggleVideoDetectionRedirect,
+    ToggleAllAdBlockers,
 }
 
 enum class BrowserFeatureMenuLabelKey {
@@ -83,9 +79,6 @@ enum class BrowserFeatureMenuLabelKey {
     CloseTab,
     ParkAddressBarRight,
     Reader,
-    Feeds,
-    Library,
-    DiscoverFeeds,
     WebAnnotations,
     Translate,
     FindInPage,
@@ -103,9 +96,7 @@ enum class BrowserFeatureMenuLabelKey {
     EnableStatusBarScrollForDomain,
     DisableStatusBarScrollForDomain,
     CandyTrail,
-    Constellations,
     AddSiteCapsule,
-    CreateSiteWidget,
     Summarize,
     SnoozeTab,
     DockAddressBar,
@@ -116,6 +107,8 @@ enum class BrowserFeatureMenuLabelKey {
     Settings,
     FirefoxExtensions,
     ToppingsCommand,
+    VideoDetectionRedirect,
+    AllAdBlockers,
 }
 
 data class BrowserFeatureMenuItem(
@@ -125,7 +118,6 @@ data class BrowserFeatureMenuItem(
     val section: BrowserFeatureMenuSection,
     val kind: BrowserFeatureMenuItemKind,
     val enabled: Boolean,
-    val unreadCount: Int = 0,
     val checked: Boolean? = null,
     val dynamicLabel: String? = null,
     val supportingText: String? = null,
@@ -152,8 +144,6 @@ data class BrowserFeatureMenuState(
     val isFavorite: Boolean = false,
     val isPinned: Boolean = false,
     val canOpenReader: Boolean = false,
-    val canDiscoverFeeds: Boolean = false,
-    val unreadFeedCount: Int = 0,
     val canOpenWebAnnotations: Boolean = false,
     val canTranslatePage: Boolean = false,
     val canUseDocumentActions: Boolean = false,
@@ -174,21 +164,18 @@ data class BrowserFeatureMenuState(
     val canToggleStatusBarScroll: Boolean = false,
     val isStatusBarScrollEnabled: Boolean = false,
     val canAddSiteCapsule: Boolean = false,
-    val canCreateSiteWidget: Boolean = false,
-    val canOpenConstellations: Boolean = false,
     val canSnooze: Boolean = false,
     val canDockAddressBar: Boolean = true,
+    val canToggleVideoDetectionRedirect: Boolean = true,
+    val isVideoDetectionRedirectEnabled: Boolean = true,
+    val canToggleAllAdBlockers: Boolean = true,
+    val isAllAdBlockersEnabled: Boolean = true,
     val overflowPageActions: List<BrowserFeatureMenuAction> = emptyList(),
     val toppingCommands: List<BrowserToppingMenuCommand> = emptyList(),
 )
 
 data class BrowserFeatureMenuCapabilities(
-    val supportsFeeds: Boolean = false,
-    val supportsFeedDiscovery: Boolean = false,
-    val supportsLibrary: Boolean = false,
-    val supportsFirefoxExtensions: Boolean = false,
-    val supportsSiteWidgets: Boolean = false,
-    val supportsConstellations: Boolean = false,
+    val supportsFirefoxExtensions: Boolean = true,
     val supportsWebAnnotations: Boolean = false,
 )
 
@@ -199,10 +186,9 @@ object BrowserFeatureMenuRules {
     ): List<BrowserFeatureMenuItem> = buildList {
         toolbarItems(state).forEach(::add)
         pageItems(state, capabilities).forEach(::add)
-        candyItems(state, capabilities).forEach(::add)
-        browserItems(state, capabilities).forEach(::add)
-        readingItems(state, capabilities).forEach(::add)
         toppingItems(state).forEach(::add)
+        candyItems(state).forEach(::add)
+        browserItems(state, capabilities).forEach(::add)
     }
 
     private fun toolbarItems(state: BrowserFeatureMenuState) = listOf(
@@ -282,16 +268,6 @@ object BrowserFeatureMenuRules {
                 enabled = state.hasPage,
             ),
         )
-        add(
-            command(
-                BrowserFeatureMenuAction.OpenReader,
-                BrowserFeatureMenuLabelKey.Reader,
-                enabled = state.canOpenReader,
-            ),
-        )
-        if ((capabilities.supportsFeeds || capabilities.supportsFeedDiscovery) && state.canDiscoverFeeds) {
-            add(command(BrowserFeatureMenuAction.DiscoverFeeds, BrowserFeatureMenuLabelKey.DiscoverFeeds))
-        }
         if (capabilities.supportsWebAnnotations) {
             add(
                 command(
@@ -321,13 +297,6 @@ object BrowserFeatureMenuRules {
                 BrowserFeatureMenuAction.OpenExternal,
                 BrowserFeatureMenuLabelKey.OpenExternal,
                 enabled = state.hasPage,
-            ),
-        )
-        add(
-            command(
-                BrowserFeatureMenuAction.Print,
-                BrowserFeatureMenuLabelKey.Print,
-                enabled = state.canUseDocumentActions,
             ),
         )
         if (
@@ -376,6 +345,14 @@ object BrowserFeatureMenuRules {
         }
         add(
             toggle(
+                BrowserFeatureMenuAction.ToggleAllAdBlockers,
+                BrowserFeatureMenuLabelKey.AllAdBlockers,
+                state.canToggleAllAdBlockers,
+                state.isAllAdBlockersEnabled,
+            ),
+        )
+        add(
+            toggle(
                 BrowserFeatureMenuAction.ToggleAlwaysBlockPopups,
                 BrowserFeatureMenuLabelKey.AlwaysBlockPopups,
                 state.canToggleAlwaysBlockPopups,
@@ -402,31 +379,25 @@ object BrowserFeatureMenuRules {
                 state.isDomainMuted,
             ),
         )
-        if (state.canToggleStatusBarScroll) {
-            add(toggle(
-                BrowserFeatureMenuAction.ToggleStatusBarScroll,
-                if (state.isStatusBarScrollEnabled) BrowserFeatureMenuLabelKey.DisableStatusBarScrollForDomain
-                else BrowserFeatureMenuLabelKey.EnableStatusBarScrollForDomain,
-                true,
-                state.isStatusBarScrollEnabled,
-            ))
-        }
-    }
+        add(
+            toggle(
+                BrowserFeatureMenuAction.ToggleVideoDetectionRedirect,
+                BrowserFeatureMenuLabelKey.VideoDetectionRedirect,
+                state.canToggleVideoDetectionRedirect,
+                state.isVideoDetectionRedirectEnabled,
+            ),
+        )
 
-    private fun readingItems(
-        state: BrowserFeatureMenuState,
-        capabilities: BrowserFeatureMenuCapabilities,
-    ) = buildList {
-        if (capabilities.supportsFeeds) {
-            add(navigation(BrowserFeatureMenuAction.OpenFeeds, BrowserFeatureMenuLabelKey.Feeds).copy(
-                section = BrowserFeatureMenuSection.Reading,
-                unreadCount = state.unreadFeedCount.coerceAtLeast(0),
-            ))
-        }
-        if (capabilities.supportsLibrary) {
-            add(navigation(BrowserFeatureMenuAction.OpenLibrary, BrowserFeatureMenuLabelKey.Library).copy(
-                section = BrowserFeatureMenuSection.Reading,
-            ))
+        if (state.canToggleStatusBarScroll) {
+            add(
+                toggle(
+                    BrowserFeatureMenuAction.ToggleStatusBarScroll,
+                    if (state.isStatusBarScrollEnabled) BrowserFeatureMenuLabelKey.DisableStatusBarScrollForDomain
+                    else BrowserFeatureMenuLabelKey.EnableStatusBarScrollForDomain,
+                    true,
+                    state.isStatusBarScrollEnabled,
+                ),
+            )
         }
     }
 
@@ -449,63 +420,7 @@ object BrowserFeatureMenuRules {
         )
     }
 
-    private fun candyItems(
-        state: BrowserFeatureMenuState,
-        capabilities: BrowserFeatureMenuCapabilities,
-    ) = buildList {
-        add(
-            command(
-                BrowserFeatureMenuAction.OpenCandyTrail,
-                BrowserFeatureMenuLabelKey.CandyTrail,
-                BrowserFeatureMenuSection.Candy,
-                state.hasPage,
-            ),
-        )
-        if (capabilities.supportsConstellations) {
-            add(
-                command(
-                    BrowserFeatureMenuAction.OpenConstellations,
-                    BrowserFeatureMenuLabelKey.Constellations,
-                    BrowserFeatureMenuSection.Candy,
-                    state.canOpenConstellations,
-                ),
-            )
-        }
-        add(
-            command(
-                BrowserFeatureMenuAction.AddSiteCapsule,
-                BrowserFeatureMenuLabelKey.AddSiteCapsule,
-                BrowserFeatureMenuSection.Candy,
-                state.canAddSiteCapsule,
-            ),
-        )
-        if (capabilities.supportsSiteWidgets) {
-            add(
-                command(
-                    BrowserFeatureMenuAction.CreateSiteWidget,
-                    BrowserFeatureMenuLabelKey.CreateSiteWidget,
-                    BrowserFeatureMenuSection.Candy,
-                    state.canCreateSiteWidget,
-                ),
-            )
-        }
-        add(
-            command(
-                BrowserFeatureMenuAction.Summarize,
-                BrowserFeatureMenuLabelKey.Summarize,
-                BrowserFeatureMenuSection.Candy,
-                state.hasPage,
-            ),
-        )
-        add(
-            command(
-                BrowserFeatureMenuAction.SnoozeTab,
-                BrowserFeatureMenuLabelKey.SnoozeTab,
-                BrowserFeatureMenuSection.Candy,
-                state.canSnooze,
-            ),
-        )
-    }
+    private fun candyItems(state: BrowserFeatureMenuState): List<BrowserFeatureMenuItem> = emptyList()
 
     private fun browserItems(
         state: BrowserFeatureMenuState,
@@ -523,12 +438,6 @@ object BrowserFeatureMenuRules {
                 ),
             )
         }
-        add(
-            navigation(
-                BrowserFeatureMenuAction.OpenSnoozedTabs,
-                BrowserFeatureMenuLabelKey.SnoozedTabs,
-            ),
-        )
         add(navigation(BrowserFeatureMenuAction.OpenFavorites, BrowserFeatureMenuLabelKey.Favorites))
         add(navigation(BrowserFeatureMenuAction.OpenDownloads, BrowserFeatureMenuLabelKey.Downloads))
         add(navigation(BrowserFeatureMenuAction.OpenHistory, BrowserFeatureMenuLabelKey.History))

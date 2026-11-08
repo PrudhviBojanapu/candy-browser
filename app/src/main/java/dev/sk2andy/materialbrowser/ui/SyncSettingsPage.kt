@@ -13,6 +13,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +43,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sk2andy.materialbrowser.R
-import dev.sk2andy.materialbrowser.shared.ui.settings.SyncExtensionStoreUrls
 import dev.sk2andy.materialbrowser.shared.ui.settings.settingsSearchTarget
 import dev.sk2andy.materialbrowser.browser.BrowserProfile
 import dev.sk2andy.materialbrowser.browser.DEFAULT_BROWSER_PROFILE
@@ -84,10 +85,6 @@ internal object SyncSettingsTestTags {
     const val ExtensionGuide = "sync_settings_extension_guide"
     const val WorkspaceGuide = "sync_settings_workspace_guide"
     const val AndroidGuide = "sync_settings_android_guide"
-    const val ChromeStore = "sync_settings_chrome_store"
-    const val ChromeStoreShare = "sync_settings_chrome_store_share"
-    const val FirefoxStore = "sync_settings_firefox_store"
-    const val FirefoxStoreShare = "sync_settings_firefox_store_share"
     const val Documentation = "sync_settings_documentation"
 
     fun accentColor(hue: Int): String = "sync_settings_accent_color:$hue"
@@ -103,7 +100,6 @@ internal fun SyncSettingsPage(
     onEnroll: (CharArray, CharArray, (SyncEnrollmentOutcome) -> Unit) -> Unit,
     onRefresh: () -> Unit,
     onOpenDocumentation: (String) -> Unit = {},
-    onShareExtensionLink: (String) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val configured = state.settings
@@ -147,9 +143,6 @@ internal fun SyncSettingsPage(
         onBack = onBack,
     ) {
         SyncSetupGuide(onOpenDocumentation)
-        SettingsPageSpacer()
-        SyncExtensionStores(onOpenDocumentation, onShareExtensionLink)
-        SettingsPageSpacer()
         SyncStatusCard(state)
         Text(
             text = stringResource(R.string.sync_connection_section),
@@ -157,259 +150,243 @@ internal fun SyncSettingsPage(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        SettingsPreferenceGroup {
-            Column(Modifier.padding(18.dp)) {
-                OutlinedTextField(
-                    value = endpoint,
-                    onValueChange = { endpoint = it },
-                    label = { Text(stringResource(R.string.sync_endpoint_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    modifier = Modifier.fillMaxWidth().testTag(SyncSettingsTestTags.Endpoint)
-                        .settingsSearchTarget(stringResource(R.string.sync_endpoint_label)),
-                )
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text(stringResource(R.string.sync_username_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag(SyncSettingsTestTags.Username)
-                        .settingsSearchTarget(stringResource(R.string.sync_username_label)),
-                )
-                SecretTextField(
-                    value = serverPassword,
-                    onValueChange = { serverPassword = it },
-                    label = stringResource(R.string.sync_server_password_label),
-                    supportingText = stringResource(R.string.sync_server_password_summary),
-                    fieldTestTag = SyncSettingsTestTags.Password,
-                    visibilityTestTag = SyncSettingsTestTags.PasswordVisibility,
-                )
+        OutlinedTextField(
+            value = endpoint,
+            onValueChange = { endpoint = it },
+            label = { Text(stringResource(R.string.sync_endpoint_label)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth().testTag(SyncSettingsTestTags.Endpoint)
+                .settingsSearchTarget(stringResource(R.string.sync_endpoint_label)),
+        )
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text(stringResource(R.string.sync_username_label)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().testTag(SyncSettingsTestTags.Username)
+                .settingsSearchTarget(stringResource(R.string.sync_username_label)),
+        )
+        SecretTextField(
+            value = serverPassword,
+            onValueChange = { serverPassword = it },
+            label = stringResource(R.string.sync_server_password_label),
+            supportingText = stringResource(R.string.sync_server_password_summary),
+            fieldTestTag = SyncSettingsTestTags.Password,
+            visibilityTestTag = SyncSettingsTestTags.PasswordVisibility,
+        )
 
-            }
-        }
         Text(
             text = stringResource(R.string.sync_this_device_section),
             modifier = Modifier.padding(start = 18.dp, top = 20.dp, bottom = 8.dp),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        SettingsPreferenceGroup {
-            Column(Modifier.padding(18.dp)) {
-                Box {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { profileMenuExpanded = true }
-                            .testTag(SyncSettingsTestTags.LocalProfile)
-                            .settingsSearchTarget(stringResource(R.string.sync_local_profile_label)),
-                        shape = MaterialTheme.shapes.large,
-                        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(selectedProfile.emoji, style = MaterialTheme.typography.headlineSmall)
-                            Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                                Text(stringResource(R.string.sync_local_profile_label))
-                                Text(
-                                    if (selectedProfile.id == activeProfileId) {
-                                        stringResource(R.string.sync_local_profile_current)
-                                    } else {
-                                        stringResource(R.string.sync_local_profile_existing)
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                    SettingsDropdown(
-                        expanded = profileMenuExpanded,
-                        onDismissRequest = { profileMenuExpanded = false },
-                    ) {
-                        localProfiles.forEach { profile ->
-                            val profileLabel = stringResource(
-                                if (profile.id == activeProfileId) R.string.sync_local_profile_current
-                                else R.string.sync_local_profile_existing,
-                            )
-                            SettingsDropdownItem(
-                                label = profileLabel,
-                                selected = profile.id == localProfileId,
-                                leadingIcon = { Text(profile.emoji) },
-                                modifier = Modifier.semantics {
-                                    contentDescription = "${profile.emoji} $profileLabel"
-                                },
-                                onClick = {
-                                    localProfileId = profile.id
-                                    profileMenuExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = deviceName,
-                    onValueChange = { deviceName = it },
-                    label = { Text(stringResource(R.string.sync_device_name_label)) },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .testTag(SyncSettingsTestTags.DeviceName)
-                        .settingsSearchTarget(stringResource(R.string.sync_device_name_label)),
-                )
-                Box {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .clickable { iconMenuExpanded = true }
-                            .testTag(SyncSettingsTestTags.Icon)
-                            .settingsSearchTarget(stringResource(R.string.sync_device_icon_label)),
-                        shape = MaterialTheme.shapes.large,
-                        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(selectedIcon.emoji, style = MaterialTheme.typography.headlineSmall)
-                            Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                                Text(stringResource(R.string.sync_device_icon_label))
-                                Text(
-                                    selectedIcon.label,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                    SettingsDropdown(
-                        expanded = iconMenuExpanded,
-                        onDismissRequest = { iconMenuExpanded = false },
-                    ) {
-                        iconCatalog.icons.forEach { icon ->
-                            SettingsDropdownItem(
-                                label = icon.label,
-                                selected = icon.id == iconCatalogId,
-                                leadingIcon = { Text(icon.emoji) },
-                                onClick = {
-                                    iconCatalogId = icon.id
-                                    iconMenuExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-                SyncAccentColorPicker(
-                    selectedHue = iconAccentHue,
-                    onHueSelected = { iconAccentHue = it },
-                )
-
-            }
-        }
-        SettingsSectionTitle(stringResource(R.string.sync_passphrase_label))
-        SettingsPreferenceGroup {
-            Column(Modifier.padding(18.dp)) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ) {
-                    Column(Modifier.padding(18.dp)) {
-                        Text(
-                            stringResource(R.string.sync_passphrase_warning_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            stringResource(R.string.sync_passphrase_warning_message),
-                            modifier = Modifier.padding(top = 6.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-                SecretTextField(
-                    value = passphrase,
-                    onValueChange = { passphrase = it },
-                    label = stringResource(R.string.sync_passphrase_label),
-                    fieldTestTag = SyncSettingsTestTags.Passphrase,
-                    visibilityTestTag = SyncSettingsTestTags.PassphraseVisibility,
-                )
-                SecretTextField(
-                    value = passphraseConfirmation,
-                    onValueChange = { passphraseConfirmation = it },
-                    label = stringResource(R.string.sync_passphrase_confirm_label),
-                    fieldTestTag = SyncSettingsTestTags.PassphraseConfirmation,
-                    visibilityTestTag = SyncSettingsTestTags.PassphraseConfirmationVisibility,
-                )
-                feedback?.let { message ->
-                    Text(
-                        stringResource(message),
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+        Box {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { profileMenuExpanded = true }
+                    .testTag(SyncSettingsTestTags.LocalProfile)
+                    .settingsSearchTarget(stringResource(R.string.sync_local_profile_label)),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(
-                        onClick = onRefresh,
-                        enabled = state.status != SyncStatus.Unconfigured && !submitting,
-                        modifier = Modifier.testTag(SyncSettingsTestTags.Refresh),
-                    ) {
-                        Text(stringResource(R.string.sync_action_refresh))
-                    }
-                    Button(
-                        onClick = {
-                            feedback = when {
-                                passphrase != passphraseConfirmation ->
-                                    R.string.sync_error_passphrase_mismatch
-                                passphrase.length < 16 -> R.string.sync_error_passphrase_too_short
-                                passphrase == serverPassword -> R.string.sync_error_password_reuse
-                                endpoint.isBlank() || username.isBlank() || serverPassword.isBlank() ||
-                                    passphrase.isBlank() || deviceName.isBlank() ->
-                                    R.string.sync_error_required_fields
-                                else -> null
-                            }
-                            if (feedback != null) return@Button
-                            val settings = SyncConnectionSettings(
-                                endpoint = endpoint,
-                                username = username,
-                                deviceName = deviceName,
-                                iconCatalogId = iconCatalogId,
-                                iconAccentHue = iconAccentHue,
-                                localProfileId = localProfileId,
-                            )
-                            if (!onConfigure(settings)) {
-                                feedback = R.string.sync_error_invalid_configuration
-                                return@Button
-                            }
-                            submitting = true
-                            val passwordChars = serverPassword.toCharArray()
-                            val passphraseChars = passphrase.toCharArray()
-                            serverPassword = ""
-                            passphrase = ""
-                            passphraseConfirmation = ""
-                            onEnroll(passwordChars, passphraseChars) { outcome ->
-                                submitting = false
-                                feedback = outcome.feedbackMessage()
-                            }
-                        },
-                        enabled = !submitting,
-                        modifier = Modifier.testTag(SyncSettingsTestTags.Enroll),
-                    ) {
-                        Text(stringResource(R.string.sync_action_connect))
+                    Text(selectedProfile.emoji, style = MaterialTheme.typography.headlineSmall)
+                    Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                        Text(stringResource(R.string.sync_local_profile_label))
+                        Text(
+                            if (selectedProfile.id == activeProfileId) {
+                                stringResource(R.string.sync_local_profile_current)
+                            } else {
+                                stringResource(R.string.sync_local_profile_existing)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
-
+            }
+            DropdownMenu(
+                expanded = profileMenuExpanded,
+                onDismissRequest = { profileMenuExpanded = false },
+            ) {
+                localProfiles.forEach { profile ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (profile.id == activeProfileId) {
+                                    "${profile.emoji}  ${stringResource(R.string.sync_local_profile_current)}"
+                                } else {
+                                    "${profile.emoji}  ${stringResource(R.string.sync_local_profile_existing)}"
+                                },
+                            )
+                        },
+                        onClick = {
+                            localProfileId = profile.id
+                            profileMenuExpanded = false
+                        },
+                    )
+                }
             }
         }
+        OutlinedTextField(
+            value = deviceName,
+            onValueChange = { deviceName = it },
+            label = { Text(stringResource(R.string.sync_device_name_label)) },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .testTag(SyncSettingsTestTags.DeviceName)
+                .settingsSearchTarget(stringResource(R.string.sync_device_name_label)),
+        )
+        Box {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .clickable { iconMenuExpanded = true }
+                    .testTag(SyncSettingsTestTags.Icon)
+                    .settingsSearchTarget(stringResource(R.string.sync_device_icon_label)),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(selectedIcon.emoji, style = MaterialTheme.typography.headlineSmall)
+                    Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                        Text(stringResource(R.string.sync_device_icon_label))
+                        Text(
+                            selectedIcon.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            DropdownMenu(
+                expanded = iconMenuExpanded,
+                onDismissRequest = { iconMenuExpanded = false },
+            ) {
+                iconCatalog.icons.forEach { icon ->
+                    DropdownMenuItem(
+                        text = { Text("${icon.emoji}  ${icon.label}") },
+                        onClick = {
+                            iconCatalogId = icon.id
+                            iconMenuExpanded = false
+                        },
+                    )
+                }
+            }
+        }
+        SyncAccentColorPicker(
+            selectedHue = iconAccentHue,
+            onHueSelected = { iconAccentHue = it },
+        )
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ) {
+            Column(Modifier.padding(18.dp)) {
+                Text(
+                    stringResource(R.string.sync_passphrase_warning_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    stringResource(R.string.sync_passphrase_warning_message),
+                    modifier = Modifier.padding(top = 6.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        SecretTextField(
+            value = passphrase,
+            onValueChange = { passphrase = it },
+            label = stringResource(R.string.sync_passphrase_label),
+            fieldTestTag = SyncSettingsTestTags.Passphrase,
+            visibilityTestTag = SyncSettingsTestTags.PassphraseVisibility,
+        )
+        SecretTextField(
+            value = passphraseConfirmation,
+            onValueChange = { passphraseConfirmation = it },
+            label = stringResource(R.string.sync_passphrase_confirm_label),
+            fieldTestTag = SyncSettingsTestTags.PassphraseConfirmation,
+            visibilityTestTag = SyncSettingsTestTags.PassphraseConfirmationVisibility,
+        )
+        feedback?.let { message ->
+            Text(
+                stringResource(message),
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(
+                onClick = onRefresh,
+                enabled = state.status != SyncStatus.Unconfigured && !submitting,
+                modifier = Modifier.testTag(SyncSettingsTestTags.Refresh),
+            ) {
+                Text(stringResource(R.string.sync_action_refresh))
+            }
+            Button(
+                onClick = {
+                    feedback = when {
+                        passphrase != passphraseConfirmation ->
+                            R.string.sync_error_passphrase_mismatch
+                        passphrase.length < 16 -> R.string.sync_error_passphrase_too_short
+                        passphrase == serverPassword -> R.string.sync_error_password_reuse
+                        endpoint.isBlank() || username.isBlank() || serverPassword.isBlank() ||
+                            passphrase.isBlank() || deviceName.isBlank() ->
+                            R.string.sync_error_required_fields
+                        else -> null
+                    }
+                    if (feedback != null) return@Button
+                    val settings = SyncConnectionSettings(
+                        endpoint = endpoint,
+                        username = username,
+                        deviceName = deviceName,
+                        iconCatalogId = iconCatalogId,
+                        iconAccentHue = iconAccentHue,
+                        localProfileId = localProfileId,
+                    )
+                    if (!onConfigure(settings)) {
+                        feedback = R.string.sync_error_invalid_configuration
+                        return@Button
+                    }
+                    submitting = true
+                    val passwordChars = serverPassword.toCharArray()
+                    val passphraseChars = passphrase.toCharArray()
+                    serverPassword = ""
+                    passphrase = ""
+                    passphraseConfirmation = ""
+                    onEnroll(passwordChars, passphraseChars) { outcome ->
+                        submitting = false
+                        feedback = outcome.feedbackMessage()
+                    }
+                },
+                enabled = !submitting,
+                modifier = Modifier.testTag(SyncSettingsTestTags.Enroll),
+            ) {
+                Text(stringResource(R.string.sync_action_connect))
+            }
+        }
+
         if (state.profiles.isNotEmpty()) {
             Text(
                 text = stringResource(R.string.sync_devices_section),
@@ -422,7 +399,7 @@ internal fun SyncSettingsPage(
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     shape = MaterialTheme.shapes.large,
-                    color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -449,88 +426,11 @@ internal fun SyncSettingsPage(
 }
 
 @Composable
-private fun SyncExtensionStores(
-    onOpenLink: (String) -> Unit,
-    onShareLink: (String) -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.sync_extension_stores_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = stringResource(R.string.sync_extension_stores_summary),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SyncExtensionStoreRow(
-                title = stringResource(R.string.sync_extension_chrome_store),
-                url = SyncExtensionStoreUrls.Chrome,
-                openTestTag = SyncSettingsTestTags.ChromeStore,
-                shareTestTag = SyncSettingsTestTags.ChromeStoreShare,
-                onOpenLink = onOpenLink,
-                onShareLink = onShareLink,
-            )
-            SyncExtensionStoreRow(
-                title = stringResource(R.string.sync_extension_firefox_store),
-                url = SyncExtensionStoreUrls.Firefox,
-                openTestTag = SyncSettingsTestTags.FirefoxStore,
-                shareTestTag = SyncSettingsTestTags.FirefoxStoreShare,
-                onOpenLink = onOpenLink,
-                onShareLink = onShareLink,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SyncExtensionStoreRow(
-    title: String,
-    url: String,
-    openTestTag: String,
-    shareTestTag: String,
-    onOpenLink: (String) -> Unit,
-    onShareLink: (String) -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        TextButton(
-            onClick = { onOpenLink(url) },
-            modifier = Modifier.weight(1f).testTag(openTestTag),
-        ) {
-            Text(title, modifier = Modifier.weight(1f))
-            Icon(
-                painter = painterResource(R.drawable.ic_symbol_open_in_new),
-                contentDescription = null,
-                modifier = Modifier.padding(start = 8.dp).size(18.dp),
-            )
-        }
-        IconButton(
-            onClick = { onShareLink(url) },
-            modifier = Modifier.testTag(shareTestTag),
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_symbol_share),
-                contentDescription = stringResource(R.string.sync_extension_share_link, title),
-            )
-        }
-    }
-}
-
-@Composable
 private fun SyncSetupGuide(onOpenDocumentation: (String) -> Unit) {
     Surface(
         modifier = Modifier.settingsSearchTarget(stringResource(R.string.sync_setup_guide_title)).fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
-        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -546,7 +446,6 @@ private fun SyncSetupGuide(onOpenDocumentation: (String) -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            SettingsPreferenceDivider()
             SyncSetupGuideStep(
                 number = 1,
                 title = stringResource(R.string.sync_setup_server_title),
@@ -554,7 +453,6 @@ private fun SyncSetupGuide(onOpenDocumentation: (String) -> Unit) {
                 testTag = SyncSettingsTestTags.ServerGuide,
                 onClick = { onOpenDocumentation(SyncDocumentationUrls.ServerQuickStart) },
             )
-            SettingsPreferenceDivider()
             SyncSetupGuideStep(
                 number = 2,
                 title = stringResource(R.string.sync_setup_extension_title),
@@ -562,7 +460,6 @@ private fun SyncSetupGuide(onOpenDocumentation: (String) -> Unit) {
                 testTag = SyncSettingsTestTags.ExtensionGuide,
                 onClick = { onOpenDocumentation(SyncDocumentationUrls.ExtensionBuild) },
             )
-            SettingsPreferenceDivider()
             SyncSetupGuideStep(
                 number = 3,
                 title = stringResource(R.string.sync_setup_workspace_title),
@@ -570,7 +467,6 @@ private fun SyncSetupGuide(onOpenDocumentation: (String) -> Unit) {
                 testTag = SyncSettingsTestTags.WorkspaceGuide,
                 onClick = { onOpenDocumentation(SyncDocumentationUrls.ExtensionSetup) },
             )
-            SettingsPreferenceDivider()
             SyncSetupGuideStep(
                 number = 4,
                 title = stringResource(R.string.sync_setup_android_title),
@@ -607,7 +503,7 @@ private fun SyncSetupGuideStep(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag(testTag).settingsSearchTarget(title),
         shape = MaterialTheme.shapes.large,
-        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -767,7 +663,7 @@ private fun SyncStatusCard(state: SyncRepositoryState) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(Modifier.padding(18.dp)) {
             Text(

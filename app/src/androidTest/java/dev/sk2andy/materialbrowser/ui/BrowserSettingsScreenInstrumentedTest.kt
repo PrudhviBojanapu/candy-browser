@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -18,7 +17,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.AndroidBrowserEngineKind
-import dev.sk2andy.materialbrowser.browser.BrowserProfile
 import dev.sk2andy.materialbrowser.browser.ExternalAppLinkHandling
 import dev.sk2andy.materialbrowser.browser.FavoriteAnimationSpeed
 import dev.sk2andy.materialbrowser.browser.PageTranslationProvider
@@ -60,9 +58,10 @@ class BrowserSettingsScreenInstrumentedTest {
             }
         }
 
+        composeRule.onNodeWithTag(BrowserSettingsTestTags.BrowserEngine).performClick()
         composeRule.onNodeWithText(
             context.getString(R.string.settings_browser_engine_system),
-        ).performScrollTo().performClick()
+        ).performClick()
 
         assertEquals(AndroidBrowserEngineKind.SystemWebView, engine)
         composeRule.onNodeWithText(
@@ -96,29 +95,9 @@ class BrowserSettingsScreenInstrumentedTest {
 
         composeRule.onNodeWithTag(BrowserSettingsTestTags.ScrollBar)
             .performScrollTo()
-            .performScrollTo().performClick()
+            .performClick()
 
         assertTrue(enabled)
-    }
-
-    @Test
-    fun externalPreviewProfileRemainsVisibleButDisabledWhenPreviewIsOff() {
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                ExternalLinkPreviewSettingsPage(
-                    isExternalLinkPreviewEnabled = false,
-                    externalLinkPreviewProfiles = listOf(BrowserProfile(id = "work", emoji = "💼")),
-                    onExternalLinkPreviewEnabledChanged = {},
-                    externalLinkPreviewProfileId = null,
-                    onExternalLinkPreviewProfileChanged = {},
-                    onBack = {},
-                )
-            }
-        }
-        composeRule.onNodeWithTag(BrowserSettingsTestTags.ExternalLinkPreviewProfile)
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertIsNotEnabled()
     }
 
     @Test
@@ -142,62 +121,9 @@ class BrowserSettingsScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithTag(BrowserSettingsTestTags.StartupAnimation).performScrollTo().performClick()
+        composeRule.onNodeWithTag(BrowserSettingsTestTags.StartupAnimation).performClick()
 
         assertFalse(enabled)
-    }
-
-    @Test
-    fun externalPreviewDefaultProfileCanBeSelected() {
-        var profileId by mutableStateOf<String?>(null)
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                ExternalLinkPreviewSettingsPage(
-                    isExternalLinkPreviewEnabled = true,
-                    externalLinkPreviewProfiles = listOf(
-                        BrowserProfile(id = "work", emoji = "💼"),
-                    ),
-                    externalLinkPreviewProfileId = profileId,
-                    onExternalLinkPreviewProfileChanged = { profileId = it },
-                    onExternalLinkPreviewEnabledChanged = {},
-                    onBack = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithText("💼").performScrollTo().performClick()
-
-        assertEquals("work", profileId)
-    }
-
-    @Test
-    fun unavailablePreviewDefaultClearlyShowsUnlockedFallback() {
-        var profileId by mutableStateOf<String?>("locked")
-        composeRule.setContent {
-            MaterialBrowserTheme {
-                ExternalLinkPreviewSettingsPage(
-                    isExternalLinkPreviewEnabled = true,
-                    externalLinkPreviewProfiles = listOf(
-                        BrowserProfile(id = "home", emoji = "🏠"),
-                    ),
-                    externalLinkPreviewProfileId = profileId,
-                    onExternalLinkPreviewProfileChanged = { profileId = it },
-                    onExternalLinkPreviewEnabledChanged = {},
-                    onBack = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag(BrowserSettingsTestTags.ExternalLinkPreviewProfile)
-            .performScrollTo()
-        composeRule.onNodeWithText(
-            context.getString(R.string.settings_external_link_preview_profile_unavailable),
-        ).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            context.getString(R.string.settings_external_link_preview_profile_last_used),
-        ).performScrollTo().performClick()
-
-        assertEquals(null, profileId)
     }
 
     @Test
@@ -223,9 +149,11 @@ class BrowserSettingsScreenInstrumentedTest {
             }
         }
 
+        composeRule.onNodeWithTag(BrowserSettingsTestTags.StartupAddressFocus)
+            .performClick()
         composeRule.onNodeWithText(
             context.getString(R.string.settings_startup_address_focus_never),
-        ).performScrollTo().performClick()
+        ).performClick()
 
         assertEquals(StartupAddressFocusMode.Never, mode)
     }
@@ -253,7 +181,7 @@ class BrowserSettingsScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithTag(BrowserSettingsTestTags.FavoriteLaunchAnimation).performScrollTo().performClick()
+        composeRule.onNodeWithTag(BrowserSettingsTestTags.FavoriteLaunchAnimation).performClick()
 
         assertFalse(enabled)
     }
@@ -281,9 +209,12 @@ class BrowserSettingsScreenInstrumentedTest {
             }
         }
 
+        composeRule.onNodeWithTag(BrowserSettingsTestTags.FavoriteAnimationSpeed)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText(
             context.getString(R.string.settings_favorite_animation_speed_fast),
-        ).performScrollTo().performClick()
+        ).performClick()
 
         assertEquals(FavoriteAnimationSpeed.Fast, speed)
     }
@@ -340,7 +271,7 @@ class BrowserSettingsScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithTag(BrowserSettingsTestTags.OpenHomeOnStartup).performScrollTo().performClick()
+        composeRule.onNodeWithTag(BrowserSettingsTestTags.OpenHomeOnStartup).performClick()
 
         assertTrue(enabled)
     }
@@ -369,6 +300,7 @@ class BrowserSettingsScreenInstrumentedTest {
         composeRule.onNodeWithText(
             context.getString(R.string.settings_translation_provider_google_summary),
         ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(BrowserSettingsTestTags.TranslationProvider).performClick()
         composeRule.onNode(
             hasText(PageTranslationProvider.Google.displayName) and
                 SemanticsMatcher.expectValue(SemanticsProperties.Selected, true),
@@ -377,12 +309,12 @@ class BrowserSettingsScreenInstrumentedTest {
             hasText(PageTranslationProvider.Kagi.displayName) and
                 SemanticsMatcher.expectValue(SemanticsProperties.Selected, false),
         ).assertExists()
-        composeRule.onNodeWithText(PageTranslationProvider.Kagi.displayName).performScrollTo().performClick()
+        composeRule.onNodeWithText(PageTranslationProvider.Kagi.displayName).performClick()
 
         assertEquals(PageTranslationProvider.Kagi, provider)
         composeRule.onNodeWithText(
             context.getString(R.string.settings_translation_provider_kagi_summary),
-        ).performScrollTo().assertIsDisplayed()
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -390,12 +322,19 @@ class BrowserSettingsScreenInstrumentedTest {
         var enabled by mutableStateOf(false)
         composeRule.setContent {
             MaterialBrowserTheme {
-                ExternalLinkPreviewSettingsPage(
+                BrowserSettingsPage(
+                    pageTranslationProvider = PageTranslationProvider.Google,
                     isExternalLinkPreviewEnabled = enabled,
+                    isFullImmersiveModeEnabled = false,
+                    isStartupAnimationEnabled = true,
+                    isScrollBarEnabled = false,
+                    isDefaultBrowser = false,
                     onExternalLinkPreviewEnabledChanged = { enabled = it },
-                    externalLinkPreviewProfileId = null,
-                    onExternalLinkPreviewProfileChanged = {},
-                    externalLinkPreviewProfiles = emptyList(),
+                    onFullImmersiveModeEnabledChanged = {},
+                    onStartupAnimationEnabledChanged = {},
+                    onScrollBarEnabledChanged = {},
+                    onPageTranslationProviderChanged = {},
+                    onOpenDefaultBrowserSettings = {},
                     onBack = {},
                 )
             }
@@ -403,25 +342,24 @@ class BrowserSettingsScreenInstrumentedTest {
 
         composeRule.onNodeWithTag(BrowserSettingsTestTags.ExternalLinkPreview)
             .performScrollTo()
-            .performScrollTo().performClick()
+            .performClick()
 
         assertTrue(enabled)
     }
 
     @Test
-    fun externalAppLinksOpenDedicatedSettingsPage() {
-        var opened = false
+    fun externalAppLinkChoiceUpdatesSetting() {
+        var handling by mutableStateOf(ExternalAppLinkHandling.Automatic)
         composeRule.setContent {
             MaterialBrowserTheme {
                 BrowserSettingsPage(
-                    section = BrowserSettingsSection.Links,
                     pageTranslationProvider = PageTranslationProvider.Google,
-                    externalAppLinkHandling = ExternalAppLinkHandling.Automatic,
+                    externalAppLinkHandling = handling,
                     isFullImmersiveModeEnabled = false,
                     isStartupAnimationEnabled = true,
                     isScrollBarEnabled = false,
                     isDefaultBrowser = false,
-                    onExternalAppLinks = { opened = true },
+                    onExternalAppLinkHandlingChanged = { handling = it },
                     onFullImmersiveModeEnabledChanged = {},
                     onStartupAnimationEnabledChanged = {},
                     onScrollBarEnabledChanged = {},
@@ -433,10 +371,12 @@ class BrowserSettingsScreenInstrumentedTest {
         }
 
         composeRule.onNodeWithTag(BrowserSettingsTestTags.ExternalAppLinks)
-            .performScrollTo().performClick()
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithText(
+            context.getString(R.string.settings_external_app_links_ask_every_time),
+        ).performClick()
 
-        composeRule.runOnIdle { assertTrue(opened) }
-        composeRule.onNodeWithText(context.getString(R.string.settings_external_app_links_ask_every_time))
-            .assertDoesNotExist()
+        assertEquals(ExternalAppLinkHandling.AskEveryTime, handling)
     }
 }

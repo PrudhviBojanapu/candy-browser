@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class CandyTrailScreenInstrumentedTest {
     @Test
-    fun listActionsDispatchNodeForkAndOpenClosedEndpoints() {
+    fun graphActionsDispatchNodeForkAndOpenClosedEndpoints() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val tab = BrowserTab(
             id = "tab-actions",
@@ -99,7 +99,6 @@ class CandyTrailScreenInstrumentedTest {
                 }
             }
             instrumentation.waitForIdleSync()
-            assertTrue(clickNode(activity.getString(R.string.candy_trail_list_view)))
         }
 
         try {

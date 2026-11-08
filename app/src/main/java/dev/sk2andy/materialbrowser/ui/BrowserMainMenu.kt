@@ -3,18 +3,10 @@ package dev.sk2andy.materialbrowser.ui
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
@@ -23,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -44,27 +35,25 @@ import dev.sk2andy.materialbrowser.browser.gecko.GeckoExtensionActionState
 import dev.sk2andy.materialbrowser.browser.userscript.UserScriptMenuCommand
 import dev.sk2andy.materialbrowser.data.AddressBarAction
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuAction
-import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuCapabilities
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuItem
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuLabelKey
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuRules
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuSection
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuState
-import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuBottomSheetToolbarRules
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuEntry
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuLayout
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuLayoutRules
+import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuBottomSheetToolbarRules
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuPresentation
 import dev.sk2andy.materialbrowser.shared.browser.BrowserMenuSurface
 import dev.sk2andy.materialbrowser.shared.browser.BrowserToppingMenuCommand
+import dev.sk2andy.materialbrowser.shared.ui.BrowserMainMenu as SharedBrowserMainMenu
 import dev.sk2andy.materialbrowser.shared.ui.BrowserMainMenuContainerRole
 import dev.sk2andy.materialbrowser.shared.ui.BrowserMainMenuEffects
 import dev.sk2andy.materialbrowser.shared.ui.BrowserMainMenuResources
 import dev.sk2andy.materialbrowser.shared.ui.BrowserMainMenuStyle
-import dev.sk2andy.materialbrowser.shared.ui.BrowserMenuRow
 import dev.sk2andy.materialbrowser.ui.theme.browserChromeColor
 import dev.sk2andy.materialbrowser.ui.theme.browserChromeSurfaceTokens
-import dev.sk2andy.materialbrowser.shared.ui.BrowserMainMenu as SharedBrowserMainMenu
 
 internal typealias BrowserMainMenuMotion =
     dev.sk2andy.materialbrowser.shared.ui.BrowserMainMenuMotion
@@ -90,9 +79,8 @@ private val AndroidBrowserMainMenuResources = object : BrowserMainMenuResources 
     @Composable
     override fun sectionTitle(section: BrowserFeatureMenuSection): String = stringResource(
         when (section) {
-            BrowserFeatureMenuSection.Reading -> R.string.browser_menu_reading_group
             BrowserFeatureMenuSection.Page -> R.string.browser_menu_page_group
-            BrowserFeatureMenuSection.Toppings -> R.string.browser_menu_workflows_group
+            BrowserFeatureMenuSection.Toppings -> R.string.browser_menu_toppings_group
             BrowserFeatureMenuSection.Browser -> R.string.browser_menu_browser_group
             BrowserFeatureMenuSection.Toolbar,
             BrowserFeatureMenuSection.Candy,
@@ -111,15 +99,6 @@ private val AndroidBrowserMainMenuResources = object : BrowserMainMenuResources 
         }
         return stringResource(item.labelKey.androidStringResource())
     }
-
-    @Composable
-    override fun sectionExpansionLabel(expanded: Boolean): String = stringResource(
-        if (expanded) R.string.browser_menu_section_expanded else R.string.browser_menu_section_collapsed,
-    )
-
-    @Composable
-    override fun unreadCountLabel(count: Int): String =
-        stringResource(R.string.browser_menu_feed_unread_count, count)
 
     @Composable
     override fun accessibilityLabel(item: BrowserFeatureMenuItem): String? = when (item.action) {
@@ -151,6 +130,8 @@ private val AndroidBrowserMainMenuResources = object : BrowserMainMenuResources 
             stringResource(R.string.action_always_block_popups_description)
         BrowserFeatureMenuAction.ToggleDesktopView ->
             stringResource(R.string.action_desktop_view_description)
+        BrowserFeatureMenuAction.ToggleVideoDetectionRedirect ->
+            stringResource(R.string.action_video_player_redirect_description)
         BrowserFeatureMenuAction.SnoozeTab -> if (item.enabled) {
             null
         } else {
@@ -226,20 +207,15 @@ private class AndroidBrowserMainMenuEffects(
         )
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun actionTooltip(
         label: String,
         modifier: Modifier,
         content: @Composable () -> Unit,
     ) {
-        TooltipBox(
-            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
-            tooltip = { PlainTooltip { Text(label) } },
-            state = rememberTooltipState(),
-            modifier = modifier,
-            content = content,
-        )
+        androidx.compose.foundation.layout.Box(modifier = modifier) {
+            content()
+        }
     }
 
     @Composable
@@ -296,6 +272,8 @@ internal fun BrowserMainMenu(
     isAlwaysBlockPopupsEnabled: Boolean,
     canToggleDesktopView: Boolean,
     isDesktopView: Boolean,
+    canToggleVideoDetectionRedirect: Boolean = true,
+    isVideoDetectionRedirectEnabled: Boolean = true,
     canToggleCookieBannerRemoval: Boolean,
     isCookieBannerRemovalEnabled: Boolean,
     canToggleForceVerticalScrolling: Boolean,
@@ -304,8 +282,9 @@ internal fun BrowserMainMenu(
     isForcePageZoomingEnabled: Boolean,
     canToggleForceSafeArea: Boolean,
     isForceSafeAreaEnabled: Boolean,
+    canToggleAllAdBlockers: Boolean = true,
+    isAllAdBlockersEnabled: Boolean = true,
     canAddSiteCapsule: Boolean,
-    canCreateSiteWidget: Boolean = false,
     canSnooze: Boolean,
     snoozedTabCount: Int,
     overflowAddressBarActions: List<AddressBarAction> = emptyList(),
@@ -324,17 +303,14 @@ internal fun BrowserMainMenu(
     onOpenExternal: () -> Unit,
     onPrint: () -> Unit,
     onOpenReader: () -> Unit,
-    onOpenFeeds: (() -> Unit)? = null,
-    onOpenLibrary: (() -> Unit)? = null,
-    onDiscoverFeeds: (() -> Unit)? = null,
-    unreadFeedCount: Int = 0,
-    canDiscoverFeeds: Boolean = false,
     onTranslate: () -> Unit,
     onFindInPage: () -> Unit = {},
+    onAllAdBlockersChange: (Boolean) -> Unit = {},
     onDomainMutedChange: (Boolean) -> Unit,
     onStatusBarScrollEnabledChange: (Boolean) -> Unit = {},
     onAlwaysBlockPopupsChange: (Boolean) -> Unit,
     onDesktopViewChange: (Boolean) -> Unit,
+    onVideoDetectionRedirectEnabledChange: (Boolean) -> Unit = {},
     onCookieBannerRemovalEnabledChange: (Boolean) -> Unit,
     onForceVerticalScrollingChange: (Boolean) -> Unit,
     onForcePageZoomingChange: (Boolean) -> Unit,
@@ -342,10 +318,7 @@ internal fun BrowserMainMenu(
     onOpenCandyTrail: () -> Unit,
     canOpenWebAnnotations: Boolean = false,
     onWebAnnotations: (() -> Unit)? = null,
-    canOpenConstellations: Boolean = false,
-    onOpenConstellations: (() -> Unit)? = null,
     onAddSiteCapsule: () -> Unit,
-    onCreateSiteWidget: () -> Unit = {},
     onSummarize: () -> Unit,
     onSnooze: () -> Unit,
     onSnoozedTabs: () -> Unit,
@@ -356,15 +329,11 @@ internal fun BrowserMainMenu(
     onFavorites: () -> Unit = {},
     onDownloads: () -> Unit = {},
     onHistory: () -> Unit,
-    onOpenRssFeeds: (() -> Unit)? = null,
-    workflowActions: CustomWorkflowSurfaceActions = CustomWorkflowSurfaceActions.Empty,
-    onWorkflow: (String) -> Unit = {},
-    onManageWorkflows: (() -> Unit)? = null,
     firefoxExtensionActions: List<GeckoExtensionActionState> = emptyList(),
     menuLayout: BrowserMenuLayout = BrowserMenuLayout.Default,
     onFirefoxExtensionAction: (GeckoExtensionActionKey) -> Unit = {},
+    onManageFirefoxExtensions: () -> Unit = {},
     onSettings: () -> Unit,
-    onOpenMenuSettings: () -> Unit = onSettings,
     bottomSheetAddressBar: (@Composable ((() -> Unit) -> Unit) -> Unit)? = null,
     bottomSheetAnchorBounds: Rect? = null,
     onBottomSheetVisibleChange: (Boolean) -> Unit = {},
@@ -384,9 +353,7 @@ internal fun BrowserMainMenu(
         canToggleFavorite = canToggleFavorite,
         isFavorite = isFavorite,
         isPinned = isPinned,
-        canOpenReader = canOpenReader,
-        canDiscoverFeeds = canDiscoverFeeds && onDiscoverFeeds != null,
-        unreadFeedCount = unreadFeedCount,
+        canOpenReader = false,
         canTranslatePage = canTranslatePage,
         canUseDocumentActions = canUseDocumentActions,
         canToggleCookieBannerRemoval = canToggleCookieBannerRemoval,
@@ -397,18 +364,20 @@ internal fun BrowserMainMenu(
         isForcePageZoomingEnabled = isForcePageZoomingEnabled,
         canToggleForceSafeArea = canToggleForceSafeArea,
         isForceSafeAreaEnabled = isForceSafeAreaEnabled,
+        canToggleAllAdBlockers = canToggleAllAdBlockers,
+        isAllAdBlockersEnabled = isAllAdBlockersEnabled,
         canToggleAlwaysBlockPopups = canToggleAlwaysBlockPopups,
         isAlwaysBlockPopupsEnabled = isAlwaysBlockPopupsEnabled,
         canToggleDesktopView = canToggleDesktopView,
         isDesktopView = isDesktopView,
+        canToggleVideoDetectionRedirect = canToggleVideoDetectionRedirect,
+        isVideoDetectionRedirectEnabled = isVideoDetectionRedirectEnabled,
         canToggleDomainMute = canToggleDomainMute,
         isDomainMuted = isDomainMuted,
         canToggleStatusBarScroll = canToggleStatusBarScroll,
         isStatusBarScrollEnabled = isStatusBarScrollEnabled,
-        canAddSiteCapsule = canAddSiteCapsule,
-        canCreateSiteWidget = canCreateSiteWidget,
+        canAddSiteCapsule = false,
         canOpenWebAnnotations = canOpenWebAnnotations,
-        canOpenConstellations = canOpenConstellations,
         canSnooze = canSnooze,
         canDockAddressBar = canDockAddressBar,
         overflowPageActions = (
@@ -419,87 +388,37 @@ internal fun BrowserMainMenu(
     val items = BrowserMenuLayoutRules.visibleItems(
         items = BrowserFeatureMenuRules.items(
             state = menuState,
-            capabilities = BrowserFeatureMenuCapabilities(
-                supportsFeeds = onOpenFeeds != null,
-                supportsFeedDiscovery = onDiscoverFeeds != null,
-                supportsLibrary = onOpenLibrary != null,
-                supportsSiteWidgets = true,
-                supportsConstellations = onOpenConstellations != null,
-                supportsWebAnnotations = onWebAnnotations != null,
-            ),
+            capabilities = dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuCapabilities(supportsFirefoxExtensions = true),
         ),
         layout = menuLayout,
         surface = BrowserMenuSurface.Tab,
-    )
+    ).filterNot {
+        it.action == BrowserFeatureMenuAction.OpenCandyTrail ||
+        it.action == BrowserFeatureMenuAction.AddSiteCapsule ||
+        it.action == BrowserFeatureMenuAction.OpenReader
+    }
     val extensionSnapshot = firefoxExtensionActions.toList()
     var presentedExtensionActions by remember { mutableStateOf(extensionSnapshot) }
     if (expanded && presentedExtensionActions != extensionSnapshot) {
         presentedExtensionActions = extensionSnapshot
     }
-    val showFirefoxActions = BrowserMenuLayoutRules.isVisible(
+    val extensionContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit = if (
+        BrowserMenuLayoutRules.isVisible(
             menuLayout,
             BrowserMenuEntry.FirefoxPageActions,
             BrowserMenuSurface.Tab,
         )
-    val extensionContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit = if (
-        showFirefoxActions || (onOpenRssFeeds != null && onOpenFeeds == null)
     ) {
         { commit ->
-            if (onOpenRssFeeds != null && onOpenFeeds == null) {
-                BrowserMenuRow(
-                    label = stringResource(R.string.rss_feeds_title),
-                    icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_rss),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    },
-                    shape = MaterialTheme.shapes.large,
-                    onClick = { commit(onOpenRssFeeds) },
-                )
-            }
-            if (showFirefoxActions) {
-                FirefoxExtensionMenuSection(
-                    actions = presentedExtensionActions,
-                    onAction = { actionKey ->
-                        commit { onFirefoxExtensionAction(actionKey) }
-                    },
-                )
-            }
+            FirefoxExtensionMenuSection(
+                actions = presentedExtensionActions,
+                onAction = { actionKey ->
+                    commit { onFirefoxExtensionAction(actionKey) }
+                },
+            )
         }
     } else {
         {}
-    }
-    val workflowContent: @Composable ColumnScope.((() -> Unit) -> Unit) -> Unit = { commit ->
-        if (workflowActions.menuActions.isNotEmpty() || onManageWorkflows != null) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.workflow_surface_group),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                if (onManageWorkflows != null) {
-                    TextButton(onClick = { commit(onManageWorkflows) }) {
-                        Text(stringResource(R.string.workflow_surface_manage))
-                    }
-                }
-            }
-            workflowActions.menuActions.forEach { action ->
-                BrowserMenuRow(
-                    label = action.label,
-                    icon = { Icon(action.icon, null, Modifier.size(20.dp)) },
-                    shape = MaterialTheme.shapes.large,
-                    enabled = action.enabled,
-                    onClick = { commit { onWorkflow(action.id) } },
-                )
-                Spacer(Modifier.height(2.dp))
-            }
-            Spacer(Modifier.height(8.dp))
-        }
     }
     val onMenuAction: (BrowserFeatureMenuItem) -> Unit = { item ->
         when (item.action) {
@@ -515,10 +434,8 @@ internal fun BrowserMainMenu(
             BrowserFeatureMenuAction.DuplicateTab -> onDuplicateTab()
             BrowserFeatureMenuAction.CloseTab -> onCloseTab()
             BrowserFeatureMenuAction.ParkAddressBarRight -> onParkAddressBarRight()
-            BrowserFeatureMenuAction.OpenFeeds -> onOpenFeeds?.invoke()
-            BrowserFeatureMenuAction.OpenLibrary -> onOpenLibrary?.invoke()
-            BrowserFeatureMenuAction.DiscoverFeeds -> onDiscoverFeeds?.invoke()
             BrowserFeatureMenuAction.OpenReader -> onOpenReader()
+            BrowserFeatureMenuAction.OpenWebAnnotations -> onWebAnnotations?.invoke()
             BrowserFeatureMenuAction.TranslatePage -> onTranslate()
             BrowserFeatureMenuAction.FindInPage -> onFindInPage()
             BrowserFeatureMenuAction.Share -> onShare()
@@ -532,19 +449,20 @@ internal fun BrowserMainMenu(
                 onForcePageZoomingChange(item.checked != true)
             BrowserFeatureMenuAction.ToggleForceSafeArea ->
                 onForceSafeAreaChange(item.checked != true)
+            BrowserFeatureMenuAction.ToggleAllAdBlockers ->
+                onAllAdBlockersChange(item.checked != true)
             BrowserFeatureMenuAction.ToggleAlwaysBlockPopups ->
                 onAlwaysBlockPopupsChange(item.checked != true)
             BrowserFeatureMenuAction.ToggleDesktopView ->
                 onDesktopViewChange(item.checked != true)
+            BrowserFeatureMenuAction.ToggleVideoDetectionRedirect ->
+                onVideoDetectionRedirectEnabledChange(item.checked != true)
             BrowserFeatureMenuAction.ToggleDomainMute ->
                 onDomainMutedChange(item.checked != true)
             BrowserFeatureMenuAction.ToggleStatusBarScroll ->
                 onStatusBarScrollEnabledChange(item.checked != true)
             BrowserFeatureMenuAction.OpenCandyTrail -> onOpenCandyTrail()
-            BrowserFeatureMenuAction.OpenConstellations -> onOpenConstellations?.invoke()
-            BrowserFeatureMenuAction.OpenWebAnnotations -> onWebAnnotations?.invoke()
             BrowserFeatureMenuAction.AddSiteCapsule -> onAddSiteCapsule()
-            BrowserFeatureMenuAction.CreateSiteWidget -> onCreateSiteWidget()
             BrowserFeatureMenuAction.Summarize -> onSummarize()
             BrowserFeatureMenuAction.SnoozeTab -> onSnooze()
             BrowserFeatureMenuAction.DockAddressBar -> onDockAddressBar()
@@ -552,7 +470,7 @@ internal fun BrowserMainMenu(
             BrowserFeatureMenuAction.OpenFavorites -> onFavorites()
             BrowserFeatureMenuAction.OpenDownloads -> onDownloads()
             BrowserFeatureMenuAction.OpenHistory -> onHistory()
-            BrowserFeatureMenuAction.OpenFirefoxExtensions -> Unit
+            BrowserFeatureMenuAction.OpenFirefoxExtensions -> onManageFirefoxExtensions()
             BrowserFeatureMenuAction.OpenSettings -> onSettings()
             BrowserFeatureMenuAction.InvokeToppingCommand -> {
                 userScriptMenuCommands.firstOrNull { command ->
@@ -574,17 +492,12 @@ internal fun BrowserMainMenu(
             items = items,
             contentLayout = menuLayout.bottomSheetContentLayout,
             toolbarEntries = menuLayout.bottomSheetToolbarEntries,
-            customShortcutSlots = workflowActions.menuShortcutSlots,
-            customFooterSlots = workflowActions.menuFooterSlots,
-            onCustomAction = onWorkflow,
             resources = AndroidBrowserMainMenuResources,
             effects = effects,
             snoozedTabCount = snoozedTabCount,
             onAction = onMenuAction,
-            onOpenMenuSettings = onOpenMenuSettings,
             onVisibleChange = onBottomSheetVisibleChange,
             extensionContent = extensionContent,
-            customContent = workflowContent,
         )
     } else {
         SharedBrowserMainMenu(
@@ -597,9 +510,6 @@ internal fun BrowserMainMenu(
             resources = AndroidBrowserMainMenuResources,
             effects = effects,
             extensionContent = extensionContent,
-            customContent = workflowContent,
-            customShortcutSlots = workflowActions.menuShortcutSlots,
-            onCustomAction = onWorkflow,
             onAction = onMenuAction,
         )
     }
@@ -643,9 +553,6 @@ private fun BrowserFeatureMenuLabelKey.androidStringResource(): Int = when (this
     BrowserFeatureMenuLabelKey.DuplicateTab -> R.string.action_duplicate_tab
     BrowserFeatureMenuLabelKey.CloseTab -> R.string.cd_close_tab
     BrowserFeatureMenuLabelKey.ParkAddressBarRight -> R.string.action_park_address_pill_right
-    BrowserFeatureMenuLabelKey.Feeds -> R.string.browser_menu_feeds
-    BrowserFeatureMenuLabelKey.Library -> R.string.browser_menu_library
-    BrowserFeatureMenuLabelKey.DiscoverFeeds -> R.string.browser_menu_discover_feeds
     BrowserFeatureMenuLabelKey.Reader -> R.string.reader_open_action
     BrowserFeatureMenuLabelKey.Translate -> R.string.action_translate_page
     BrowserFeatureMenuLabelKey.FindInPage -> R.string.action_find_in_page
@@ -664,10 +571,8 @@ private fun BrowserFeatureMenuLabelKey.androidStringResource(): Int = when (this
     BrowserFeatureMenuLabelKey.EnableStatusBarScrollForDomain -> R.string.settings_status_bar_scroll_enable_for_domain
     BrowserFeatureMenuLabelKey.DisableStatusBarScrollForDomain -> R.string.settings_status_bar_scroll_disable_for_domain
     BrowserFeatureMenuLabelKey.CandyTrail -> R.string.action_open_candy_trail
-    BrowserFeatureMenuLabelKey.Constellations -> R.string.constellations_title
     BrowserFeatureMenuLabelKey.WebAnnotations -> R.string.web_annotation_title
     BrowserFeatureMenuLabelKey.AddSiteCapsule -> R.string.action_add_site_capsule
-    BrowserFeatureMenuLabelKey.CreateSiteWidget -> R.string.site_widget_editor_title
     BrowserFeatureMenuLabelKey.Summarize -> R.string.action_summarize
     BrowserFeatureMenuLabelKey.SnoozeTab -> R.string.action_snooze_tab
     BrowserFeatureMenuLabelKey.DockAddressBar -> R.string.action_dock_address_bar
@@ -678,6 +583,8 @@ private fun BrowserFeatureMenuLabelKey.androidStringResource(): Int = when (this
     BrowserFeatureMenuLabelKey.Settings -> R.string.action_settings
     BrowserFeatureMenuLabelKey.FirefoxExtensions -> R.string.gecko_extensions_title
     BrowserFeatureMenuLabelKey.ToppingsCommand -> R.string.browser_menu_toppings_group
+    BrowserFeatureMenuLabelKey.VideoDetectionRedirect -> R.string.action_video_player_redirect
+    BrowserFeatureMenuLabelKey.AllAdBlockers -> R.string.action_all_ad_blockers
 }
 
 @DrawableRes
@@ -692,14 +599,12 @@ internal fun BrowserFeatureMenuItem.androidDrawableResource(): Int = when (actio
         R.drawable.ic_symbol_favorite
     }
     BrowserFeatureMenuAction.TogglePinned -> R.drawable.ic_push_pin
+    BrowserFeatureMenuAction.ToggleStatusBarScroll -> R.drawable.ic_symbol_vertical_scroll
     BrowserFeatureMenuAction.ShowTabs -> R.drawable.ic_switch_to_tab
     BrowserFeatureMenuAction.NewTab -> R.drawable.ic_symbol_add
     BrowserFeatureMenuAction.DuplicateTab -> R.drawable.ic_content_copy
     BrowserFeatureMenuAction.CloseTab -> R.drawable.ic_symbol_close
     BrowserFeatureMenuAction.ParkAddressBarRight -> R.drawable.ic_symbol_chevron_physical_right
-    BrowserFeatureMenuAction.OpenFeeds -> R.drawable.ic_rss_feed
-    BrowserFeatureMenuAction.OpenLibrary -> R.drawable.ic_reader_library
-    BrowserFeatureMenuAction.DiscoverFeeds -> R.drawable.ic_rss_feed
     BrowserFeatureMenuAction.OpenReader -> R.drawable.ic_reader_align_start
     BrowserFeatureMenuAction.TranslatePage -> R.drawable.ic_symbol_translate
     BrowserFeatureMenuAction.FindInPage -> R.drawable.ic_symbol_find_in_page
@@ -707,12 +612,10 @@ internal fun BrowserFeatureMenuItem.androidDrawableResource(): Int = when (actio
     BrowserFeatureMenuAction.OpenExternal -> R.drawable.ic_symbol_open_in_new
     BrowserFeatureMenuAction.Print -> R.drawable.ic_symbol_print
     BrowserFeatureMenuAction.ToggleDomainMute -> R.drawable.ic_symbol_volume_off
-    BrowserFeatureMenuAction.ToggleStatusBarScroll -> R.drawable.ic_symbol_vertical_scroll
+    BrowserFeatureMenuAction.ToggleVideoDetectionRedirect -> R.drawable.ic_media_playback
     BrowserFeatureMenuAction.OpenCandyTrail -> R.drawable.ic_symbol_route
-    BrowserFeatureMenuAction.OpenConstellations -> R.drawable.ic_symbol_route
     BrowserFeatureMenuAction.OpenWebAnnotations -> R.drawable.ic_web_annotation
     BrowserFeatureMenuAction.AddSiteCapsule -> R.drawable.ic_symbol_add_to_home_screen
-    BrowserFeatureMenuAction.CreateSiteWidget -> R.drawable.ic_symbol_add_to_home_screen
     BrowserFeatureMenuAction.Summarize -> R.drawable.ic_symbol_auto_awesome
     BrowserFeatureMenuAction.SnoozeTab -> R.drawable.ic_snooze
     BrowserFeatureMenuAction.OpenSnoozedTabs -> R.drawable.ic_snoozed_tabs
@@ -729,6 +632,7 @@ internal fun BrowserFeatureMenuItem.androidDrawableResource(): Int = when (actio
         R.drawable.ic_symbol_vertical_scroll
     BrowserFeatureMenuAction.ToggleForcePageZooming -> R.drawable.ic_symbol_zoom_in
     BrowserFeatureMenuAction.ToggleForceSafeArea -> R.drawable.ic_symbol_fit_screen
+    BrowserFeatureMenuAction.ToggleAllAdBlockers -> R.drawable.ic_symbol_shield
     BrowserFeatureMenuAction.ToggleAlwaysBlockPopups -> R.drawable.ic_symbol_block
     BrowserFeatureMenuAction.ToggleDesktopView -> R.drawable.ic_symbol_desktop
 }

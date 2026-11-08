@@ -115,31 +115,6 @@ class BrowserControllerProfilesInstrumentedTest {
     }
 
     @Test
-    fun externalPreviewFallsBackFromLockedSavedDefaultWithoutUnlockingIt() {
-        activityRule.scenario.onActivity { activity ->
-            val store = resetAndSeed(activity, protectedWorkProfiles(), activeProfileId = "home")
-            store.saveExternalLinkPreviewEnabled(true)
-            store.saveExternalLinkPreviewProfileId("work")
-            var authenticationRequests = 0
-            val controller = BrowserController(
-                activity = activity,
-                profileProtectionSupported = { true },
-                authenticateProfile = { _, _ -> authenticationRequests++ },
-            ).also { this.controller = it }
-
-            assertTrue("work" in controller.lockedProfileIds)
-            assertTrue(controller.openExternalLinkPreview("https://example.com/external"))
-
-            assertEquals("work", controller.externalLinkPreviewProfileId)
-            assertEquals("home", controller.externalLinkPreviewState?.targetProfileId)
-            assertEquals("home", controller.activeProfileId)
-            assertTrue("work" in controller.lockedProfileIds)
-            assertEquals(0, authenticationRequests)
-            assertEquals("work", store.loadExternalLinkPreviewProfileId())
-        }
-    }
-
-    @Test
     fun canceledPreviewProfileAuthenticationKeepsOriginalPreview() {
         activityRule.scenario.onActivity { activity ->
             resetAndSeed(activity, protectedWorkProfiles(), activeProfileId = "home")
@@ -285,7 +260,7 @@ class BrowserControllerProfilesInstrumentedTest {
     }
 
     @Test
-    fun lockedInitialPreviewSelectsUnlockedFallbackBeforeRuntimePreparation() {
+    fun lockedInitialPreviewCannotPrepareProfileRuntime() {
         activityRule.scenario.onActivity { activity ->
             resetAndSeed(activity, protectedWorkProfiles(), activeProfileId = "work")
             val controller = BrowserController(
@@ -294,9 +269,12 @@ class BrowserControllerProfilesInstrumentedTest {
             ).also { this.controller = it }
             assertTrue(controller.isActiveProfileLocked)
             assertTrue(controller.openExternalLinkPreview("https://example.com/account"))
+            val preview = requireNotNull(controller.externalLinkPreviewState)
+
+            assertFalse(controller.prepareExternalLinkPreview(preview.sessionId))
 
             assertNull(controller.externalLinkPreviewEngineViewForTesting())
-            assertEquals("home", controller.externalLinkPreviewState?.targetProfileId)
+            assertEquals("work", controller.externalLinkPreviewState?.targetProfileId)
             assertTrue("work" in controller.lockedProfileIds)
         }
     }

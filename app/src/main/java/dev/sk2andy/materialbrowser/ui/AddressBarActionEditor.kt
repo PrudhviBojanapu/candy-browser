@@ -15,7 +15,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.rememberScrollState
@@ -56,7 +55,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -608,7 +606,6 @@ internal fun AddressBarActionEditorPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(dev.sk2andy.materialbrowser.shared.ui.settings.settingsPageColor())
             .testTag(AddressBarActionEditorTestTags.Page)
             .onGloballyPositioned { rootBounds = it.boundsInRoot() },
     ) {
@@ -617,7 +614,7 @@ internal fun AddressBarActionEditorPage(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
         ) {
             Row(
@@ -632,7 +629,7 @@ internal fun AddressBarActionEditorPage(
                 }
                 Text(
                     text = title,
-                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
                     style = if (compactLayout) {
                         MaterialTheme.typography.titleLarge
                     } else {
@@ -656,7 +653,7 @@ internal fun AddressBarActionEditorPage(
                     .fillMaxWidth()
                     .testTag(AddressBarActionEditorTestTags.Preview),
                 shape = MaterialTheme.shapes.extraLarge,
-                color = dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor(),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 Row(
                     modifier = Modifier.padding(4.dp),
@@ -761,8 +758,6 @@ internal fun AddressBarActionEditorPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 72.dp)
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .background(dev.sk2andy.materialbrowser.shared.ui.settings.settingsRowColor())
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .testTag(AddressBarActionEditorTestTags.Palette)

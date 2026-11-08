@@ -11,13 +11,12 @@ import androidx.compose.ui.res.stringResource
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.InlineMediaPlayerMode
 import dev.sk2andy.materialbrowser.browser.LinkLongPressAction
-import dev.sk2andy.materialbrowser.browser.LinkPeekSwipeAction
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsFeatureIllustration
-import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsHeaderArtwork
-import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsHeaderIllustration
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsIllustrationKind
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPlayerModeArtwork
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPlayerModeIllustration
-import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsIllustrationKind
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsRadioOption
 import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsSelectionPage
 import dev.sk2andy.materialbrowser.shared.ui.settings.settingsSearchTarget
@@ -31,7 +30,6 @@ internal fun LinkLongPressSettingsPage(
     GestureChoicesPage(
         title = stringResource(R.string.settings_link_long_press_action),
         summary = stringResource(R.string.settings_link_long_press_explanation),
-        preview = { SettingsHeaderIllustration(SettingsHeaderArtwork.LinkLongPress) },
         selected = action,
         groups = listOf(
             R.string.settings_gesture_preview_group to listOf(LinkLongPressAction.LinkPeek),
@@ -52,35 +50,6 @@ internal fun LinkLongPressSettingsPage(
 }
 
 @Composable
-internal fun LinkPeekSwipeSettingsPage(
-    action: LinkPeekSwipeAction,
-    enabled: Boolean,
-    onActionChanged: (LinkPeekSwipeAction) -> Unit,
-    onBack: () -> Unit,
-) {
-    GestureChoicesPage(
-        title = stringResource(R.string.settings_link_peek_swipe_action),
-        summary = stringResource(R.string.settings_link_peek_swipe_action_summary),
-        selected = action,
-        enabled = enabled,
-        groups = listOf(
-            R.string.settings_gesture_normal_tabs_group to listOf(
-                LinkPeekSwipeAction.OpenForeground, LinkPeekSwipeAction.OpenBackground,
-                LinkPeekSwipeAction.OpenNewStack,
-            ),
-            R.string.settings_gesture_private_tabs_group to listOf(LinkPeekSwipeAction.OpenPrivate),
-            R.string.settings_gesture_link_actions_group to listOf(
-                LinkPeekSwipeAction.Copy, LinkPeekSwipeAction.Share, LinkPeekSwipeAction.Favorite,
-                LinkPeekSwipeAction.Snooze, LinkPeekSwipeAction.ReaderLater,
-            ),
-        ),
-        label = { stringResource(it.labelRes()) },
-        onSelected = onActionChanged,
-        onBack = onBack,
-    )
-}
-
-@Composable
 private fun <T> GestureChoicesPage(
     title: String,
     summary: String,
@@ -90,12 +59,11 @@ private fun <T> GestureChoicesPage(
     onSelected: (T) -> Unit,
     onBack: () -> Unit,
     enabled: Boolean = true,
-    preview: @Composable () -> Unit = { SettingsFeatureIllustration(SettingsIllustrationKind.LinkGesture) },
 ) {
     SettingsPage(title = title, onBack = onBack) {
         Text(summary, modifier = Modifier.settingsSearchTarget(title), style = MaterialTheme.typography.bodyMedium)
         SettingsPageSpacer()
-        preview()
+        SettingsFeatureIllustration(SettingsIllustrationKind.LinkGesture)
         SettingsPageSpacer()
         Column(Modifier.selectableGroup()) {
             groups.forEach { (heading, choices) ->

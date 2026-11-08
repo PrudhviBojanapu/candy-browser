@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -119,8 +120,6 @@ import androidx.compose.material.icons.outlined.PushPin
 import dev.sk2andy.materialbrowser.data.TabOverviewMode
 import dev.sk2andy.materialbrowser.browser.PageTranslationProvider
 import dev.sk2andy.materialbrowser.browser.SearchEngine
-import dev.sk2andy.materialbrowser.reader.ReaderSpeech
-import dev.sk2andy.materialbrowser.reader.ReaderLibraryDataSource
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionResult
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuAction
 import dev.sk2andy.materialbrowser.shared.browser.BrowserFeatureMenuItem
@@ -147,9 +146,6 @@ data class BrowserViewportTab(
     val isSelected: Boolean,
     val isFavorite: Boolean,
     val isPinned: Boolean,
-    val isPrivate: Boolean = false,
-    val moveTargetProfileIds: List<String> = emptyList(),
-    val canSnooze: Boolean = false,
 )
 
 data class BrowserViewportTopping(
@@ -164,14 +160,6 @@ data class BrowserReaderSnapshot(
     val result: ReaderExtractionResult?,
     val sourceUrl: String,
     val isPrivate: Boolean,
-)
-
-data class BrowserSnoozeSnapshot(
-    val tab: BrowserTab?,
-    val tabs: List<dev.sk2andy.materialbrowser.data.SnoozedTab>,
-    val profiles: List<dev.sk2andy.materialbrowser.browser.BrowserProfile>,
-    val isLibraryVisible: Boolean,
-    val wakeTimeLabels: Map<String, String>,
 )
 
 data class BrowserCandyTrailSnapshot(
@@ -194,12 +182,8 @@ data class BrowserViewportSnapshot(
     val activeProfileId: String = "",
     val isTabOverviewVisible: Boolean,
     val isSettingsVisible: Boolean = false,
-    val isBrowserMenuVisible: Boolean = false,
     val tabOverviewMode: TabOverviewMode,
     val tabListStartsAtBottom: Boolean = false,
-    val dismissResistancePercent: Int = TabDismissPhysics.DEFAULT_RESISTANCE_PERCENT,
-    val appearanceSettings: dev.sk2andy.materialbrowser.data.AppearanceSettings =
-        dev.sk2andy.materialbrowser.data.AppearanceSettings(),
     val addressFocusRequest: Long,
     val searchEngine: SearchEngine = SearchEngine.Google,
     val searxngInstanceUrl: String = "",
@@ -208,9 +192,6 @@ data class BrowserViewportSnapshot(
     val menuConfigurableEntries: List<BrowserMenuEntry> = BrowserMenuEntry.entries,
     val toppings: List<BrowserViewportTopping> = emptyList(),
     val reader: BrowserReaderSnapshot? = null,
-    val library: BrowserLibrarySnapshot? = null,
-    val snooze: BrowserSnoozeSnapshot? = null,
-    val snoozedTabCount: Int = 0,
     val candyTrail: BrowserCandyTrailSnapshot? = null,
     val syncSettings: SyncSettingsUiState = SyncSettingsUiState(),
 )
@@ -268,12 +249,6 @@ interface BrowserViewportActionSink : SyncSettingsActionSink {
         enabled: Boolean,
     )
 
-    fun closeAllTabs() = Unit
-
-    fun moveTabToProfile(tabId: String, profileId: String) = Unit
-
-    fun deleteProfile(profileId: String) = Unit
-
     fun hideTabOverview()
 
     fun showSettings()
@@ -283,10 +258,6 @@ interface BrowserViewportActionSink : SyncSettingsActionSink {
     fun changeTabOverviewMode(mode: TabOverviewMode)
 
     fun changeTabListStartsAtBottom(enabled: Boolean)
-
-    fun changeDismissResistancePercent(value: Int) = Unit
-
-    fun changeAppearanceSettings(settings: dev.sk2andy.materialbrowser.data.AppearanceSettings) = Unit
 
     fun changeSearchEngine(searchEngine: SearchEngine)
 
@@ -298,10 +269,6 @@ interface BrowserViewportActionSink : SyncSettingsActionSink {
         entry: BrowserMenuEntry,
         location: BrowserMenuLocation,
     )
-
-    fun changeBrowserMenuLayout(layout: BrowserMenuLayout) = Unit
-
-    fun dismissBrowserMenu() = Unit
 
     fun saveTopping(
         id: String?,
@@ -321,33 +288,6 @@ interface BrowserViewportActionSink : SyncSettingsActionSink {
     )
 
     fun deleteTopping(id: String)
-
-    fun createReaderSpeech(): ReaderSpeech = UnavailableReaderSpeech()
-
-    fun createReaderLibrary(): ReaderLibraryDataSource =
-        SessionReaderLibraryDataSource()
-
-    fun dismissSnooze() = Unit
-
-    fun applySnoozePreset(preset: dev.sk2andy.materialbrowser.data.SnoozePreset) = Unit
-
-    fun customSnooze() = Unit
-
-    fun rescheduleSnoozedTab(tabId: String) = Unit
-
-    fun openSnoozedTabNow(tabId: String) = Unit
-
-    fun deleteSnoozedTab(tabId: String) = Unit
-
-    fun dismissLibrary() = Unit
-
-    fun openLibraryEntry(entry: dev.sk2andy.materialbrowser.shared.browser.BrowserLibraryEntry) = Unit
-
-    fun removeLibraryEntry(entry: dev.sk2andy.materialbrowser.shared.browser.BrowserLibraryEntry) = Unit
-
-    fun restoreLibraryEntry(entry: dev.sk2andy.materialbrowser.shared.browser.BrowserLibraryEntry) = Unit
-
-    fun clearLibraryHistory() = Unit
 
     fun retryReader()
 
@@ -390,43 +330,14 @@ fun CandyBrowserApp(
         CandyTabPreviewFallback(tab = tab, modifier = modifier)
     },
 ) {
-    val readerRepository = remember(actionSink) { actionSink.createReaderLibrary() }
-    chromeEffects.browserTheme(settings = snapshot.appearanceSettings) {
-        val snooze = snapshot.snooze
-        dev.sk2andy.materialbrowser.ui.SharedSnoozeTabDialog(
-            tab = snooze?.tab,
-            onPreset = actionSink::applySnoozePreset,
-            onCustom = actionSink::customSnooze,
-            onDismiss = actionSink::dismissSnooze,
-        )
+    val readerRepository = remember { SessionReaderLibraryDataSource() }
+    chromeEffects.browserTheme {
         val reader = snapshot.reader
         val candyTrail = snapshot.candyTrail
         val candyTrailTab = candyTrail?.let { trail ->
             snapshot.tabs.firstOrNull { tab -> tab.id == trail.tabId }
         }
-        val library = snapshot.library
-        if (snooze?.isLibraryVisible == true) {
-            Surface(modifier = Modifier.fillMaxSize()) {
-                dev.sk2andy.materialbrowser.ui.SharedSnoozedTabsContent(
-                    snoozedTabs = snooze.tabs,
-                    profiles = snooze.profiles,
-                    wakeLabel = { item -> snooze.wakeTimeLabels[item.tab.id].orEmpty() },
-                    onBack = actionSink::dismissSnooze,
-                    onReschedule = actionSink::rescheduleSnoozedTab,
-                    onOpenNow = actionSink::openSnoozedTabNow,
-                    onDelete = actionSink::deleteSnoozedTab,
-                )
-            }
-        } else if (library != null) {
-            BrowserLibraryScreen(
-                snapshot = library,
-                onOpen = actionSink::openLibraryEntry,
-                onRemove = actionSink::removeLibraryEntry,
-                onRestore = actionSink::restoreLibraryEntry,
-                onClearHistory = actionSink::clearLibraryHistory,
-                onDismiss = actionSink::dismissLibrary,
-            )
-        } else if (candyTrail != null && candyTrailTab != null) {
+        if (candyTrail != null && candyTrailTab != null) {
             CandyTrailScreenContent(
                 tab = candyTrailTab.toBrowserTab(),
                 trail = candyTrail.trail,
@@ -456,7 +367,7 @@ fun CandyBrowserApp(
                 isPrivate = reader.isPrivate,
                 repository = readerRepository,
                 resources = DefaultReaderStudioResources,
-                speechFactory = actionSink::createReaderSpeech,
+                speechFactory = ::UnavailableReaderSpeech,
                 onRetry = actionSink::retryReader,
                 onDismiss = actionSink::dismissReader,
                 onOpenOriginal = actionSink::openReaderOriginal,
@@ -472,16 +383,11 @@ fun CandyBrowserApp(
                 onTabOverviewModeChanged = actionSink::changeTabOverviewMode,
                 tabListStartsAtBottom = snapshot.tabListStartsAtBottom,
                 onTabListStartsAtBottomChanged = actionSink::changeTabListStartsAtBottom,
-                dismissResistancePercent = snapshot.dismissResistancePercent,
-                onDismissResistanceChanged = actionSink::changeDismissResistancePercent,
-                appearanceSettings = snapshot.appearanceSettings,
-                onAppearanceSettingsChanged = actionSink::changeAppearanceSettings,
                 translationProvider = snapshot.translationProvider,
                 onTranslationProviderChanged = actionSink::changeTranslationProvider,
                 menuLayout = snapshot.menuLayout,
                 menuConfigurableEntries = snapshot.menuConfigurableEntries,
                 onBrowserMenuLocationChanged = actionSink::changeBrowserMenuLocation,
-                onBrowserMenuLayoutChanged = actionSink::changeBrowserMenuLayout,
                 toppings = snapshot.toppings,
                 onSaveTopping = actionSink::saveTopping,
                 toppingSource = actionSink::toppingSource,
@@ -508,9 +414,6 @@ fun CandyBrowserApp(
                     CandyBlankTab()
                 } else {
                     browserViewport()
-                }
-                if (snapshot.isBrowserMenuVisible && !snapshot.isTabOverviewVisible) {
-                    CandyBrowserMenuSheet(snapshot = snapshot, actionSink = actionSink)
                 }
                 if (showBrowserChrome && !snapshot.isTabOverviewVisible) {
                     CandyBrowserChrome(
@@ -603,7 +506,6 @@ private fun CandyTabOverview(
     var profileActionsProfileId by remember { mutableStateOf<String?>(null) }
     var profileEmojiTargetId by remember { mutableStateOf<String?>(null) }
     var profileIsolationChange by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
-    var profileDeletionTargetId by remember { mutableStateOf<String?>(null) }
     var overviewActionTargetId by remember {
         mutableStateOf(snapshot.tabs.firstOrNull(BrowserViewportTab::isSelected)?.id)
     }
@@ -613,7 +515,6 @@ private fun CandyTabOverview(
         snapshot.tabs.firstOrNull(BrowserViewportTab::isSelected) ?: snapshot.tabs.firstOrNull()
     }
     val initialTabId = initialTab?.id.orEmpty()
-    val reduceMotion = LocalCandyBrowserChromeEffects.current.reducesMotion()
     val heroProgress = remember { Animatable(0f) }
     val exitHeroProgress = remember { Animatable(0f) }
     var heroTargetBounds by remember { mutableStateOf<Rect?>(null) }
@@ -650,9 +551,7 @@ private fun CandyTabOverview(
             heroProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(
-                    durationMillis = CandyPresentationRules.animationDuration(
-                        TabOverviewHeroRules.ENTRY_DURATION_MILLIS, reduceMotion,
-                    ),
+                    durationMillis = TabOverviewHeroRules.ENTRY_DURATION_MILLIS,
                     easing = FastOutSlowInEasing,
                 ),
             )
@@ -690,9 +589,7 @@ private fun CandyTabOverview(
                 exitHeroProgress.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(
-                        durationMillis = CandyPresentationRules.animationDuration(
-                            TabOverviewHeroRules.EXIT_DURATION_MILLIS, reduceMotion,
-                        ),
+                        durationMillis = TabOverviewHeroRules.EXIT_DURATION_MILLIS,
                         easing = FastOutSlowInEasing,
                     ),
                 )
@@ -763,13 +660,12 @@ private fun CandyTabOverview(
                         translationY = (1f - chromeProgress) * -18f
                     },
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(4.dp))
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(vertical = 12.dp),
         ) {
             when (snapshot.tabOverviewMode) {
                 TabOverviewMode.Hero -> BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -805,12 +701,6 @@ private fun CandyTabOverview(
                 val layout = TabOverviewHeroRules.coverflowCardLayout(
                     viewportWidth = maxWidth.value,
                     viewportHeight = maxHeight.value,
-                    reservedHeight = (
-                        maxOf(
-                            22.dp,
-                            with(density) { MaterialTheme.typography.titleSmall.lineHeight.toDp() },
-                        ) + 16.dp + 12.dp
-                    ).value,
                 )
                 val cardWidth = layout.width.dp
                 val pageSlotWidth = cardWidth + 12.dp
@@ -825,15 +715,14 @@ private fun CandyTabOverview(
                     cardAspectRatio = layout.aspectRatio,
                     pageSlotWidth = pageSlotWidth,
                     pageHorizontalPadding = pageHorizontalPadding,
-                    topPadding = 0.dp,
-                    bottomPadding = 0.dp,
+                    topPadding = 4.dp,
+                    bottomPadding = 4.dp,
                     heroProgress = { heroProgress.value },
                     heroCompleted = heroCompleted,
                     heroVisible = entryHeroVisible,
                     rootHeightPx = rootHeightPx,
-                    dismissResistanceFraction = TabDismissPhysics.resistanceFraction(
-                        snapshot.dismissResistancePercent,
-                    ),
+                    dismissResistanceFraction =
+                        TabDismissPhysics.DEFAULT_RESISTANCE_FRACTION,
                     dismissingTabId = dismissingTabId,
                     movingTabId = null,
                     movingProgress = { 0f },
@@ -890,34 +779,30 @@ private fun CandyTabOverview(
                             titleTestTag = "tab-overview-title-${tab.id}",
                             closeTestTag = "tab-overview-close-${tab.id}",
                             favicon = { size ->
-                                LocalCandyBrowserChromeEffects.current.icon(
-                                    symbol = "globe",
-                                    fallback = Icons.Filled.Language,
+                                Icon(
+                                    imageVector = Icons.Filled.Language,
                                     contentDescription = null,
                                     modifier = Modifier.size(size),
                                 )
                             },
                             incognitoIcon = { iconModifier, tint ->
-                                LocalCandyBrowserChromeEffects.current.icon(
-                                    symbol = "hand.raised.fill",
-                                    fallback = Icons.Filled.AutoAwesome,
+                                Icon(
+                                    imageVector = Icons.Filled.AutoAwesome,
                                     contentDescription = null,
                                     modifier = iconModifier,
                                     tint = tint,
                                 )
                             },
                             blankIcon = { iconModifier ->
-                                LocalCandyBrowserChromeEffects.current.icon(
-                                    symbol = "plus",
-                                    fallback = Icons.Filled.Add,
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
                                     contentDescription = null,
                                     modifier = iconModifier,
                                 )
                             },
                             pinnedIcon = { iconModifier, tint ->
-                                LocalCandyBrowserChromeEffects.current.icon(
-                                    symbol = "pin.fill",
-                                    fallback = Icons.Filled.PushPin,
+                                Icon(
+                                    imageVector = Icons.Filled.PushPin,
                                     contentDescription = "Angeheftet",
                                     modifier = iconModifier,
                                     tint = tint,
@@ -944,7 +829,6 @@ private fun CandyTabOverview(
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag(TabOverviewChromeTestTags.HeroPager),
-                    titleAbovePreview = true,
                 )
             }
                 TabOverviewMode.Grid -> BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -986,9 +870,7 @@ private fun CandyTabOverview(
                     heroCompleted = heroCompleted,
                     heroVisible = entryHeroVisible,
                     exitHeroTabId = exitHero?.tab?.id,
-                    dismissResistanceFraction = TabDismissPhysics.resistanceFraction(
-                        snapshot.dismissResistancePercent,
-                    ),
+                    dismissResistanceFraction = TabDismissPhysics.DEFAULT_RESISTANCE_FRACTION,
                     interactionsEnabled = heroCompleted &&
                         dismissingTabId == null &&
                         tabActionsTabId == null &&
@@ -1126,10 +1008,10 @@ private fun CandyTabOverview(
             shadowElevation = 0.dp,
             bottomInset = overviewContentBottomPadding,
             newTabIcon = {
-                LocalCandyBrowserChromeEffects.current.icon("plus", Icons.Filled.Add, contentDescription = "Neuer Tab")
+                Icon(Icons.Filled.Add, contentDescription = "Neuer Tab")
             },
             moreIcon = {
-                LocalCandyBrowserChromeEffects.current.icon("ellipsis", Icons.Filled.MoreVert, contentDescription = "Mehr")
+                Icon(Icons.Filled.MoreVert, contentDescription = "Mehr")
             },
             modifier = Modifier
                 .onGloballyPositioned { coordinates ->
@@ -1229,7 +1111,7 @@ private fun CandyTabOverview(
             TabActionsMenuState(
                 tabId = tab.id,
                 pageSubtitle = tab.address.ifBlank { "Neuer Tab" },
-                canToggleFavorite = hasPage && !tab.isPrivate,
+                canToggleFavorite = hasPage,
                 isFavorite = tab.isFavorite,
                 isPinned = tab.isPinned,
                 canUsePageActions = hasPage,
@@ -1238,17 +1120,14 @@ private fun CandyTabOverview(
                 canOpenCandyTrail = hasPage,
                 canAddSiteCapsule = false,
                 canSummarize = false,
-                canSnooze = tab.canSnooze,
-                canCloseAllTabs = snapshot.tabs.any { !it.isPinned },
-                profiles = snapshot.profiles.filter { it.id in tab.moveTargetProfileIds }
-                    .map { TabActionsProfile(id = it.id, emoji = it.emoji) },
+                canSnooze = false,
+                canCloseAllTabs = false,
                 hasPinnedTabs = snapshot.tabs.any(BrowserViewportTab::isPinned),
                 menuLayout = snapshot.menuLayout,
             )
         },
         screenSize = screenSize,
         resources = CandyTabActionsMenuResources,
-        effects = LocalCandyBrowserChromeEffects.current.tabActionsMenu,
         onToggleFavorite = { tabId ->
             tabActionsTabId = null
             actionSink.performTabAction(tabId, BrowserFeatureMenuAction.ToggleFavorite)
@@ -1257,10 +1136,7 @@ private fun CandyTabOverview(
             tabActionsTabId = null
             actionSink.performTabAction(tabId, BrowserFeatureMenuAction.TogglePinned)
         },
-        onMoveToProfile = { tabId, profileId ->
-            tabActionsTabId = null
-            actionSink.moveTabToProfile(tabId, profileId)
-        },
+        onMoveToProfile = { _, _ -> },
         onAction = { tabId, action ->
             tabActionsTabId = null
             actionSink.performTabAction(tabId, action)
@@ -1268,10 +1144,7 @@ private fun CandyTabOverview(
         onDomainMutedChange = { tabId, _ ->
             actionSink.performTabAction(tabId, BrowserFeatureMenuAction.ToggleDomainMute)
         },
-        onCloseAllTabs = {
-            tabActionsTabId = null
-            actionSink.closeAllTabs()
-        },
+        onCloseAllTabs = {},
         onDismiss = { tabActionsTabId = null },
         )
 
@@ -1283,7 +1156,7 @@ private fun CandyTabOverview(
         SharedProfileActionsSheet(
             profile = actionProfile,
             copy = CandyProfileSheetCopy,
-            canDelete = actionProfile?.canDelete == true,
+            canDelete = false,
             isolationSupported = snapshot.profileIsolationSupported,
             onChangeEmoji = {
                 val target = actionProfile ?: return@SharedProfileActionsSheet
@@ -1291,10 +1164,7 @@ private fun CandyTabOverview(
                 profileEmojiTargetId = target.id
             },
             onCustomizeWallpaper = null,
-            onDelete = {
-                profileDeletionTargetId = actionProfile?.id
-                profileActionsProfileId = null
-            },
+            onDelete = null,
             onIsolationChange = { enabled ->
                 val target = actionProfile ?: return@SharedProfileActionsSheet
                 profileActionsProfileId = null
@@ -1303,28 +1173,8 @@ private fun CandyTabOverview(
             onDismiss = { profileActionsProfileId = null },
         )
 
-        profileDeletionTargetId?.let { profileId ->
-            CandyAlertDialog(
-                onDismissRequest = { profileDeletionTargetId = null },
-                title = { Text("Profil löschen?") },
-                text = { Text("Die Tabs werden in ein anderes lokales Profil verschoben. Verlauf und getrennte Website-Daten dieses Profils werden gelöscht.") },
-                confirmButton = {
-                    CandyActionButton(
-                        onClick = {
-                            profileDeletionTargetId = null
-                            actionSink.deleteProfile(profileId)
-                        },
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ) { Text("Profil löschen") }
-                },
-                dismissButton = {
-                    CandyActionButton(onClick = { profileDeletionTargetId = null }) { Text("Abbrechen") }
-                },
-            )
-        }
-
         profileIsolationChange?.let { (profileId, enabled) ->
-            CandyAlertDialog(
+            AlertDialog(
                 onDismissRequest = { profileIsolationChange = null },
                 title = { Text("Profilspeicher wechseln?") },
                 text = {
@@ -1339,8 +1189,7 @@ private fun CandyTabOverview(
                     )
                 },
                 confirmButton = {
-                    CandyActionButton(
-                        prominent = !LocalCandyBrowserChromeEffects.current.usesGroupedSettings,
+                    Button(
                         onClick = {
                             actionSink.setProfileIsolation(profileId, enabled)
                             profileIsolationChange = null
@@ -1350,7 +1199,7 @@ private fun CandyTabOverview(
                     }
                 },
                 dismissButton = {
-                    CandyActionButton(onClick = { profileIsolationChange = null }) {
+                    TextButton(onClick = { profileIsolationChange = null }) {
                         Text("Abbrechen")
                     }
                 },
@@ -1468,7 +1317,6 @@ private fun BrowserViewportTab.toBrowserTab(): BrowserTab = BrowserTab(
     title = title,
     url = address.ifBlank { BLANK_URL },
     isPinned = isPinned,
-    isIncognito = isPrivate,
 )
 
 @Composable
@@ -1485,34 +1333,30 @@ private fun candyTabOverviewVisuals(
     titleTestTag = "tab-overview-title-${tab.id}",
     closeTestTag = "tab-overview-close-${tab.id}",
     favicon = { size ->
-        LocalCandyBrowserChromeEffects.current.icon(
-            symbol = "globe",
-            fallback = Icons.Filled.Language,
+        Icon(
+            imageVector = Icons.Filled.Language,
             contentDescription = null,
             modifier = Modifier.size(size),
         )
     },
     incognitoIcon = { iconModifier, tint ->
-        LocalCandyBrowserChromeEffects.current.icon(
-            symbol = "hand.raised.fill",
-            fallback = Icons.Filled.AutoAwesome,
+        Icon(
+            imageVector = Icons.Filled.AutoAwesome,
             contentDescription = null,
             modifier = iconModifier,
             tint = tint,
         )
     },
     blankIcon = { iconModifier ->
-        LocalCandyBrowserChromeEffects.current.icon(
-            symbol = "plus",
-            fallback = Icons.Filled.Add,
+        Icon(
+            imageVector = Icons.Filled.Add,
             contentDescription = null,
             modifier = iconModifier,
         )
     },
     pinnedIcon = { iconModifier, tint ->
-        LocalCandyBrowserChromeEffects.current.icon(
-            symbol = "pin.fill",
-            fallback = Icons.Filled.PushPin,
+        Icon(
+            imageVector = Icons.Filled.PushPin,
             contentDescription = "Angeheftet",
             modifier = iconModifier,
             tint = tint,
@@ -1537,9 +1381,8 @@ internal fun CandyTabPreviewFallback(
         ),
         contentAlignment = Alignment.Center,
     ) {
-        LocalCandyBrowserChromeEffects.current.icon(
-            symbol = "globe",
-            fallback = Icons.Filled.Language,
+        Icon(
+            imageVector = Icons.Filled.Language,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(36.dp),
@@ -1777,7 +1620,7 @@ private fun CandyBrowserChrome(
             onDismissRequest = { menuExpanded = false },
             pageSubtitle = snapshot.pageTitle,
             items = snapshot.menuItems,
-            snoozedTabCount = snapshot.snoozedTabCount,
+            snoozedTabCount = 0,
             screenSize = screenSize,
             resources = CandyBrowserMainMenuResources,
             effects = chromeEffects.mainMenu,
@@ -1794,7 +1637,7 @@ private fun CandyBrowserChrome(
     }
 }
 
-internal object CandyBrowserMainMenuResources : BrowserMainMenuResources {
+private object CandyBrowserMainMenuResources : BrowserMainMenuResources {
     @Composable
     override fun title(): String = "Menü"
 
@@ -1885,9 +1728,7 @@ private object CandyTabActionsMenuResources : TabActionsMenuResources {
         modifier: Modifier,
     ) {
         if (action == BrowserFeatureMenuAction.CloseTab) {
-            LocalCandyBrowserChromeEffects.current.icon(
-                "trash", Icons.Filled.DeleteOutline, contentDescription = null, modifier = modifier,
-            )
+            Icon(Icons.Filled.DeleteOutline, contentDescription = null, modifier = modifier)
         } else {
             BrowserMenuActionIcon(
                 action = action,
@@ -1921,15 +1762,6 @@ private val candyBrowserTrailStrings = CandyTrailStrings(
     zoomOut = "Verkleinern",
     resetZoom = "Zoom zurücksetzen",
     zoomIn = "Vergrößern",
-    fitAll = "Alles zeigen",
-    currentPage = "Aktuelle Seite",
-    graphView = "Graph",
-    listView = "Liste",
-    focusRoute = "Aktuellen Pfad fokussieren",
-    allBranches = "Alle Abzweigungen zeigen",
-    collapseBranch = "Nebenäste einklappen",
-    expandBranch = "Nebenäste aufklappen",
-    hiddenPages = { count -> "$count ausgeblendet" },
 )
 
 @Composable
@@ -1958,22 +1790,17 @@ private fun BrowserMenuActionIcon(
         BrowserFeatureMenuAction.ParkAddressBarRight,
         BrowserFeatureMenuAction.DockAddressBar,
         -> Icons.Filled.ChevronRight
-        BrowserFeatureMenuAction.OpenFeeds -> Icons.Filled.MenuBook
-        BrowserFeatureMenuAction.OpenLibrary -> Icons.Filled.MenuBook
-        BrowserFeatureMenuAction.DiscoverFeeds -> Icons.Filled.Search
-        BrowserFeatureMenuAction.OpenReader -> Icons.Filled.MenuBook
-        BrowserFeatureMenuAction.OpenWebAnnotations -> Icons.Filled.MenuBook
+        BrowserFeatureMenuAction.OpenReader,
+        BrowserFeatureMenuAction.OpenWebAnnotations,
+        -> Icons.Filled.MenuBook
         BrowserFeatureMenuAction.TranslatePage -> Icons.Filled.Translate
         BrowserFeatureMenuAction.FindInPage -> Icons.Filled.Search
         BrowserFeatureMenuAction.Share -> Icons.Filled.Share
         BrowserFeatureMenuAction.OpenExternal -> Icons.Filled.OpenInNew
         BrowserFeatureMenuAction.Print -> Icons.Filled.Print
         BrowserFeatureMenuAction.ToggleDomainMute -> Icons.Filled.VolumeOff
-        BrowserFeatureMenuAction.ToggleStatusBarScroll -> Icons.Filled.Settings
         BrowserFeatureMenuAction.OpenCandyTrail -> Icons.Filled.Route
-        BrowserFeatureMenuAction.OpenConstellations -> Icons.Filled.Route
         BrowserFeatureMenuAction.AddSiteCapsule -> Icons.Filled.AddToHomeScreen
-        BrowserFeatureMenuAction.CreateSiteWidget -> Icons.Filled.AddToHomeScreen
         BrowserFeatureMenuAction.OpenFavorites -> Icons.Filled.Star
         BrowserFeatureMenuAction.OpenDownloads -> Icons.Filled.Download
         BrowserFeatureMenuAction.OpenHistory -> Icons.Filled.History
@@ -1986,58 +1813,17 @@ private fun BrowserMenuActionIcon(
         BrowserFeatureMenuAction.InvokeToppingCommand,
         -> Icons.Filled.Extension
         BrowserFeatureMenuAction.ToggleDesktopView -> Icons.Filled.DesktopWindows
+        BrowserFeatureMenuAction.ToggleAllAdBlockers,
         BrowserFeatureMenuAction.ToggleCookieBannerRemoval,
         BrowserFeatureMenuAction.ToggleForceVerticalScrolling,
         BrowserFeatureMenuAction.ToggleForcePageZooming,
         BrowserFeatureMenuAction.ToggleForceSafeArea,
+        BrowserFeatureMenuAction.ToggleVideoDetectionRedirect,
+        BrowserFeatureMenuAction.ToggleStatusBarScroll,
         -> Icons.Filled.Settings
         BrowserFeatureMenuAction.ToggleAlwaysBlockPopups -> Icons.Filled.Block
     }
-    val symbol = when (action) {
-        BrowserFeatureMenuAction.Back -> "chevron.left"
-        BrowserFeatureMenuAction.Forward -> "chevron.right"
-        BrowserFeatureMenuAction.Reload -> "arrow.clockwise"
-        BrowserFeatureMenuAction.Stop -> "xmark"
-        BrowserFeatureMenuAction.ToggleFavorite -> if (useFilledVariant) "star.fill" else "star"
-        BrowserFeatureMenuAction.TogglePinned -> if (useFilledVariant) "pin.fill" else "pin"
-        BrowserFeatureMenuAction.ShowTabs -> "square.on.square"
-        BrowserFeatureMenuAction.NewTab -> "plus"
-        BrowserFeatureMenuAction.DuplicateTab -> "doc.on.doc"
-        BrowserFeatureMenuAction.CloseTab -> "xmark.circle"
-        BrowserFeatureMenuAction.OpenFeeds -> "dot.radiowaves.up.forward"
-        BrowserFeatureMenuAction.OpenLibrary -> "books.vertical"
-        BrowserFeatureMenuAction.DiscoverFeeds -> "magnifyingglass"
-        BrowserFeatureMenuAction.OpenReader -> "book.closed"
-        BrowserFeatureMenuAction.OpenWebAnnotations -> "highlighter"
-        BrowserFeatureMenuAction.TranslatePage -> "character.book.closed"
-        BrowserFeatureMenuAction.FindInPage -> "magnifyingglass"
-        BrowserFeatureMenuAction.Share -> "square.and.arrow.up"
-        BrowserFeatureMenuAction.OpenExternal -> "arrow.up.right.square"
-        BrowserFeatureMenuAction.Print -> "printer"
-        BrowserFeatureMenuAction.ToggleDomainMute -> "speaker.slash"
-        BrowserFeatureMenuAction.ToggleStatusBarScroll -> "arrow.up.to.line"
-        BrowserFeatureMenuAction.OpenCandyTrail -> "point.topleft.down.curvedto.point.bottomright.up"
-        BrowserFeatureMenuAction.OpenConstellations -> "point.topleft.down.curvedto.point.bottomright.up"
-        BrowserFeatureMenuAction.AddSiteCapsule, BrowserFeatureMenuAction.CreateSiteWidget -> "shippingbox"
-        BrowserFeatureMenuAction.OpenFavorites -> "star"
-        BrowserFeatureMenuAction.OpenDownloads -> "arrow.down.circle"
-        BrowserFeatureMenuAction.OpenHistory -> "clock.arrow.circlepath"
-        BrowserFeatureMenuAction.OpenSettings -> "gearshape"
-        BrowserFeatureMenuAction.Summarize -> "text.alignleft"
-        BrowserFeatureMenuAction.SnoozeTab, BrowserFeatureMenuAction.OpenSnoozedTabs -> "moon.zzz"
-        BrowserFeatureMenuAction.OpenFirefoxExtensions -> "puzzlepiece.extension"
-        BrowserFeatureMenuAction.InvokeToppingCommand -> "wand.and.stars"
-        BrowserFeatureMenuAction.ToggleDesktopView -> "desktopcomputer"
-        BrowserFeatureMenuAction.ToggleCookieBannerRemoval -> "hand.raised"
-        BrowserFeatureMenuAction.ToggleForceVerticalScrolling -> "arrow.up.and.down"
-        BrowserFeatureMenuAction.ToggleForcePageZooming -> "plus.magnifyingglass"
-        BrowserFeatureMenuAction.ToggleForceSafeArea -> "rectangle.inset.filled"
-        BrowserFeatureMenuAction.ToggleAlwaysBlockPopups -> "macwindow.badge.xmark"
-        BrowserFeatureMenuAction.ParkAddressBarRight, BrowserFeatureMenuAction.DockAddressBar -> "dock.rectangle"
-    }
-    LocalCandyBrowserChromeEffects.current.icon(
-        symbol = symbol, fallback = imageVector, contentDescription = null, modifier = modifier,
-    )
+    Icon(imageVector = imageVector, contentDescription = null, modifier = modifier)
 }
 
 private fun BrowserFeatureMenuSection.localizedTitle(): String = when (this) {
@@ -2046,7 +1832,6 @@ private fun BrowserFeatureMenuSection.localizedTitle(): String = when (this) {
     BrowserFeatureMenuSection.Toppings -> "Toppings"
     BrowserFeatureMenuSection.Candy -> "Candy"
     BrowserFeatureMenuSection.Browser -> "Browser"
-    BrowserFeatureMenuSection.Reading -> "Lesen & sammeln"
 }
 
 private fun BrowserFeatureMenuItem.localizedLabel(): String = dynamicLabel ?: when (labelKey) {
@@ -2063,30 +1848,27 @@ private fun BrowserFeatureMenuItem.localizedLabel(): String = dynamicLabel ?: wh
     BrowserFeatureMenuLabelKey.DuplicateTab -> "Tab duplizieren"
     BrowserFeatureMenuLabelKey.CloseTab -> "Tab schließen"
     BrowserFeatureMenuLabelKey.ParkAddressBarRight -> "Adressleiste rechts parken"
-    BrowserFeatureMenuLabelKey.Feeds -> "Feeds"
-    BrowserFeatureMenuLabelKey.Library -> "Bibliothek"
-    BrowserFeatureMenuLabelKey.DiscoverFeeds -> "Feeds entdecken"
     BrowserFeatureMenuLabelKey.Reader -> "Lesemodus"
+    BrowserFeatureMenuLabelKey.WebAnnotations -> "Highlights & notes"
     BrowserFeatureMenuLabelKey.Translate -> "Übersetzen"
     BrowserFeatureMenuLabelKey.FindInPage -> "Auf Seite suchen"
     BrowserFeatureMenuLabelKey.Share -> "Teilen"
     BrowserFeatureMenuLabelKey.OpenExternal -> "Extern öffnen"
     BrowserFeatureMenuLabelKey.Print -> "Drucken"
+    BrowserFeatureMenuLabelKey.AllAdBlockers -> "Alle Werbeblocker"
     BrowserFeatureMenuLabelKey.CookieBannerRemoval -> "Cookie-Banner entfernen"
     BrowserFeatureMenuLabelKey.ForceVerticalScrolling -> "Vertikales Scrollen erzwingen"
     BrowserFeatureMenuLabelKey.ForcePageZooming -> "Seitenzoom erzwingen"
     BrowserFeatureMenuLabelKey.ForceSafeArea -> "Safe Area erzwingen"
+    BrowserFeatureMenuLabelKey.VideoDetectionRedirect -> "Video-Player-Weiterleitung"
     BrowserFeatureMenuLabelKey.AlwaysBlockPopups -> "Pop-ups immer blockieren"
     BrowserFeatureMenuLabelKey.DesktopView -> "Desktop-Ansicht"
     BrowserFeatureMenuLabelKey.MuteDomain -> "Domain stummschalten"
     BrowserFeatureMenuLabelKey.UnmuteDomain -> "Domain aktivieren"
-    BrowserFeatureMenuLabelKey.EnableStatusBarScrollForDomain -> "Statusleisten-Tipp zum Seitenanfang aktivieren"
-    BrowserFeatureMenuLabelKey.DisableStatusBarScrollForDomain -> "Statusleisten-Tipp zum Seitenanfang deaktivieren"
+    BrowserFeatureMenuLabelKey.EnableStatusBarScrollForDomain -> "Statusleisten-Tipp aktivieren"
+    BrowserFeatureMenuLabelKey.DisableStatusBarScrollForDomain -> "Statusleisten-Tipp deaktivieren"
     BrowserFeatureMenuLabelKey.CandyTrail -> "Candy Trail"
-    BrowserFeatureMenuLabelKey.Constellations -> "Candy Constellations"
-    BrowserFeatureMenuLabelKey.WebAnnotations -> "Highlights & notes"
     BrowserFeatureMenuLabelKey.AddSiteCapsule -> "Site Capsule hinzufügen"
-    BrowserFeatureMenuLabelKey.CreateSiteWidget -> "Website-Widget"
     BrowserFeatureMenuLabelKey.Summarize -> "Zusammenfassen"
     BrowserFeatureMenuLabelKey.SnoozeTab -> "Tab schlummern"
     BrowserFeatureMenuLabelKey.DockAddressBar -> "Adressleiste andocken"

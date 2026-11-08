@@ -15,7 +15,7 @@ class StartupAddressFocusModeTest {
     fun `missing and unknown ids preserve previous behavior`() {
         listOf(null, "unknown").forEach { value ->
             assertEquals(
-                StartupAddressFocusMode.WhenStartupAnimationDisabled,
+                StartupAddressFocusMode.Never,
                 StartupAddressFocusMode.fromStableId(value),
             )
         }

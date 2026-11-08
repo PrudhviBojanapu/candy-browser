@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.SearchShortcut
 import dev.sk2andy.materialbrowser.browser.SearchShortcutRules
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceDivider
+import dev.sk2andy.materialbrowser.shared.ui.settings.SettingsPreferenceGroup
 import dev.sk2andy.materialbrowser.shared.ui.settings.settingsSearchTarget
 
 internal object SearchShortcutsSettingsTestTags {

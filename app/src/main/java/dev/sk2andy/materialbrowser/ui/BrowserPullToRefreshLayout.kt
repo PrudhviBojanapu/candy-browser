@@ -39,6 +39,10 @@ internal class BrowserPullToRefreshLayout(
         )
         setOnChildScrollUpCallback { _, _ -> canContentScrollUp() }
         setOnRefreshListener {
+            performHapticFeedback(
+                android.view.HapticFeedbackConstants.CLOCK_TICK,
+                android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING,
+            )
             val accepted = isEnabled && (gestureOnRefresh ?: onRefresh)()
             gestureOnRefresh = null
             if (!accepted) isRefreshing = false

@@ -32,5 +32,5 @@ internal object AddressBarControlRules {
         editing: Boolean,
         addressFieldFocused: Boolean,
         imeVisible: Boolean,
-    ): Boolean = editing && addressFieldFocused && imeVisible
+    ): Boolean = editing
 }

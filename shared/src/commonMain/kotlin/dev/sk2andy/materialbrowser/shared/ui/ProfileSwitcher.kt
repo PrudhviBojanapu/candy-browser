@@ -6,7 +6,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -34,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,7 +65,6 @@ data class BrowserViewportProfile(
     val syncedIconEmoji: String? = null,
     val syncedIconAccentHue: Int? = null,
     val isSyncLinked: Boolean = false,
-    val canDelete: Boolean = false,
 )
 
 object ProfileSwitcherTestTags {
@@ -86,16 +85,13 @@ fun ProfileSwitcher(
     onLongClick: (String) -> Unit,
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
-    onAddLongClick: (() -> Unit)? = null,
-    onAddLongClickLabel: String? = null,
     profileDescription: String = "Profil",
     editProfileDescription: String = "Profil bearbeiten",
     addProfileDescription: String = "Profil hinzufügen",
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f),
     addIcon: @Composable (Boolean) -> Unit = { isEnabled ->
-        LocalCandyBrowserChromeEffects.current.icon(
-            symbol = "plus",
-            fallback = Icons.Default.Add,
+        Icon(
+            imageVector = Icons.Default.Add,
             contentDescription = addProfileDescription,
             tint = if (isEnabled) {
                 MaterialTheme.colorScheme.primary
@@ -105,13 +101,11 @@ fun ProfileSwitcher(
         )
     },
 ) {
-    val effects = LocalCandyBrowserChromeEffects.current
-    val reduceMotion = effects.reducesMotion()
     val scrollState = rememberScrollState()
     val activeIndex = profiles.indexOfFirst { it.id == activeProfileId }.coerceAtLeast(0)
     val indicatorSlotOffset by animateDpAsState(
         targetValue = (activeIndex * PROFILE_SLOT_WIDTH).dp,
-        animationSpec = if (reduceMotion) snap() else spring(dampingRatio = 0.72f, stiffness = 430f),
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 430f),
         label = "profile-indicator-offset",
     )
     BoxWithConstraints(
@@ -138,17 +132,16 @@ fun ProfileSwitcher(
                 else -> scrollState.value
             }.coerceIn(0, scrollState.maxValue)
             if (targetScroll != scrollState.value) {
-                if (reduceMotion) scrollState.scrollTo(targetScroll) else scrollState.animateScrollTo(targetScroll)
+                scrollState.animateScrollTo(targetScroll)
             }
         }
-        effects.floatingSurface(
+        Surface(
             modifier = Modifier
                 .testTag(ProfileSwitcherTestTags.Switcher)
                 .width(barWidth)
                 .height(60.dp),
             shape = MaterialTheme.shapes.extraLarge,
             color = containerColor,
-            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
             shadowElevation = 4.dp,
         ) {
@@ -185,17 +178,17 @@ fun ProfileSwitcher(
                                         isSelected -> MaterialTheme.colorScheme.primaryContainer
                                         else -> MaterialTheme.colorScheme.surfaceContainerHighest
                                     },
-                                    animationSpec = tween(durationMillis = CandyPresentationRules.animationDuration(180, reduceMotion)),
+                                    animationSpec = tween(durationMillis = 180),
                                     label = "profile-container-color",
                                 )
                                 val profileElevation by animateDpAsState(
                                     targetValue = if (isSelected) 2.dp else 0.dp,
-                                    animationSpec = tween(durationMillis = CandyPresentationRules.animationDuration(180, reduceMotion)),
+                                    animationSpec = tween(durationMillis = 180),
                                     label = "profile-container-elevation",
                                 )
                                 val profileContainerSize by animateDpAsState(
                                     targetValue = if (isSelected) 48.dp else 44.dp,
-                                    animationSpec = if (reduceMotion) snap() else spring(
+                                    animationSpec = spring(
                                         dampingRatio = 0.72f,
                                         stiffness = 430f,
                                     ),
@@ -203,7 +196,7 @@ fun ProfileSwitcher(
                                 )
                                 val scale by animateFloatAsState(
                                     targetValue = if (isSelected) 1.02f else 0.92f,
-                                    animationSpec = if (reduceMotion) snap() else spring(
+                                    animationSpec = spring(
                                         dampingRatio = 0.68f,
                                         stiffness = 540f,
                                     ),
@@ -241,8 +234,7 @@ fun ProfileSwitcher(
                                     AnimatedContent(
                                         targetState = profile.syncedIconEmoji ?: profile.emoji,
                                         transitionSpec = {
-                                            fadeIn(tween(CandyPresentationRules.animationDuration(150, reduceMotion))) togetherWith
-                                                fadeOut(tween(CandyPresentationRules.animationDuration(90, reduceMotion)))
+                                            fadeIn(tween(150)) togetherWith fadeOut(tween(90))
                                         },
                                         label = "profile-emoji",
                                     ) { emoji ->
@@ -322,19 +314,12 @@ fun ProfileSwitcher(
                         ),
                         tonalElevation = 1.dp,
                     ) {}
-                    Box(
+                    IconButton(
+                        onClick = onAdd,
+                        enabled = enabled,
                         modifier = Modifier
                             .size(52.dp)
-                            .testTag(ProfileSwitcherTestTags.Add)
-                            .clip(CircleShape)
-                            .combinedClickable(
-                                enabled = enabled,
-                                role = Role.Button,
-                                onClick = onAdd,
-                                onLongClick = onAddLongClick,
-                                onLongClickLabel = onAddLongClickLabel,
-                            ),
-                        contentAlignment = Alignment.Center,
+                            .testTag(ProfileSwitcherTestTags.Add),
                     ) {
                         addIcon(enabled)
                     }

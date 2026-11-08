@@ -10,8 +10,6 @@ internal enum class AppIconOption(
     val aliasName: String,
 ) {
     Classic("LauncherIconClassic"),
-    OutlineLight("LauncherIconOutlineLight"),
-    OutlineDark("LauncherIconOutlineDark"),
     Cookie("LauncherIconCookie"),
     CookieMaxed("LauncherIconCookieMaxed"),
     CottonCandy("LauncherIconCottonCandy"),

@@ -15,8 +15,6 @@ internal data class DownloadEntry(
     val mime: String,
     val supportsPause: Boolean = false,
     val supportsCancel: Boolean = id >= 0L,
-    val sourceProfileId: String? = null,
-    val isPrivate: Boolean = false,
 )
 
 internal enum class DownloadStatus(val isActive: Boolean) {
@@ -90,12 +88,4 @@ internal object DownloadHistoryRules {
         }
         return earliestDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
     }
-}
-
-internal object DownloadSourceRules {
-    fun canOpenSource(entry: DownloadEntry): Boolean =
-        !entry.isPrivate &&
-            entry.sourceProfileId == null &&
-            (entry.status == DownloadStatus.Failed || entry.status == DownloadStatus.Cancelled) &&
-            SafeDownloadValues.isHttpUrl(entry.source)
 }
